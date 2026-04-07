@@ -6,13 +6,13 @@ import re, requests, unicodedata, simplekml, io, json
 from streamlit_gsheets import GSheetsConnection
 
 # --- CONFIGURACIÓN ---
-st.set_page_config(page_title="SF PANGEA v4.5.3", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.5.4", layout="wide")
 
 BASE_COORDS = (19.291395219739588, -99.63555838631413)
 URL_HOJA = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3PKHzeJSbMwxUm8/edit#gid=0"
 NOMBRE_HOJA = "Sheet1" 
 
-# --- FUNCIONES LÓGICAS ---
+# --- LÓGICA DE PROCESAMIENTO ---
 def normalizar(t):
     return "".join(c for c in unicodedata.normalize('NFD', str(t)) if unicodedata.category(c) != 'Mn').lower()
 
@@ -29,26 +29,23 @@ def extraer_carga(p_dict, tipo):
     return int(m.group(1)) if m else 0
 
 # --- INTERFAZ ---
-st.title("🚀 SF PANGEA - Gestión de Rutas Toluca")
+st.title("🚀 SF PANGEA - Alumbrado Público Toluca")
 
-tab1, tab2 = st.tabs(["🆕 Generar Productos", "📂 Historial y My Maps"])
+tab1, tab2 = st.tabs(["🆕 Generador de Rutas", "📂 Historial y My Maps"])
 
 with tab1:
-    up = st.file_uploader("Subir Reporte (Excel/CSV)", type=["csv", "xlsx"])
+    up = st.file_uploader("Subir Reporte de Campo (Excel/CSV)", type=["csv", "xlsx"])
     if up:
         try:
             df_raw = pd.read_excel(up) if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin1')
             res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-            df_raw['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
-            df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
+            df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
             df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
 
             if not df_v.empty:
-                # LÓGICA DE RUTA: Punto 1 = El más lejano
+                # LÓGICA PUNTO 1 MÁS LEJANO
                 pts = df_v.to_dict('records')
-                coords_array = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
-                idx_lejano = np.argmax(cdist([BASE_COORDS], coords_array)[0])
-                
+                idx_lejano = np.argmax(cdist([BASE_COORDS], np.array([[p['lat_aux'], p['lon_aux']] for p in pts]))[0])
                 ordenados = [pts.pop(idx_lejano)]
                 while pts:
                     rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
@@ -61,49 +58,55 @@ with tab1:
                     df_f.at[i, 'Cant_Luminarias'] = extraer_carga(r, 'lum') or 1
                     df_f.at[i, 'ID_Pangea'] = r.get('FOLIO', r.get('ID', 'S/N'))
 
-                st.success(f"✅ Optimizada: {len(df_f)} puntos. Inicio en el punto más lejano.")
+                st.success(f"✅ {len(df_f)} puntos procesados. El Punto 1 inicia en la zona más alejada.")
 
-                # CONTENEDOR DE DESCARGAS
-                with st.container(border=True):
-                    st.write("### ⬇️ Descargar Archivos para My Maps")
+                # PANEL DE DESCARGAS
+                with st.expander("📥 DESCARGAR INSUMOS AHORA", expanded=True):
                     c1, c2, c3 = st.columns(3)
                     
-                    # CORRECCIÓN KML: simplekml.Kml() con minúsculas
                     kml_obj = simplekml.Kml()
                     for _, p in df_f.iterrows():
                         kml_obj.newpoint(name=f"{int(p['No_Ruta'])}-{p['ID_Pangea']}", coords=[(p['lon_aux'], p['lat_aux'])])
                     
-                    c1.download_button("📥 KML", kml_obj.kml(), file_name=f"{up.name}.kml", use_container_width=True)
-                    c2.download_button("📊 CSV", df_f.to_csv(index=False).encode('utf-8-sig'), file_name=f"{up.name}.csv", use_container_width=True)
+                    c1.download_button("📥 Archivo KML", kml_obj.kml(), file_name=f"{up.name}.kml", use_container_width=True)
+                    c2.download_button("📊 Archivo CSV", df_f.to_csv(index=False).encode('utf-8-sig'), file_name=f"{up.name}.csv", use_container_width=True)
                     
                     buf = io.BytesIO()
                     with pd.ExcelWriter(buf, engine='openpyxl') as w: df_f.to_excel(w, index=False)
-                    c3.download_button("📗 Excel", buf.getvalue(), file_name=f"{up.name}.xlsx", use_container_width=True)
+                    c3.download_button("📗 Archivo Excel", buf.getvalue(), file_name=f"{up.name}.xlsx", use_container_width=True)
 
-                if st.button("💾 Guardar en Bitácora Virtual"):
+                if st.button("💾 REGISTRAR EN BITÁCORA GOOGLE SHEETS"):
                     try:
                         conn = st.connection("gsheets", type=GSheetsConnection)
                         hist = conn.read(spreadsheet=URL_HOJA, worksheet=NOMBRE_HOJA, ttl=0)
-                        nueva = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y"), "Nombre_Ruta": up.name, "Usuario_Genera": "ADMIN_PANGEA", "Datos_JSON": f"{len(df_f)} pts"}])
+                        nueva = pd.DataFrame([{
+                            "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y"), 
+                            "Nombre_Ruta": up.name, 
+                            "Usuario_Genera": "OPERADOR_SF", 
+                            "Datos_JSON": f"{len(df_f)} puntos extraídos"
+                        }])
                         conn.update(spreadsheet=URL_HOJA, worksheet=NOMBRE_HOJA, data=pd.concat([hist, nueva], ignore_index=True))
-                        st.success(f"Guardado correctamente en {NOMBRE_HOJA}")
-                    except Exception as e: st.error(f"Error de conexión: {e}")
+                        st.balloons()
+                        st.success(f"¡Sincronizado con éxito en {NOMBRE_HOJA}!")
+                    except Exception as e: st.error(f"Error de red: {e}")
             else:
-                st.warning("No se detectaron coordenadas GPS en el archivo.")
-        except Exception as e:
-            st.error(f"Error procesando el archivo: {e}")
+                st.warning("No se encontraron coordenadas GPS válidas.")
+        except Exception as e: st.error(f"Error en archivo: {e}")
 
 with tab2:
-    st.subheader("📂 Repositorio de Rutas Generadas")
-    # URL de My Maps corregida
-    st.link_button("🗺️ ABRIR GOOGLE MY MAPS", "https://www.google.com/maps/d/", type="primary")
+    st.subheader("📂 Bitácora Histórica de Mapas")
+    st.link_button("🗺️ IR A GOOGLE MY MAPS (NUEVO MAPA)", "https://www.google.com/maps/d/u/0/create", type="primary")
     
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         historial = conn.read(spreadsheet=URL_HOJA, worksheet=NOMBRE_HOJA, ttl=0)
-        busqueda = st.text_input("🔍 Buscar por nombre o fecha...")
+        
+        busqueda = st.text_input("🔍 Buscar ruta por nombre, fecha o folio...")
         if busqueda:
             historial = historial[historial.astype(str).apply(lambda x: x.str.contains(busqueda, case=False)).any(axis=1)]
-        st.dataframe(historial, use_container_width=True)
+        
+        st.write("---")
+        st.dataframe(historial.sort_index(ascending=False), use_container_width=True)
+        
     except:
-        st.info("Conexión con Google Sheets pendiente o tabla vacía.")
+        st.info("Aún no hay registros en la bitácora o la conexión está cargando...")
