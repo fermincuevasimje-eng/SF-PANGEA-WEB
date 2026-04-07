@@ -14,7 +14,7 @@ URL_HOJA = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw
 NOMBRE_HOJA = "Sheet1"
 T_UNIDAD_MIN, V_CIU = 20, 25 
 
-# --- FUNCIONES DEL MOTOR ---
+# --- FUNCIONES DEL MOTOR (Basadas en v4.3.3) ---
 def get_real_route(coords_list):
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
@@ -46,7 +46,7 @@ def extraer_carga_robusta(punto_dict, tipo):
     m = re.search(patrones[tipo], t_norm)
     return int(m.group(1)) if m else 0
 
-# --- LOGIN ---
+# --- CONTROL DE ACCESO ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
@@ -59,21 +59,23 @@ if not st.session_state.autenticado:
             st.rerun()
 else:
     st.title("🚀 SF PANGEA - Dirección de Alumbrado")
-    tab1, tab2 = st.tabs(["🆕 Generar Ruta", "📂 Historial"])
+    tab1, tab2 = st.tabs(["🆕 Generar Ruta", "📂 Historial de Bitácora"])
 
     with tab1:
         up = st.file_uploader("Subir Reporte (Excel/CSV)", type=["csv", "xlsx"])
         if up:
             try:
+                # Lectura de datos
                 df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
                 id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                 
+                # Detección GPS
                 res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                 df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
                 df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
 
                 if not df_v.empty:
-                    # PROXIMIDAD (Inicio lejano)
+                    # Lógica de proximidad (Punto 1 más lejano de la base)
                     pts = df_v.to_dict('records')
                     idx_lejano = np.argmax(cdist([BASE_COORDS], np.array([[p['lat_aux'], p['lon_aux']] for p in pts]))[0])
                     ordenados = [pts.pop(idx_lejano)]
@@ -82,7 +84,7 @@ else:
                         idx = np.argmin(cdist([(ordenados[-1]['lat_aux'], ordenados[-1]['lon_aux'])], rest))
                         ordenados.append(pts.pop(idx))
 
-                    # RUTA Y CÁLCULOS
+                    # Trazado vial OSRM y cálculos operativos
                     route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
                     geo_trazo, dist_real_km = get_real_route(route_coords)
                     if not dist_real_km: dist_real_km = (len(ordenados) + 1) * 1.3
@@ -92,18 +94,18 @@ else:
                         p['Cant_Luminarias'] = extraer_carga_robusta(p, 'lum') or (1 if extraer_carga_robusta(p, 'poste')==0 and extraer_carga_robusta(p, 'cable')==0 else 0)
                         p['Cant_Postes'] = extraer_carga_robusta(p, 'poste')
                         p['Cant_Cable_m'] = extraer_carga_robusta(p, 'cable')
-                        p['Maps'] = f"http://maps.google.com/?q={p['lat_aux']},{p['lon_aux']}"
+                        p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
 
+                    # Totales para el Resumen
                     tl, tp, tc = sum(x['Cant_Luminarias'] for x in ordenados), sum(x['Cant_Postes'] for x in ordenados), sum(x['Cant_Cable_m'] for x in ordenados)
                     tm = ((tl + tp) * T_UNIDAD_MIN) + ((dist_real_km / V_CIU) * 60)
                     tstr = f"{int(tm//60)}h {int(tm%60)}min"
 
-                    # DATA EXPORT
+                    # Generación de DataFrame para Exportar
                     df_f = pd.DataFrame(ordenados)
                     vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                     cols_orig = [c for c in df_f.columns if c not in vits + ['lat_aux','lon_aux', id_col]]
                     
-                    # --- RESUMEN OPERATIVO COMPLETO ---
                     df_resumen = pd.DataFrame([
                         {'No_Ruta': '---', 'ID_Pangea_Nombre': '--- RESUMEN OPERATIVO ---'},
                         {'No_Ruta': 'Total Puntos:', 'ID_Pangea_Nombre': len(ordenados)},
@@ -115,12 +117,13 @@ else:
                     ])
                     df_final_export = pd.concat([df_f[vits + cols_orig], df_resumen], ignore_index=True)
 
-                    st.success(f"✅ Ruta Generada: {len(df_f)} puntos con trazo vial.")
+                    st.success(f"✅ Ruta Optimizada: {len(df_f)} puntos procesados correctamente.")
 
-                    # --- DESCARGAS ---
-                    c1, c2, c3 = st.columns(3)
+                    # --- GESTIÓN DE SALIDA (4 BOTONES) ---
+                    st.write("### ⬇️ Descargar y Visualizar")
+                    c1, c2, c3, c4 = st.columns(4)
 
-                    # EXCEL CON COLORES
+                    # 1. Excel Pro (Con Colores)
                     buf_xlsx = io.BytesIO()
                     with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                         df_final_export.to_excel(writer, index=False, sheet_name='Ruta')
@@ -133,56 +136,59 @@ else:
                                 elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                     for cell in ws[r]: cell.fill = fa
                             except: pass
-                    c1.download_button("📗 Excel Pro", buf_xlsx.getvalue(), file_name=f"{up.name}_PANGEA.xlsx")
+                    c1.download_button("📗 Excel Pro", buf_xlsx.getvalue(), file_name=f"{up.name}_PANGEA.xlsx", use_container_width=True)
 
-                    # CSV
-                    c2.download_button("📊 CSV Completo", df_final_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"{up.name}_PANGEA.csv")
+                    # 2. CSV Completo
+                    c2.download_button("📊 CSV Completo", df_final_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"{up.name}_PANGEA.csv", use_container_width=True)
 
-                    # KML CON DESGLOSE Y RESUMEN
+                    # 3. KML Maestro (Con Desglose y Trazo)
                     kml = simplekml.Kml()
                     fld = kml.newfolder(name="SF PANGEA")
                     if geo_trazo:
                         ls = fld.newlinestring(name="Trayectoria Vial", coords=geo_trazo)
-                        ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff'
+                        ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff' # Rojo
                     
                     for p in ordenados:
                         pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                        # Construcción de Tabla HTML para el KML
                         h = f"<![CDATA[<table border='1' style='font-size:11px; border-collapse:collapse; width:320px;'>"
                         h += f"<tr><td bgcolor='#f2f2f2' width='120'><b>No. Ruta</b></td><td><b>{p['No_Ruta']}</b></td></tr>"
                         for col in df_raw.columns:
                             if col not in ['lat_aux', 'lon_aux'] and str(p.get(col, "")).strip() != "":
                                 h += f"<tr><td bgcolor='#f2f2f2'><b>{col}</b></td><td>{p[col]}</td></tr>"
-                        
-                        # DESGLOSE
+                        # Desglose de materiales
                         h += f"<tr><td colspan='2' bgcolor='#333' style='color:white; text-align:center;'><b>DESGLOSE DE MATERIALES</b></td></tr>"
                         h += f"<tr><td><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                         h += f"<tr><td><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                         h += f"<tr><td><b>Cable (m):</b></td><td>{p['Cant_Cable_m']}</td></tr>"
-                        
-                        # RESUMEN COMPLETO (Recuperado)
+                        # Resumen Operativo completo en el punto
                         h += f"<tr><td colspan='2' bgcolor='#004d40' style='color:white; text-align:center;'><b>RESUMEN OPERATIVO</b></td></tr>"
-                        h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
                         h += f"<tr><td><b>Total Lums:</b></td><td>{tl}</td></tr>"
                         h += f"<tr><td><b>Total Postes:</b></td><td>{tp}</td></tr>"
-                        h += f"<tr><td><b>Distancia:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                        h += f"<tr><td><b>Distancia Ruta:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
                         h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tstr}</td></tr>"
                         h += f"</table>]]>"
                         pnt.description = h
-                    c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"{up.name}_PANGEA.kml")
+                    
+                    c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"{up.name}_PANGEA.kml", use_container_width=True)
 
-                    if st.button("💾 REGISTRAR EN SHEET"):
+                    # 4. Acceso Directo a My Maps
+                    c4.link_button("🚀 Abrir My Maps", "https://www.google.com/maps/d/u/0/create", use_container_width=True, type="primary")
+
+                    if st.button("💾 REGISTRAR EN BITÁCORA"):
                         try:
                             conn = st.connection("gsheets", type=GSheetsConnection)
                             hist = conn.read(spreadsheet=URL_HOJA, worksheet=NOMBRE_HOJA, ttl=0)
-                            nueva = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Puntos": len(df_f)}])
+                            nueva = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Puntos": len(df_f), "Distancia": round(dist_real_km,2)}])
                             conn.update(spreadsheet=URL_HOJA, worksheet=NOMBRE_HOJA, data=pd.concat([hist, nueva], ignore_index=True))
-                            st.balloons(); st.success("Sincronizado.")
-                        except: st.error("Error GSheets.")
+                            st.balloons(); st.success("Sincronizado con GSheets.")
+                        except: st.error("Error al conectar con la bitácora.")
 
-            except Exception as e: st.error(f"Error: {e}")
+            except Exception as e: st.error(f"Error procesando el archivo: {e}")
 
     with tab2:
         try:
             conn = st.connection("gsheets", type=GSheetsConnection)
-            st.dataframe(conn.read(spreadsheet=URL_HOJA, worksheet=NOMBRE_HOJA, ttl=0).sort_index(ascending=False), use_container_width=True)
-        except: st.info("Cargando...")
+            df_hist = conn.read(spreadsheet=URL_HOJA, worksheet=NOMBRE_HOJA, ttl=0)
+            st.dataframe(df_hist.sort_index(ascending=False), use_container_width=True)
+        except: st.info("Cargando bitácora...")
