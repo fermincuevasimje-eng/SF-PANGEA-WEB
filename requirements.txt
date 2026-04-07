@@ -4,7 +4,4 @@ numpy
 scipy
 simplekml
 openpyxl
-requests
-folium
-streamlit-folium
-st-gsheets-connection
+streamlit-gsheets
