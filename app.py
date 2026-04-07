@@ -2,107 +2,104 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from scipy.spatial.distance import cdist
-import re, requests, folium, json
-from streamlit_folium import st_folium
+import re, requests, unicodedata, simplekml, json
 from streamlit_gsheets import GSheetsConnection
 
-# --- CONFIGURACIÓN ---
-st.set_page_config(page_title="SF PANGEA v4.4.8", layout="wide")
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="SF PANGEA v4.5.0", layout="wide")
 
-# --- MOTOR ESTABLE CON CACHÉ ---
-@st.cache_data(show_spinner=True)
-def calcular_ruta_calles(puntos_ordenados, base_coords):
-    if len(puntos_ordenados) < 2: return puntos_ordenados
-    todos = [base_coords] + [[p['lat_aux'], p['lon_aux']] for p in puntos_ordenados] + [base_coords]
-    coords_str = ";".join([f"{lon},{lat}" for lat, lon in todos])
-    url = f"http://router.project-osrm.org/route/v1/driving/{coords_str}?overview=full&geometries=geojson"
-    try:
-        r = requests.get(url, timeout=15).json()
-        return [(p[1], p[0]) for p in r['routes'][0]['geometry']['coordinates']]
-    except: return todos
+# --- VARIABLES CONSTANTES ---
+BASE_COORDS = (19.291395219739588, -99.63555838631413)
+T_UNIDAD_MIN, V_CIU = 20, 25
+URL_MY_MAPS = "https://www.google.com/maps/d/u/0/"
 
-@st.cache_data(show_spinner=False)
-def optimizar_puntos(df_v, base_coords):
-    pts = df_v.to_dict('records')
-    coords_array = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
-    idx_lejano = np.argmax(cdist([base_coords], coords_array)[0])
-    ordenados = [pts.pop(idx_lejano)]
-    while pts:
-        rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
-        idx = np.argmin(cdist([(ordenados[-1]['lat_aux'], ordenados[-1]['lon_aux'])], rest))
-        ordenados.append(pts.pop(idx))
-    return ordenados
+# --- FUNCIONES DE LÓGICA PURA ---
+def normalizar_texto(texto):
+    if not isinstance(texto, str): texto = str(texto)
+    texto = "".join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
+    return texto.lower()
 
-# --- LOGIN ---
-if "autenticado" not in st.session_state: st.session_state.autenticado = False
+def extraer_materiales(punto_dict, tipo):
+    d_letras = {'un ':'1 ','uno ':'1 ','una ':'1 ','dos ':'2 ','tres ':'3 ','cuatro ':'4 ','cinco ':'5 '}
+    posibles_cols = ['ASUNTO', 'Observaciones', 'asunto', 'observaciones', 'Asunto']
+    texto_fuente = ""
+    for col in posibles_cols:
+        if col in punto_dict and str(punto_dict[col]).strip() != "":
+            texto_fuente = str(punto_dict[col])
+            break
+    t_norm = normalizar_texto(texto_fuente)
+    for p, n in d_letras.items(): t_norm = t_norm.replace(p, n)
+    patrones = {
+        'lum': r'(\d+)\s*(?:lampara|foco|reflector|arbotante|luminari[oa]|unidad|brazo)s?',
+        'poste': r'(\d+)\s*(?:poste)s?',
+        'cable': r'(\d+)\s*(?:metro)s?'
+    }
+    m = re.search(patrones[tipo], t_norm)
+    return int(m.group(1)) if m else 0
 
-if not st.session_state.autenticado:
-    st.title("🚀 SF PANGEA - ALUMBRADO PÚBLICO")
-    u, p = st.text_input("Usuario"), st.text_input("Contraseña", type="password")
-    if st.button("Ingresar"):
-        if u == "SF" and p == "1827":
-            st.session_state.autenticado = True
-            st.rerun()
-else:
-    BASE_COORD = (19.291395219739588, -99.63555838631413)
-    # URL de tu archivo según capturas
-    URL_HOJA = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3PKHzeJSbMwxUm8/edit#gid=0"
+def generar_kml(df_ordenado, nombre_ruta):
+    kml = simplekml.Kml()
+    capa = kml.newfolder(name="SF PANGEA")
+    for _, p in df_ordenado.iterrows():
+        pnt = capa.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+        # Aquí se puede insertar la tabla HTML que ya tenías en tu script
+        pnt.description = f"Punto: {p['No_Ruta']}\nLuminarias: {p['Cant_Luminarias']}"
+    return kml.kml()
 
-    try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-    except: pass
+# --- INTERFAZ ---
+st.title("🚀 SF PANGEA - Centro de Gestión Operativa")
 
-    up = st.file_uploader("Subir Reporte CSV/XLSX", type=["csv", "xlsx"])
+# Pestañas: 1. Nueva Ruta, 2. Historial de Mapas
+tab1, tab2 = st.tabs(["🆕 Generar Nueva Ruta", "📂 Historial y Descargas"])
 
+with tab1:
+    up = st.file_uploader("Cargar archivo de reporte", type=["csv", "xlsx"])
     if up:
-        try:
-            df_raw = pd.read_excel(up) if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin1')
-            df_raw = df_raw.fillna("")
-            res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-            df_raw['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
-            df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
-            df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
+        df_raw = pd.read_excel(up) if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin1')
+        
+        # Detección GPS
+        res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
+        df_raw['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
+        df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
+        df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
 
-            if not df_v.empty:
-                puntos_ruta = optimizar_puntos(df_v, BASE_COORD)
-                trazo_calles = calcular_ruta_calles(puntos_ruta, BASE_COORD)
-                
-                @st.fragment
-                def mostrar_mapa(geometria, marcas):
-                    st.subheader("Mapa Operativo - Trazo Real por Calles")
-                    m = folium.Map(location=BASE_COORD, zoom_start=14)
-                    folium.PolyLine(geometria, color="#611232", weight=5, opacity=0.8).add_to(m)
-                    for i, p in enumerate(marcas):
-                        folium.Marker([p['lat_aux'], p['lon_aux']], popup=f"Punto {i+1}").add_to(m)
-                    folium.Marker(BASE_COORD, icon=folium.Icon(color="green", icon="home")).add_to(m)
-                    st_folium(m, width=1000, height=500, returned_objects=[])
+        if not df_v.empty:
+            # --- LÓGICA DE RUTA: INICIO EN PUNTO MÁS LEJANO (NO EN 0) ---
+            pts = df_v.to_dict('records')
+            # 1. Encontrar el punto 1 (el más lejano a la base)
+            distancias_a_base = cdist([BASE_COORDS], np.array([[p['lat_aux'], p['lon_aux']] for p in pts]))[0]
+            idx_lejano = np.argmax(distancias_a_base)
+            
+            # Comenzar la lista con el más lejano
+            ordenados = [pts.pop(idx_lejano)]
+            
+            # Seguir con la lógica de proximidad desde ese punto
+            while pts:
+                restante_coords = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
+                idx_proximo = np.argmin(cdist([(ordenados[-1]['lat_aux'], ordenados[-1]['lon_aux'])], restante_coords))
+                ordenados.append(pts.pop(idx_proximo))
+            
+            df_final = pd.DataFrame(ordenados)
+            for i, row in df_final.iterrows():
+                df_final.at[i, 'No_Ruta'] = i + 1
+                df_final.at[i, 'Cant_Luminarias'] = extraer_materiales(row, 'lum')
+                df_final.at[i, 'ID_Pangea_Nombre'] = row.get('FOLIO', row.get('ID', 'S/N'))
 
-                mostrar_mapa(trazo_calles, puntos_ruta)
+            st.success(f"Ruta optimizada con {len(df_final)} puntos. El punto 1 es el más lejano a la base.")
+            
+            if st.button("💾 Guardar y Finalizar"):
+                # Aquí conectaríamos con tu Google Sheets para guardar la referencia
+                st.info("Ruta procesada. Ve a la pestaña 'Historial' para descargar.")
 
-                # --- GUARDADO AJUSTADO A TUS CAPTURAS ---
-                if st.button("💾 REGISTRAR EN BITÁCORA BD_PANGEA"):
-                    with st.spinner("Conectando con Google Sheets..."):
-                        try:
-                            # 1. Leemos 'Hoja1' (como sale en tu captura)
-                            df_historial = conn.read(spreadsheet=URL_HOJA, worksheet="Hoja1", ttl=0)
-                            
-                            # 2. Nueva fila con tus columnas exactas
-                            nueva_fila = pd.DataFrame([{
-                                "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
-                                "Nombre_Ruta": up.name,
-                                "Usuario_Genera": "OPERADOR_SF",
-                                "Datos_JSON": f"Puntos: {len(puntos_ruta)}"
-                            }])
-                            
-                            df_final = pd.concat([df_historial, nueva_fila], ignore_index=True)
-                            
-                            # 3. Guardar en 'Hoja1'
-                            conn.update(spreadsheet=URL_HOJA, worksheet="Hoja1", data=df_final)
-                            st.success("✅ ¡Registro exitoso en BD_PANGEA!")
-                        except Exception as e:
-                            st.error(f"Error: {e}")
-                            st.info("Asegúrate de haber compartido el Excel con el correo de la Service Account.")
-            else:
-                st.warning("No hay coordenadas.")
-        except Exception as e:
-            st.error(f"Error: {e}")
+with tab2:
+    st.subheader("📦 Repositorio de Rutas")
+    # Simulación de menú de historial con buscador
+    search = st.text_input("🔍 Buscar ruta por nombre o fecha...")
+    
+    # Ejemplo de cómo se vería una fila del menú
+    col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 2])
+    with col1: st.write("📅 2026-04-07 | Ruta_Sauces_Sector_1")
+    with col2: st.button("📥 KML", key="k1")
+    with col3: st.button("📊 CSV", key="c1")
+    with col4: st.button("📗 XLSX", key="x1")
+    with col5: st.link_button("🌐 Ir a My Maps", URL_MY_MAPS)
