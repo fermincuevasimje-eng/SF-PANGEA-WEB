@@ -172,8 +172,8 @@ else:
                     
                     c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"{up.name}_PANGEA.kml", use_container_width=True)
 
-                    # 4. Acceso Directo a My Maps
-                    c4.link_button("🚀 Abrir My Maps", "https://www.google.com/maps/d/u/0/create", use_container_width=True, type="primary")
+                    # 4. Acceso Directo a My Maps (Versión Estable)
+                    c4.link_button("🚀 Abrir My Maps", "https://www.google.com/maps/d/u/0/", use_container_width=True, type="primary")
 
                     if st.button("💾 REGISTRAR EN BITÁCORA"):
                         try:
