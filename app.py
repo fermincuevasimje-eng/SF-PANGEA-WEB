@@ -6,15 +6,15 @@ import re, unicodedata, simplekml, io, requests, time
 from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
 
-# --- 1. CONFIGURACIÓN E IDENTIDAD ---
-st.set_page_config(page_title="SF PANGEA v4.7.2", layout="wide")
+# --- 1. CONFIGURACIÓN ---
+st.set_page_config(page_title="SF PANGEA v4.7.3", layout="wide")
 
 BASE_COORDS = (19.291395219739588, -99.63555838631413)
 URL_DB = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8/edit?gid=0#gid=0"
 HOJA_PRINCIPAL = "Sheet1"
 HOJA_PAPELERA = "Trash"
 
-# --- 2. MOTOR GEOGRÁFICO Y EXTRACCIÓN ---
+# --- 2. MOTOR LÓGICO ---
 def get_real_route(coords_list):
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
@@ -46,11 +46,9 @@ def extraer_carga_robusta(punto_dict, tipo):
     m = re.search(patrones[tipo], t_norm)
     return int(m.group(1)) if m else 0
 
-# --- 3. GESTIÓN DE SESIÓN ---
+# --- 3. AUTENTICACIÓN ---
 if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
-    st.session_state.perfil = None
-    st.session_state.usuario_nombre = ""
+    st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
 
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
@@ -64,9 +62,9 @@ if not st.session_state.autenticado:
         elif u == "GuaDAP" and p == "5555":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
             st.rerun()
-        else: st.error("Credenciales incorrectas")
+        else: st.error("Acceso denegado")
 else:
-    # --- 4. PANEL LATERAL (CONTROLES DINÁMICOS) ---
+    # --- 4. SIDEBAR ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
@@ -78,15 +76,15 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.7.2")
+        st.info("SF PANGEA v4.7.3")
 
-    # --- 5. CUERPO DE LA APP ---
-    st.title("🚀 SF PANGEA - Gestión de Rutas")
+    # --- 5. CUERPO ---
+    st.title("🚀 SF PANGEA - Dirección de Alumbrado")
     tab1, tab2, tab3 = st.tabs(["🆕 Generar Ruta", "📂 Bitácora", "🗑️ Papelera"])
 
     with tab1:
         if st.session_state.perfil == "CONSULTA":
-            st.warning("⚠️ Perfil de Consulta: No tienes permiso para generar rutas.")
+            st.warning("⚠️ Modo Consulta: Solo lectura de bitácora disponible.")
         else:
             up = st.file_uploader("Subir Archivo", type=["csv", "xlsx"])
             if up:
@@ -120,24 +118,27 @@ else:
                         tiempo_min = ((tl + tp) * t_por_punto) + ((dist_real_km / v_promedio) * 60)
                         tiempo_str = f"{int(tiempo_min//60)}h {int(tiempo_min%60)}min"
 
-                        # EXPORTACIÓN CON RESUMEN OPERATIVO COMPLETO
+                        # CONSOLIDACIÓN DE TABLA: RESUMEN OPERATIVO
                         df_f = pd.DataFrame(ordenados)
                         vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                         cols_orig = [c for c in df_f.columns if c not in vits + ['lat_aux','lon_aux', id_col]]
-                        df_resumen = pd.DataFrame([
-                            {'No_Ruta': '---', 'ID_Pangea_Nombre': '--- RESUMEN FINAL ---'},
+                        
+                        # TABLA DE RESUMEN IDÉNTICA PARA TODOS LOS FORMATOS
+                        df_res_op = pd.DataFrame([
+                            {'No_Ruta': '---', 'ID_Pangea_Nombre': '--- RESUMEN OPERATIVO ---'},
                             {'No_Ruta': 'Total Puntos:', 'ID_Pangea_Nombre': len(ordenados)},
                             {'No_Ruta': 'Total Lums:', 'ID_Pangea_Nombre': tl},
                             {'No_Ruta': 'Total Postes:', 'ID_Pangea_Nombre': tp},
                             {'No_Ruta': 'Total Cable:', 'ID_Pangea_Nombre': f"{tc} m"},
-                            {'No_Ruta': 'Distancia:', 'ID_Pangea_Nombre': f"{round(dist_real_km,2)} km"},
+                            {'No_Ruta': 'Distancia Real:', 'ID_Pangea_Nombre': f"{round(dist_real_km,2)} km"},
                             {'No_Ruta': 'Tiempo Est.:', 'ID_Pangea_Nombre': tiempo_str}
                         ])
-                        df_final_export = pd.concat([df_f[vits + cols_orig], df_resumen], ignore_index=True)
+                        df_final_export = pd.concat([df_f[vits + cols_orig], df_res_op], ignore_index=True)
 
-                        st.success(f"✅ Ruta lista ({len(ordenados)} pts).")
+                        st.success(f"✅ Ruta optimizada para {len(ordenados)} puntos.")
                         c1, c2, c3, c4 = st.columns(4)
 
+                        # EXCEL
                         buf_xlsx = io.BytesIO()
                         with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                             df_final_export.to_excel(writer, index=False, sheet_name='Ruta')
@@ -153,7 +154,7 @@ else:
                         c1.download_button("📗 Excel Pro", buf_xlsx.getvalue(), file_name=f"{up.name}_PANGEA.xlsx", use_container_width=True)
                         c2.download_button("📊 CSV Completo", df_final_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"{up.name}_PANGEA.csv", use_container_width=True)
 
-                        # KML CON DESGLOSE Y RESUMEN RECUPERADOS (GLOBO DETALLADO)
+                        # KML MAESTRO CON RESUMEN OPERATIVO HOMOGÉNEO
                         kml = simplekml.Kml()
                         fld = kml.newfolder(name="SF PANGEA")
                         if geo_trazo:
@@ -161,18 +162,20 @@ else:
                             ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff'
                         for p in ordenados:
                             pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                            # Tabla de Globo HTML
+                            # Tabla de Globo HTML con Desglose y Resumen Operativo idéntico al CSV/XLSX
                             h = f"<![CDATA[<table border='1' style='font-size:11px; width:300px; border-collapse:collapse;'>"
-                            h += f"<tr><td bgcolor='#f2f2f2'><b>No. Ruta</b></td><td><b>{p['No_Ruta']}</b></td></tr>"
+                            h += f"<tr><td bgcolor='#f2f2f2' colspan='2'><b>PUNTO DE RUTA NO. {p['No_Ruta']}</b></td></tr>"
                             for col in df_raw.columns:
                                 if col not in ['lat_aux','lon_aux']: h += f"<tr><td>{col}</td><td>{p[col]}</td></tr>"
                             h += f"<tr><td colspan='2' bgcolor='#333' style='color:white; text-align:center;'><b>DESGLOSE DE MATERIALES</b></td></tr>"
                             h += f"<tr><td><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                             h += f"<tr><td><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                             h += f"<tr><td><b>Cable (m):</b></td><td>{p['Cant_Cable_m']}</td></tr>"
-                            h += f"<tr><td colspan='2' bgcolor='#004d40' style='color:white; text-align:center;'><b>RESUMEN OPERATIVO</b></td></tr>"
-                            h += f"<tr><td><b>Distancia Ruta:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
-                            h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_str}</td></tr>"
+                            h += f"<tr><td colspan='2' bgcolor='#1a237e' style='color:white; text-align:center;'><b>RESUMEN OPERATIVO</b></td></tr>"
+                            h += f"<tr><td>Total Puntos en Ruta:</td><td>{len(ordenados)}</td></tr>"
+                            h += f"<tr><td>Total Luminarias:</td><td>{tl}</td></tr>"
+                            h += f"<tr><td>Distancia Total:</td><td>{round(dist_real_km,2)} km</td></tr>"
+                            h += f"<tr><td>Tiempo Estimado:</td><td>{tiempo_str}</td></tr>"
                             h += "</table>]]>"
                             pnt.description = h
                         c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"{up.name}_PANGEA.kml", use_container_width=True)
@@ -193,14 +196,14 @@ else:
         try:
             conn = st.connection("gsheets", type=GSheetsConnection)
             df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-            st.write("### Historial de Operaciones")
+            st.write("### Historial de Bitácora")
             if st.session_state.perfil == "ADMIN" and not df_bt.empty:
-                sel = st.multiselect("Mover a papelera:", df_bt.index)
-                if st.button("🗑️ Mover Seleccionados"):
+                sel = st.multiselect("Seleccionar para Papelera:", df_bt.index)
+                if st.button("🗑️ Mover a Papelera"):
                     df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[sel]], ignore_index=True))
                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(sel))
-                    st.success("Movido."); st.rerun()
+                    st.success("Operación completada."); st.rerun()
             st.dataframe(df_bt.sort_index(ascending=False), use_container_width=True)
         except: st.info("Sincronizando...")
 
@@ -211,12 +214,12 @@ else:
                 df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
                 st.write("### Papelera de Reciclaje")
                 if not df_tr.empty:
-                    rec = st.multiselect("Restaurar:", df_tr.index)
-                    if st.button("♻️ Restaurar ahora"):
+                    rec = st.multiselect("Restaurar registros:", df_tr.index)
+                    if st.button("♻️ Restaurar"):
                         df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
                         conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[rec]], ignore_index=True))
                         conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(rec))
                         st.success("Restaurado."); st.rerun()
                 st.dataframe(df_tr, use_container_width=True)
             except: st.info("Cargando papelera...")
-        else: st.warning("Área restringida para Administradores.")
+        else: st.warning("Área restringida para administradores.")
