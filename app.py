@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.25", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.26", layout="wide")
 
 st.markdown(
     """
@@ -43,7 +43,7 @@ CHISTES = [
     "— ¿Cómo se queda un mago después de comer? — Magordito."
 ]
 
-# --- 2. MOTOR LÓGICO MEJORADO ---
+# --- 2. MOTOR LÓGICO ---
 def get_real_route(coords_list):
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
@@ -106,7 +106,6 @@ if not st.session_state.autenticado:
             st.rerun()
         else: st.error("Acceso denegado")
 else:
-    # --- 4. SIDEBAR ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
@@ -116,23 +115,19 @@ else:
         if st.button("📁 SF2", use_container_width=True): st.session_state.menu = "SF2"
         if st.button("📊 SF3", use_container_width=True): st.session_state.menu = "SF3"
         st.write("---")
-        
         if st.session_state.menu == "GdR":
             st.subheader("📊 Ajustes GdR")
             t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
             v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
-            st.write("---")
-            
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.25")
+        st.info("SF PANGEA v4.8.26")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
-        st.write("Seleccione el módulo GdR para comenzar con la optimización de rutas.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu in ["SF2", "SF3"]:
@@ -151,6 +146,7 @@ else:
                 if up:
                     try:
                         df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
+                        cols_originales = df_raw.columns.tolist()
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
@@ -177,32 +173,20 @@ else:
 
                             df_f = pd.DataFrame(ordenados)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
-                            cols_orig = [c for c in df_f.columns if c not in cols_vits + ['lat_aux','lon_aux', id_col]]
                             
                             st.success(f"✅ Ruta optimizada: {len(ordenados)} puntos.")
                             c1, c2, c3, c4 = st.columns(4)
                             
-                            # GENERACIÓN EXCEL PRO DINÁMICO
+                            # EXCEL PRO
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
-                                df_f[cols_vits + cols_orig].to_excel(writer, index=False, sheet_name='Ruta')
-                                ws = writer.sheets['Ruta']
-                                last_row = len(ordenados) + 1
+                                df_f[cols_vits + [c for c in cols_originales if c not in cols_vits]].to_excel(writer, index=False, sheet_name='Ruta')
+                                ws, last_row = writer.sheets['Ruta'], len(ordenados) + 1
                                 res_row = last_row + 2
                                 ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
-                                ws.cell(row=res_row+1, column=1, value="Total Luminarias:")
-                                ws.cell(row=res_row+1, column=2, value=f"=SUM(C2:C{last_row})")
-                                ws.cell(row=res_row+2, column=1, value="Total Postes:")
-                                ws.cell(row=res_row+2, column=2, value=f"=SUM(D2:D{last_row})")
-                                ws.cell(row=res_row+3, column=1, value="Total Cable:")
-                                ws.cell(row=res_row+3, column=2, value=f"=SUM(E2:E{last_row})")
-                                ws.cell(row=res_row+4, column=1, value="Distancia:")
-                                ws.cell(row=res_row+4, column=2, value=f"{round(dist_real_km,2)} km")
-                                
-                                f_calc_minutos = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
-                                ws.cell(row=res_row+5, column=1, value="Tiempo Estimado:")
-                                ws.cell(row=res_row+5, column=2, value=f'=INT({f_calc_minutos}/60) & " horas " & MOD({f_calc_minutos},60) & " minutos"')
-
+                                ws.cell(row=res_row+1, column=1, value="Total Luminarias:"); ws.cell(row=res_row+1, column=2, value=f"=SUM(C2:C{last_row})")
+                                f_calc = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
+                                ws.cell(row=res_row+5, column=1, value="Tiempo Estimado:"); ws.cell(row=res_row+5, column=2, value=f'=INT({f_calc}/60) & " h " & MOD({f_calc},60) & " m"')
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
                                 for r in range(2, last_row + 1):
                                     if int(df_f.iloc[r-2]['Cant_Postes']) > 0:
@@ -210,24 +194,34 @@ else:
                                     elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
 
-                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
-                            c2.download_button("📊 CSV Estático", df_f[cols_vits + cols_orig].to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
+                            c1.download_button("📗 Excel Pro", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
+                            c2.download_button("📊 CSV Estático", df_f.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # GENERACIÓN KML DETALLADO (INFORMACIÓN REPARADA)
+                            # KML MAESTRO (RECUPERANDO TODA LA INFORMACIÓN DE LAS CAPTURAS)
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
                             if geo_trazo:
                                 ls = fld.newlinestring(name="Trayectoria Vial", coords=geo_trazo)
                                 ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff'
+                            
                             for p in ordenados:
-                                pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                h = f"<![CDATA[<table border='1' style='width:250px; border-collapse:collapse; font-family:Arial;'>"
-                                h += f"<tr><td bgcolor='#f2f2f2' colspan='2' align='center'><b>PUNTO {p['No_Ruta']}</b></td></tr>"
-                                h += f"<tr><td><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
-                                h += f"<tr><td><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
-                                h += f"<tr><td><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                h += "</table>]]>"
-                                pnt.description = h
+                                pnt = fld.newpoint(name=f"P{p['No_Ruta']} - {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                                # Bucle para incluir TODAS las columnas originales (Como querías)
+                                html_desc = f"<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Sans-serif; font-size:12px;'>"
+                                html_desc += f"<tr><td bgcolor='#004586' colspan='2' align='center'><b style='color:white;'>DATOS DEL PUNTO {p['No_Ruta']}</b></td></tr>"
+                                
+                                # Primero ponemos los datos calculados por SF Pangea
+                                html_desc += f"<tr><td><b>Luminarias SF</b></td><td>{p['Cant_Luminarias']}</td></tr>"
+                                html_desc += f"<tr><td><b>Postes SF</b></td><td>{p['Cant_Postes']}</td></tr>"
+                                html_desc += f"<tr><td><b>Cable SF</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
+                                
+                                # Luego incluimos TODOS los datos originales del archivo subido
+                                for col in cols_originales:
+                                    valor = p.get(col, "")
+                                    html_desc += f"<tr><td><b>{col}</b></td><td>{valor}</td></tr>"
+                                
+                                html_desc += "</table>]]>"
+                                pnt.description = html_desc
                             
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
                             c4.link_button("🚀 My Maps", "http://google.com/maps/d/", use_container_width=True)
@@ -241,7 +235,7 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
-                    except Exception as e: st.error(f"Error procesando archivo: {e}")
+                    except Exception as e: st.error(f"Error: {e}")
 
         with tab2:
             try:
@@ -286,4 +280,4 @@ else:
                         st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
                     else: st.info("Papelera vacía.")
                 except: st.info("Cargando papelera...")
-# FIN DEL CÓDIGO - SF PANGEA v4.8.25 COMPLETO Y REPARADO
+# FIN DEL CÓDIGO SF PANGEA v4.8.26 - REGLA DE ORO RESTAURADA
