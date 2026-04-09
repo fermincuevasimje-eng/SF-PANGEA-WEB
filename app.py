@@ -7,7 +7,7 @@ from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="SF PANGEA v4.7.4", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.7.5", layout="wide")
 
 BASE_COORDS = (19.291395219739588, -99.63555838631413)
 URL_DB = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8/edit?gid=0#gid=0"
@@ -76,7 +76,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.7.4")
+        st.info("SF PANGEA v4.7.5")
 
     # --- 5. CUERPO ---
     st.title("🚀 SF PANGEA - Dirección de Alumbrado")
@@ -118,29 +118,15 @@ else:
                         tiempo_min = ((tl + tp) * t_por_punto) + ((dist_real_km / v_promedio) * 60)
                         tiempo_str = f"{int(tiempo_min//60)}h {int(tiempo_min%60)}min"
 
-                        # --- CONSTRUCCIÓN DEL RESUMEN OPERATIVO UNIFICADO ---
-                        res_op_data = [
-                            ('Total Puntos:', f"{len(ordenados)}"),
-                            ('Total Lums:', f"{tl}"),
-                            ('Total Postes:', f"{tp}"),
-                            ('Total Cable:', f"{tc} m"),
-                            ('Distancia Real:', f"{round(dist_real_km,2)} km"),
-                            ('Tiempo Est.:', f"{tiempo_str}")
-                        ]
-
-                        # DataFrame para Excel/CSV
+                        res_op_data = [('Total Puntos:', f"{len(ordenados)}"), ('Total Lums:', f"{tl}"), ('Total Postes:', f"{tp}"), ('Total Cable:', f"{tc} m"), ('Distancia Real:', f"{round(dist_real_km,2)} km"), ('Tiempo Est.:', f"{tiempo_str}")]
                         df_f = pd.DataFrame(ordenados)
                         vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                         cols_orig = [c for c in df_f.columns if c not in vits + ['lat_aux','lon_aux', id_col]]
-                        
-                        df_res_op = pd.DataFrame([{'No_Ruta': '---', 'ID_Pangea_Nombre': '--- RESUMEN OPERATIVO ---'}] + 
-                                               [{'No_Ruta': label, 'ID_Pangea_Nombre': val} for label, val in res_op_data])
+                        df_res_op = pd.DataFrame([{'No_Ruta': '---', 'ID_Pangea_Nombre': '--- RESUMEN OPERATIVO ---'}] + [{'No_Ruta': label, 'ID_Pangea_Nombre': val} for label, val in res_op_data])
                         df_final_export = pd.concat([df_f[vits + cols_orig], df_res_op], ignore_index=True)
 
                         st.success(f"✅ Ruta generada con éxito.")
                         c1, c2, c3, c4 = st.columns(4)
-
-                        # EXCEL
                         buf_xlsx = io.BytesIO()
                         with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                             df_final_export.to_excel(writer, index=False, sheet_name='Ruta')
@@ -156,15 +142,12 @@ else:
                         c1.download_button("📗 Excel Pro", buf_xlsx.getvalue(), file_name=f"{up.name}_PANGEA.xlsx", use_container_width=True)
                         c2.download_button("📊 CSV Completo", df_final_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"{up.name}_PANGEA.csv", use_container_width=True)
 
-                        # KML MAESTRO (GLOBO ESPEJO DEL EXCEL)
                         kml = simplekml.Kml()
                         fld = kml.newfolder(name="SF PANGEA")
                         if geo_trazo:
-                            ls = fld.newlinestring(name="Trayectoria Vial", coords=geo_trazo)
-                            ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff'
+                            ls = fld.newlinestring(name="Trayectoria Vial", coords=geo_trazo); ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff'
                         for p in ordenados:
                             pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                            # Tabla HTML idéntica
                             h = f"<![CDATA[<table border='1' style='font-size:11px; width:300px; border-collapse:collapse;'>"
                             h += f"<tr><td bgcolor='#f2f2f2' colspan='2' style='text-align:center;'><b>PUNTO DE RUTA NO. {p['No_Ruta']}</b></td></tr>"
                             for col in df_raw.columns:
@@ -174,11 +157,8 @@ else:
                             h += f"<tr><td>Postes:</td><td>{p['Cant_Postes']}</td></tr>"
                             h += f"<tr><td>Cable:</td><td>{p['Cant_Cable_m']} m</td></tr>"
                             h += f"<tr><td colspan='2' bgcolor='#1a237e' style='color:white; text-align:center;'><b>RESUMEN OPERATIVO (TOTALES)</b></td></tr>"
-                            # Inserción de la misma data que el Excel
-                            for label, val in res_op_data:
-                                h += f"<tr><td><b>{label}</b></td><td>{val}</td></tr>"
-                            h += "</table>]]>"
-                            pnt.description = h
+                            for label, val in res_op_data: h += f"<tr><td><b>{label}</b></td><td>{val}</td></tr>"
+                            h += "</table>]]>"; pnt.description = h
                         c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"{up.name}_PANGEA.kml", use_container_width=True)
                         c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/u/0/", use_container_width=True)
 
@@ -198,14 +178,29 @@ else:
             conn = st.connection("gsheets", type=GSheetsConnection)
             df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
             st.write("### Historial de Bitácora")
-            if st.session_state.perfil == "ADMIN" and not df_bt.empty:
-                sel = st.multiselect("Seleccionar para Papelera:", df_bt.index)
-                if st.button("🗑️ Mover a Papelera"):
-                    df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
-                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[sel]], ignore_index=True))
-                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(sel))
-                    st.success("Movido."); st.rerun()
-            st.dataframe(df_bt.sort_index(ascending=False), use_container_width=True)
+            if not df_bt.empty:
+                # CREACIÓN DE ID VISUAL (EMPIEZA EN 1)
+                df_bt_visual = df_bt.copy()
+                df_bt_visual.insert(0, "ID_Reg", range(1, len(df_bt_visual) + 1))
+                
+                if st.session_state.perfil == "ADMIN":
+                    col_sel, col_btn = st.columns([3, 1])
+                    with col_sel:
+                        sel_ids = st.multiselect("Seleccione ID de registros para mover a Papelera:", df_bt_visual["ID_Reg"].tolist())
+                    with col_btn:
+                        st.write(" ")
+                        if st.button("🗑️ Eliminar", use_container_width=True):
+                            if sel_ids:
+                                # Traducir IDs visuales a índices reales de pandas
+                                indices_reales = df_bt_visual[df_bt_visual["ID_Reg"].isin(sel_ids)].index
+                                df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[indices_reales]], ignore_index=True))
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(indices_reales))
+                                st.success(f"Registros {sel_ids} movidos."); time.sleep(1); st.rerun()
+                            else: st.warning("Seleccione al menos un ID.")
+                
+                st.dataframe(df_bt_visual.sort_values("ID_Reg", ascending=False), use_container_width=True, hide_index=True)
+            else: st.info("Bitácora vacía.")
         except: st.info("Sincronizando...")
 
     with tab3:
@@ -215,12 +210,24 @@ else:
                 df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
                 st.write("### Papelera de Reciclaje")
                 if not df_tr.empty:
-                    rec = st.multiselect("Restaurar registros:", df_tr.index)
-                    if st.button("♻️ Restaurar"):
-                        df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                        conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[rec]], ignore_index=True))
-                        conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(rec))
-                        st.success("Restaurado."); st.rerun()
-                st.dataframe(df_tr, use_container_width=True)
+                    # ID VISUAL PARA PAPELERA
+                    df_tr_visual = df_tr.copy()
+                    df_tr_visual.insert(0, "ID_Reg", range(1, len(df_tr_visual) + 1))
+                    
+                    col_sel_p, col_btn_p = st.columns([3, 1])
+                    with col_sel_p:
+                        rec_ids = st.multiselect("Seleccione ID para restaurar:", df_tr_visual["ID_Reg"].tolist())
+                    with col_btn_p:
+                        st.write(" ")
+                        if st.button("♻️ Restaurar", use_container_width=True):
+                            if rec_ids:
+                                indices_reales_p = df_tr_visual[df_tr_visual["ID_Reg"].isin(rec_ids)].index
+                                df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[indices_reales_p]], ignore_index=True))
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(indices_reales_p))
+                                st.success(f"Registros {rec_ids} restaurados."); time.sleep(1); st.rerun()
+                            else: st.warning("Seleccione al menos un ID.")
+                    st.dataframe(df_tr_visual, use_container_width=True, hide_index=True)
+                else: st.info("La papelera está vacía.")
             except: st.info("Cargando papelera...")
         else: st.warning("Área restringida para administradores.")
