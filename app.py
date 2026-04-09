@@ -2,17 +2,29 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from scipy.spatial.distance import cdist
-import re, unicodedata, simplekml, io, requests, time
+import re, unicodedata, simplekml, io, requests, time, random
 from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="SF PANGEA v4.8.0", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.1", layout="wide")
 
 BASE_COORDS = (19.291395219739588, -99.63555838631413)
 URL_DB = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8/edit?gid=0#gid=0"
 HOJA_PRINCIPAL = "Sheet1"
 HOJA_PAPELERA = "Trash"
+
+# --- LISTA DE CHISTES BLANCOS ---
+CHISTES = [
+    "— ¿Qué le dice un jaguar a otro jaguar? — Jaguar you.",
+    "— ¿Cómo se dice pañuelo en japonés? — Sakamoco.",
+    "— ¿Qué hace un perro con un taladro? — Adiestrando.",
+    "— ¿Cuál es el pez que más brilla? — El 'eléctrico' no, ¡el lucio!",
+    "— ¿Por qué los pájaros vuelan al sur en invierno? — Porque caminando tardarían mucho.",
+    "— ¿Qué le dice una impresora a otra? — ¿Esa hoja es tuya o es una impresión mía?",
+    "— ¿Cómo se queda un mago después de comer? — Magordito.",
+    "— ¿Qué hace una abeja en el gimnasio? — Zumba."
+]
 
 # --- 2. MOTOR LÓGICO (SIN CAMBIOS) ---
 def get_real_route(coords_list):
@@ -66,19 +78,24 @@ if not st.session_state.autenticado:
             st.rerun()
         else: st.error("Acceso denegado")
 else:
-    # --- 4. SIDEBAR (NUEVO PANEL DE BOTONES) ---
+    # --- 4. SIDEBAR (MENÚ DE NAVEGACIÓN) ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
         
-        # BOTÓN GdR - Generador de Rutas
+        # BOTONES DE NAVEGACIÓN
+        if st.button("🏠 Inicio", use_container_width=True):
+            st.session_state.menu = "Inicio"
+            
         if st.button("🚀 GdR (Generador de Rutas)", use_container_width=True):
             st.session_state.menu = "GdR"
         
-        # Espacio para futuros botones
-        st.button("📁 Delegaciones (Próximamente)", use_container_width=True, disabled=True)
-        st.button("📊 Reportes (Próximamente)", use_container_width=True, disabled=True)
+        if st.button("📁 SF2", use_container_width=True):
+            st.session_state.menu = "SF2"
+            
+        if st.button("📊 SF3", use_container_width=True):
+            st.session_state.menu = "SF3"
         
         st.write("---")
         if st.session_state.menu == "GdR":
@@ -90,16 +107,28 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.0")
+        st.info("SF PANGEA v4.8.1")
 
-    # --- 5. CUERPO LÓGICO DEPENDIENTE DEL MENÚ ---
+    # --- 5. CUERPO LÓGICO ---
     
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
-        st.write("Seleccione una herramienta en el **Panel Operativo** de la izquierda para comenzar.")
-        st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=200)
+        st.info("Sistema de Gestión Operativa - Alumbrado Público")
+        st.write("Utilice el menú de la izquierda para navegar entre los módulos disponibles.")
+        st.image("https://img.icons8.com/clouds/500/000000/google-maps.png", width=200)
+
+    elif st.session_state.menu in ["SF2", "SF3"]:
+        st.title(f"🛠️ Módulo {st.session_state.menu}")
+        st.subheader("Este módulo estará disponible próximamente.")
+        st.write("---")
+        st.info("**Un chiste para amenizar la espera:**")
+        st.success(random.choice(CHISTES))
+        if st.button("Volver al Inicio"):
+            st.session_state.menu = "Inicio"
+            st.rerun()
 
     elif st.session_state.menu == "GdR":
+        # ... (AQUÍ VA TODO EL CÓDIGO DEL GENERADOR DE RUTAS QUE YA TENEMOS, SIN PERDER NI UNA LÍNEA)
         st.title("🚀 GdR - Generador de Rutas")
         tab1, tab2, tab3 = st.tabs(["🆕 Nueva Ruta", "📂 Bitácora", "🗑️ Papelera"])
 
@@ -148,6 +177,7 @@ else:
 
                             st.success(f"✅ Ruta optimizada.")
                             c1, c2, c3, c4 = st.columns(4)
+                            # (Se mantiene toda la lógica de exportación Excel/CSV/KML intacta...)
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                                 df_final_export.to_excel(writer, index=False, sheet_name='Ruta')
@@ -195,6 +225,7 @@ else:
                     except Exception as e: st.error(f"Error crítico: {e}")
 
         with tab2:
+            # (Aquí va la lógica de Bitácora con ID visual que hicimos antes...)
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
                 df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
@@ -216,10 +247,10 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(indices_reales))
                                     st.success(f"Registros movidos."); time.sleep(1); st.rerun()
                     st.dataframe(df_bt_visual.sort_values("ID_Reg", ascending=False), use_container_width=True, hide_index=True)
-                else: st.info("Bitácora vacía.")
             except: st.info("Sincronizando...")
 
         with tab3:
+            # (Aquí va la lógica de Papelera con ID visual que hicimos antes...)
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -241,5 +272,4 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(indices_reales_p))
                                     st.success(f"Restaurados."); time.sleep(1); st.rerun()
                         st.dataframe(df_tr_visual, use_container_width=True, hide_index=True)
-                    else: st.info("Papelera vacía.")
                 except: st.info("Cargando...")
