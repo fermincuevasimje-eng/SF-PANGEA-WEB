@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.35", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.40", layout="wide")
 
 st.markdown(
     """
@@ -120,7 +120,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.35")
+        st.info("SF PANGEA v4.8.40")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -173,7 +173,7 @@ else:
                                 total_lums += p['Cant_Luminarias']; total_postes += p['Cant_Postes']; total_cable += p['Cant_Cable_m']
 
                             min_totales = ((total_lums + total_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
-                            tiempo_str = f"{int(min_totales // 60)} horas {int(min_totales % 60)} minutos"
+                            tiempo_abreviado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
                             
                             df_f = pd.DataFrame(ordenados)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
@@ -194,9 +194,11 @@ else:
                                 ws.cell(row=res_row+2, column=1, value="Total Postes:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(D2:D{last_row})")
                                 ws.cell(row=res_row+3, column=1, value="Total Cable:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(E2:E{last_row})")
                                 ws.cell(row=res_row+4, column=1, value="Distancia:"); ws.cell(row=res_row+4, column=2, value=f"{round(dist_real_km,2)} km")
+                                # AJUSTE: Formato abreviado h y m
                                 f_calc_minutos = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
                                 ws.cell(row=res_row+5, column=1, value="Tiempo Estimado:")
-                                ws.cell(row=res_row+5, column=2, value=f'=INT({f_calc_minutos}/60) & " horas " & MOD({f_calc_minutos},60) & " minutos"')
+                                ws.cell(row=res_row+5, column=2, value=f'=INT({f_calc_minutos}/60) & " h " & MOD({f_calc_minutos},60) & " m"')
+                                
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
                                 for r in range(2, last_row + 1):
                                     if int(df_f.iloc[r-2]['Cant_Postes']) > 0:
@@ -207,7 +209,7 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_f[cols_vits + [c for c in cols_orig if c != id_col]].to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO (CON INFORMACIÓN ORDENADA PARA MY MAPS) ---
+                            # --- KML MAESTRO (AJUSTE DE ORDEN Y NOMBRE) ---
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
                             if geo_trazo:
@@ -215,24 +217,26 @@ else:
                                 ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff'
                             
                             for p in ordenados:
-                                pnt = fld.newpoint(name=f"P{p['No_Ruta']} - {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                # Construcción de Tabla HTML para descripción
+                                # AJUSTE: Solo el número de Ticket en el nombre del punto
+                                pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                                
+                                # AJUSTE DE ORDEN: Desglose -> Datos Reporte -> Resumen Operativo
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
-                                # Sección Operativa
+                                # 1. DESGLOSE OPERATIVO
                                 h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOSE OPERATIVO</b></td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                # Sección Datos Originales
+                                # 2. DATOS DEL REPORTE
                                 h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
                                 for col in cols_orig:
                                     val = str(p.get(col, '')).strip()
                                     if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                                # Sección Ruta
-                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>INFO GENERAL RUTA</b></td></tr>"
+                                # 3. RESUMEN OPERATIVO (Nombre solicitado)
+                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO</b></td></tr>"
                                 h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
-                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_str}</td></tr>"
+                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
                             
