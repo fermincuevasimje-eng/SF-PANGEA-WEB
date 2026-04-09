@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.10", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.12", layout="wide")
 
 st.markdown(
     """
@@ -126,7 +126,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.10")
+        st.info("SF PANGEA v4.8.12")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -201,12 +201,10 @@ else:
                                 ws.cell(row=res_row+3, column=2, value=f"=SUM(E2:E{last_row})")
                                 ws.cell(row=res_row+4, column=1, value="Distancia:")
                                 ws.cell(row=res_row+4, column=2, value=f"{round(dist_real_km,2)} km")
-                                
-                                # --- AJUSTE SOLICITADO: TIEMPO EN HORAS Y MINUTOS ---
-                                f_calc_minutos = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
-                                ws.cell(row=res_row+5, column=1, value="Tiempo Estimado:")
-                                # Usamos INT para horas y MOD para los minutos restantes
-                                ws.cell(row=res_row+5, column=2, value=f'=INT({f_calc_minutos}/60) & " horas " & MOD({f_calc_minutos},60) & " minutos"')
+                                # Fórmula de tiempo dinámica con formato 16h 27min
+                                f_min = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
+                                ws.cell(row=res_row+5, column=1, value="Tiempo Est.:")
+                                ws.cell(row=res_row+5, column=2, value=f'=INT({f_min}/60) & "h " & MOD({f_min},60) & "min"')
 
                                 # Formato de colores
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
