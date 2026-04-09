@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.12", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.13", layout="wide")
 
 st.markdown(
     """
@@ -126,7 +126,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.12")
+        st.info("SF PANGEA v4.8.13")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -201,12 +201,14 @@ else:
                                 ws.cell(row=res_row+3, column=2, value=f"=SUM(E2:E{last_row})")
                                 ws.cell(row=res_row+4, column=1, value="Distancia:")
                                 ws.cell(row=res_row+4, column=2, value=f"{round(dist_real_km,2)} km")
-                                # Fórmula de tiempo dinámica con formato 16h 27min
+                                # Cálculo de tiempo para el excel y la bitácora
+                                min_totales = int(round(((sum(df_f['Cant_Luminarias'])+sum(df_f['Cant_Postes']))*t_por_punto)+(dist_real_km/v_promedio*60),0))
+                                t_fmt = f"{min_totales//60}h {min_totales%60}min"
+                                # Fórmula dinámica para el Excel
                                 f_min = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
                                 ws.cell(row=res_row+5, column=1, value="Tiempo Est.:")
                                 ws.cell(row=res_row+5, column=2, value=f'=INT({f_min}/60) & "h " & MOD({f_min},60) & "min"')
 
-                                # Formato de colores
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
                                 for r in range(2, last_row + 1):
                                     if int(df_f.iloc[r-2]['Cant_Postes']) > 0:
@@ -217,7 +219,6 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_f[cols_vits + cols_orig].to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # GENERACIÓN KML DETALLADO
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
                             if geo_trazo:
@@ -239,8 +240,8 @@ else:
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    sum_lums = sum(df_f['Cant_Luminarias'])
-                                    info_j = f"Pts: {len(ordenados)}, Lums: {sum_lums}, Dist: {round(dist_real_km,2)}km"
+                                    # JSON REPARADO: Pts, Lums, Postes, Km, Tiempo
+                                    info_j = f"Pts: {len(ordenados)}, Lums: {sum(df_f['Cant_Luminarias'])}, Poste: {sum(df_f['Cant_Postes'])}, Km: {round(dist_real_km,2)}, Tiempo: {t_fmt}"
                                     n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
