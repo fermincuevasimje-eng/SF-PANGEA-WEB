@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.13", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.15", layout="wide")
 
 st.markdown(
     """
@@ -126,7 +126,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.13")
+        st.info("SF PANGEA v4.8.15")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -173,7 +173,7 @@ else:
                                 p['No_Ruta'], p['ID_Pangea_Nombre'] = i, p[id_col]
                                 p['Cant_Luminarias'] = extraer_carga_robusta(p, 'lum') or (1 if extraer_carga_robusta(p, 'poste')==0 and extraer_carga_robusta(p, 'cable')==0 else 0)
                                 p['Cant_Postes'], p['Cant_Cable_m'] = extraer_carga_robusta(p, 'poste'), extraer_carga_robusta(p, 'cable')
-                                p['Maps'] = f"http://googleusercontent.com/maps.google.com/6{p['lat_aux']},{p['lon_aux']}"
+                                p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
 
                             df_f = pd.DataFrame(ordenados)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
@@ -190,7 +190,6 @@ else:
                                 last_row = len(ordenados) + 1
                                 res_row = last_row + 2
                                 
-                                # Resumen Operativo Dinámico
                                 ws.cell(row=res_row, column=1, value="---")
                                 ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
                                 ws.cell(row=res_row+1, column=1, value="Total Luminarias:")
@@ -201,10 +200,10 @@ else:
                                 ws.cell(row=res_row+3, column=2, value=f"=SUM(E2:E{last_row})")
                                 ws.cell(row=res_row+4, column=1, value="Distancia:")
                                 ws.cell(row=res_row+4, column=2, value=f"{round(dist_real_km,2)} km")
-                                # Cálculo de tiempo para el excel y la bitácora
+                                
                                 min_totales = int(round(((sum(df_f['Cant_Luminarias'])+sum(df_f['Cant_Postes']))*t_por_punto)+(dist_real_km/v_promedio*60),0))
                                 t_fmt = f"{min_totales//60}h {min_totales%60}min"
-                                # Fórmula dinámica para el Excel
+                                
                                 f_min = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
                                 ws.cell(row=res_row+5, column=1, value="Tiempo Est.:")
                                 ws.cell(row=res_row+5, column=2, value=f'=INT({f_min}/60) & "h " & MOD({f_min},60) & "min"')
@@ -219,28 +218,25 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_f[cols_vits + cols_orig].to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
+                            # GENERACIÓN KML - REPARACIÓN DE GLOBOS
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
                             if geo_trazo:
                                 ls = fld.newlinestring(name="Trayectoria Vial", coords=geo_trazo)
                                 ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff'
                             for p in ordenados:
-                                pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                h = f"<![CDATA[<table border='1' style='width:250px; border-collapse:collapse;'>"
-                                h += f"<tr><td bgcolor='#f2f2f2' colspan='2' align='center'><b>PUNTO {p['No_Ruta']}</b></td></tr>"
-                                h += f"<tr><td><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
-                                h += f"<tr><td><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
-                                h += f"<tr><td><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                h += "</table>]]>"
-                                pnt.description = h
+                                pnt = fld.newpoint(name=f"P{p['No_Ruta']} - {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                                # Descripción limpia para máxima compatibilidad visual
+                                desc = f"PUNTO: {p['No_Ruta']}\nLuminarias: {p['Cant_Luminarias']}\nPostes: {p['Cant_Postes']}\nCable: {p['Cant_Cable_m']}m"
+                                pnt.description = desc
+                                
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
-                            c4.link_button("🚀 My Maps", "http://google.com/maps/d/", use_container_width=True)
+                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR EN BITÁCORA"):
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    # JSON REPARADO: Pts, Lums, Postes, Km, Tiempo
                                     info_j = f"Pts: {len(ordenados)}, Lums: {sum(df_f['Cant_Luminarias'])}, Poste: {sum(df_f['Cant_Postes'])}, Km: {round(dist_real_km,2)}, Tiempo: {t_fmt}"
                                     n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
