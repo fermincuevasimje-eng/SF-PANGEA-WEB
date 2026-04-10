@@ -48,7 +48,6 @@ def get_real_route(coords_list):
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
     try:
-        # Añadimos timeout=3 para evitar que la página se trabe infinitamente
         r = requests.get(url, timeout=3).json()
         if r['code'] == 'Ok':
             return r['routes'][0]['geometry']['coordinates'], r['routes'][0]['distance'] / 1000
@@ -179,13 +178,19 @@ else:
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
                             
+                            # --- LIMPIEZA DE COLUMNAS DUPLICADAS ANTES DE EXPORTAR ---
+                            cols_extra_a_quitar = ['ï»¿No_Ruta', 'Maps']
+                            # Creamos el dataframe de salida final quitando duplicados si existen en las columnas originales
+                            columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in cols_extra_a_quitar]
+                            df_export = df_f[columnas_finales]
+
                             st.success(f"✅ Ruta optimizada: {len(ordenados)} puntos.")
                             c1, c2, c3, c4 = st.columns(4)
 
                             # --- EXCEL PRO DINÁMICO ---
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
-                                df_f[cols_vits + [c for c in cols_orig if c != id_col]].to_excel(writer, index=False, sheet_name='Ruta')
+                                df_export.to_excel(writer, index=False, sheet_name='Ruta')
                                 ws = writer.sheets['Ruta']
                                 last_row = len(ordenados) + 1
                                 res_row = last_row + 2
@@ -206,7 +211,7 @@ else:
                                         for cell in ws[r]: cell.fill = fa
 
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
-                            c2.download_button("📊 CSV Estático", df_f[cols_vits + [c for c in cols_orig if c != id_col]].to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
+                            c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
                             # --- KML MAESTRO ---
                             kml = simplekml.Kml()
@@ -244,7 +249,6 @@ else:
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    # Ajuste de robustez en el registro
                                     info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
                                     n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
@@ -295,7 +299,6 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r))
                                     st.success("Restaurado."); time.sleep(1); st.rerun()
                         with col_r3:
-                            # EL NUEVO BOTÓN DE ELIMINACIÓN DEFINITIVA
                             if st.button("🔥 VACIAR PAPELERA", help="Borra físicamente todos los datos de la hoja de Google Sheets"):
                                 df_vacio = pd.DataFrame(columns=df_tr.columns)
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
