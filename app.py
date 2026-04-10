@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.50", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.55", layout="wide")
 
 st.markdown(
     """
@@ -120,7 +120,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.50")
+        st.info("SF PANGEA v4.8.55")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -208,7 +208,7 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_f[cols_vits + [c for c in cols_orig if c != id_col]].to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO (VERSION 4.8.50 - ESPEJO DE CAPTURAS) ---
+                            # --- KML MAESTRO (VERSIÓN 4.8.55) ---
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
                             if geo_trazo:
@@ -232,7 +232,7 @@ else:
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
                                 
-                                # 3. RESUMEN OPERATIVO DINÁMICO (5 ELEMENTOS SEGÚN IMAGEN)
+                                # 3. RESUMEN OPERATIVO DINÁMICO
                                 h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
                                 h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
                                 h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
@@ -250,10 +250,11 @@ else:
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Dist: {round(dist_real_km,2)}km"
+                                    # Lógica mejorada del JSON para incluir TODOS los datos del resumen dinámico
+                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Poste: {total_postes}, Cable: {total_cable}m, Km: {round(dist_real_km,2)}, Tiempo: {tiempo_abreviado}"
                                     n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                    st.balloons(); st.success("¡Bitácora actualizada!")
+                                    st.balloons(); st.success("¡Bitácora actualizada con éxito!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
 
                     except Exception as e: st.error(f"Error procesando archivo: {e}")
