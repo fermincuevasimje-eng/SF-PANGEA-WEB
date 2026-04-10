@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.50", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.70", layout="wide")
 
 st.markdown(
     """
@@ -48,7 +48,8 @@ def get_real_route(coords_list):
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
     try:
-        r = requests.get(url).json()
+        # Añadimos timeout=3 para evitar que la página se trabe infinitamente
+        r = requests.get(url, timeout=3).json()
         if r['code'] == 'Ok':
             return r['routes'][0]['geometry']['coordinates'], r['routes'][0]['distance'] / 1000
     except: return None, None
@@ -120,7 +121,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.50")
+        st.info("SF PANGEA v4.8.70")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -146,7 +147,6 @@ else:
                     try:
                         df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
-                        
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
                         df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
@@ -181,7 +181,7 @@ else:
                             
                             st.success(f"✅ Ruta optimizada: {len(ordenados)} puntos.")
                             c1, c2, c3, c4 = st.columns(4)
-                            
+
                             # --- EXCEL PRO DINÁMICO ---
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
@@ -208,7 +208,7 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_f[cols_vits + [c for c in cols_orig if c != id_col]].to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO (VERSION 4.8.50 - ESPEJO DE CAPTURAS) ---
+                            # --- KML MAESTRO ---
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
                             if geo_trazo:
@@ -217,22 +217,16 @@ else:
                             
                             for p in ordenados:
                                 pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
-                                # 1. DATOS DEL REPORTE
                                 h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
                                 for col in cols_orig:
                                     val = str(p.get(col, '')).strip()
                                     if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                                
-                                # 2. DESGLOCE OPERATIVO
                                 h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                
-                                # 3. RESUMEN OPERATIVO DINÁMICO (5 ELEMENTOS SEGÚN IMAGEN)
                                 h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
                                 h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
                                 h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
@@ -250,7 +244,8 @@ else:
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Dist: {round(dist_real_km,2)}km"
+                                    # Ajuste de robustez en el registro
+                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
                                     n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
@@ -280,7 +275,7 @@ else:
                 else: st.info("Bitácora vacía.")
             except: st.info("Sincronizando...")
 
-        with tab3: # PAPELERA
+        with tab3: # PAPELERA MEJORADA CON PURGA DEFINITIVA
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -288,9 +283,10 @@ else:
                     if not df_tr.empty:
                         df_tr_v = df_tr.copy()
                         df_tr_v.insert(0, "ID_Reg", range(1, len(df_tr_v) + 1))
-                        c_sel_r, c_res = st.columns([3, 1])
-                        with c_sel_r: ids_r = st.multiselect("ID para restaurar:", df_tr_v["ID_Reg"].tolist())
-                        with c_res:
+                        
+                        col_r1, col_r2, col_r3 = st.columns([2, 1, 1])
+                        with col_r1: ids_r = st.multiselect("ID para restaurar:", df_tr_v["ID_Reg"].tolist())
+                        with col_r2: 
                             if st.button("♻️ Restaurar"):
                                 if ids_r:
                                     idx_r = df_tr_v[df_tr_v["ID_Reg"].isin(ids_r)].index
@@ -298,6 +294,13 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[idx_r]], ignore_index=True))
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r))
                                     st.success("Restaurado."); time.sleep(1); st.rerun()
+                        with col_r3:
+                            # EL NUEVO BOTÓN DE ELIMINACIÓN DEFINITIVA
+                            if st.button("🔥 VACIAR PAPELERA", help="Borra físicamente todos los datos de la hoja de Google Sheets"):
+                                df_vacio = pd.DataFrame(columns=df_tr.columns)
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
+                                st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
+                        
                         st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
                     else: st.info("Papelera vacía.")
                 except: st.info("Cargando papelera...")
