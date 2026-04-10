@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.60", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.65", layout="wide")
 
 st.markdown(
     """
@@ -120,7 +120,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.60")
+        st.info("SF PANGEA v4.8.65")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -208,7 +208,7 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_f[cols_vits + [c for c in cols_orig if c != id_col]].to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO (VERSION 4.8.60) ---
+                            # --- KML MAESTRO (VERSION 4.8.65) ---
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
                             if geo_trazo:
@@ -219,20 +219,17 @@ else:
                                 pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
-                                # 1. DATOS DEL REPORTE
                                 h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
                                 for col in cols_orig:
                                     val = str(p.get(col, '')).strip()
                                     if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
                                 
-                                # 2. DESGLOCE OPERATIVO
                                 h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
                                 
-                                # 3. RESUMEN OPERATIVO DINÁMICO
                                 h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
                                 h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
                                 h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
@@ -249,8 +246,8 @@ else:
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
-                                    # Leer sin cache para escribir (esto es necesario para no sobreescribir)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    # AJUSTE JSON COMPLETO (v4.8.65): Inclusión de cable y desglose total
                                     info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Poste: {total_postes}, Cable: {total_cable}m, Km: {round(dist_real_km,2)}, Tiempo: {tiempo_abreviado}"
                                     n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
@@ -259,11 +256,10 @@ else:
 
                     except Exception as e: st.error(f"Error procesando archivo: {e}")
 
-        with tab2: # BITÁCORA (CON CAPA DE VELOCIDAD TTL)
+        with tab2: # BITÁCORA (BASE v4.8.50 - SIN CAMBIOS DE VELOCIDAD)
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
-                # TTL=600 son 10 minutos de cache para velocidad máxima
-                df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=600).dropna(how='all')
+                df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
                 if not df_bt.empty:
                     df_bt_v = df_bt.copy()
                     df_bt_v.insert(0, "ID_Reg", range(1, len(df_bt_v) + 1))
@@ -277,17 +273,16 @@ else:
                                     df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[idx_e]], ignore_index=True))
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(idx_e))
-                                    st.cache_data.clear() # Limpiar cache para forzar actualización tras borrar
                                     st.success("Movido."); time.sleep(1); st.rerun()
                     st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
                 else: st.info("Bitácora vacía.")
-            except: st.info("Cargando bitácora...")
+            except: st.info("Sincronizando...")
 
-        with tab3: # PAPELERA (CON CAPA DE VELOCIDAD TTL)
+        with tab3: # PAPELERA (BASE v4.8.50)
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
-                    df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=600).dropna(how='all')
+                    df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
                     if not df_tr.empty:
                         df_tr_v = df_tr.copy()
                         df_tr_v.insert(0, "ID_Reg", range(1, len(df_tr_v) + 1))
@@ -300,8 +295,7 @@ else:
                                     df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[idx_r]], ignore_index=True))
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r))
-                                    st.cache_data.clear() # Limpiar cache tras restaurar
                                     st.success("Restaurado."); time.sleep(1); st.rerun()
                         st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
                     else: st.info("Papelera vacía.")
-                except: st.info("Sincronizando papelera...")
+                except: st.info("Cargando papelera...")
