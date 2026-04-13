@@ -212,18 +212,10 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO PLANO (SIN CARPETAS) PARA UNA SOLA CAPA ---
+                            # --- KML MAESTRO PLANO (ORDENADO PARA UNA SOLA CAPA) ---
                             kml = simplekml.Kml()
                             
-                            # Insertamos la línea directamente en la raíz del KML
-                            if geo_trazo:
-                                ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                ls = kml.newlinestring(name="TRAYECTO VIAL")
-                                ls.coords = ls_coords
-                                ls.style.linestyle.width = 6
-                                ls.style.linestyle.color = 'ff0000ff'
-                            
-                            # Insertamos los puntos directamente en la raíz del KML
+                            # PASO 1: Insertamos PRIMERO los puntos para que queden arriba en la lista
                             for p in ordenados:
                                 pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
@@ -245,6 +237,14 @@ else:
                                 h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
+
+                            # PASO 2: Insertamos AL FINAL el trazado para que aparezca al final de la lista de My Maps
+                            if geo_trazo:
+                                ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO")
+                                ls.coords = ls_coords
+                                ls.style.linestyle.width = 6
+                                ls.style.linestyle.color = 'ff0000ff'
                             
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
                             c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
