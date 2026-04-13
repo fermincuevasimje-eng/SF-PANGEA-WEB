@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.70", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.71", layout="wide")
 
 st.markdown(
     """
@@ -120,7 +120,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.70")
+        st.info("SF PANGEA v4.8.71")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -178,9 +178,7 @@ else:
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
                             
-                            # --- LIMPIEZA DE COLUMNAS DUPLICADAS ANTES DE EXPORTAR ---
                             cols_extra_a_quitar = ['ï»¿No_Ruta', 'Maps']
-                            # Creamos el dataframe de salida final quitando duplicados si existen en las columnas originales
                             columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in cols_extra_a_quitar]
                             df_export = df_f[columnas_finales]
 
@@ -213,13 +211,17 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO ---
+                            # --- KML MAESTRO CON TRAZADO DE RUTA ---
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
-                            if geo_trazo:
-                                ls = fld.newlinestring(name="Trayectoria Vial", coords=geo_trazo)
-                                ls.style.linestyle.width, ls.style.linestyle.color = 5, 'ff0000ff'
                             
+                            # Trazar la línea de la ruta si existe geo_trazo
+                            if geo_trazo:
+                                ls = fld.newlinestring(name="Trayectoria Vial (Ruta)")
+                                ls.coords = geo_trazo
+                                ls.style.linestyle.width = 6
+                                ls.style.linestyle.color = 'ff0000ff' # Rojo intenso (AABBGGRR)
+
                             for p in ordenados:
                                 pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
