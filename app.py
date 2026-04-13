@@ -6,10 +6,10 @@ import re, unicodedata, simplekml, io, requests, time, random
 from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
- 
+
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
 st.set_page_config(page_title="SF PANGEA v4.8.70", layout="wide")
- 
+
 st.markdown(
     """
     <style>
@@ -29,12 +29,12 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
- 
+
 BASE_COORDS = (19.291395219739588, -99.63555838631413)
 URL_DB = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8/edit?gid=0#gid=0"
 HOJA_PRINCIPAL = "Sheet1"
 HOJA_PAPELERA = "Trash"
- 
+
 CHISTES = [
     "— ¿Qué le dice un jaguar a otro jaguar? — Jaguar you.",
     "— ¿Cómo se dice pañuelo en japonés? — Sakamoco.",
@@ -42,7 +42,7 @@ CHISTES = [
     "— ¿Qué hace una abeja en el gimnasio? — Zumba.",
     "— ¿Cómo se queda un mago después de comer? — Magordito."
 ]
- 
+
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
@@ -52,12 +52,12 @@ def get_real_route(coords_list):
         if r['code'] == 'Ok':
             return r['routes'][0]['geometry']['coordinates'], r['routes'][0]['distance'] / 1000
     except: return None, None
- 
+
 def normalizar_texto(texto):
     if not isinstance(texto, str): texto = str(texto)
     texto = "".join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
     return texto.lower()
- 
+
 def extraer_carga_robusta(punto_dict, tipo):
     d_letras = {'un ':'1 ','uno ':'1 ','una ':'1 ','dos ':'2 ','tres ':'3 ','cuatro ':'4 ','cinco ':'5 '}
     posibles_cols = ['ASUNTO', 'Observaciones', 'asunto', 'observaciones', 'Asunto', 'OBSERVACIONES']
@@ -81,13 +81,13 @@ def extraer_carga_robusta(punto_dict, tipo):
         return 0
     m = re.search(patrones[tipo], t_norm)
     return int(m.group(1)) if m else 0
- 
+
 # --- 3. AUTENTICACIÓN Y ESTADO ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
 if "menu" not in st.session_state:
     st.session_state.menu = "Inicio"
- 
+
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
     col_u, col_p = st.columns(2)
@@ -122,22 +122,22 @@ else:
             st.session_state.autenticado = False
             st.rerun()
         st.info("SF PANGEA v4.8.70")
- 
+
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
         st.write("Seleccione el módulo GdR para comenzar con la optimización de rutas.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
- 
+
     elif st.session_state.menu in ["SF2", "SF3"]:
         st.title(f"🛠️ Módulo {st.session_state.menu}")
         st.success(random.choice(CHISTES))
- 
+
     elif st.session_state.menu == "GdR":
         st.title("🚀 GdR - Generador de Rutas")
         tab1, tab2, tab3 = st.tabs(["🆕 Nueva Ruta", "📂 Bitácora", "🗑️ Papelera"])
- 
+
         with tab1:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
@@ -150,7 +150,7 @@ else:
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
                         df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
- 
+
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
                             idx_lejano = np.argmax(cdist([BASE_COORDS], np.array([[p['lat_aux'], p['lon_aux']] for p in pts]))[0])
@@ -159,11 +159,11 @@ else:
                                 rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
                                 idx = np.argmin(cdist([(ordenados[-1]['lat_aux'], ordenados[-1]['lon_aux'])], rest))
                                 ordenados.append(pts.pop(idx))
- 
+
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
                             geo_trazo, dist_real_km = get_real_route(route_coords)
                             if not dist_real_km: dist_real_km = (len(ordenados) + 1) * 1.3
- 
+
                             total_lums = 0; total_postes = 0; total_cable = 0
                             for i, p in enumerate(ordenados, 1):
                                 p['No_Ruta'], p['ID_Pangea_Nombre'] = i, p[id_col]
@@ -171,22 +171,22 @@ else:
                                 p['Cant_Postes'], p['Cant_Cable_m'] = extraer_carga_robusta(p, 'poste'), extraer_carga_robusta(p, 'cable')
                                 p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
                                 total_lums += p['Cant_Luminarias']; total_postes += p['Cant_Postes']; total_cable += p['Cant_Cable_m']
- 
+
                             min_totales = ((total_lums + total_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
                             tiempo_abreviado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
- 
+
                             df_f = pd.DataFrame(ordenados)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
-                             
+                            
                             # --- LIMPIEZA DE COLUMNAS DUPLICADAS ANTES DE EXPORTAR ---
                             cols_extra_a_quitar = ['ï»¿No_Ruta', 'Maps']
                             columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in cols_extra_a_quitar]
                             df_export = df_f[columnas_finales]
- 
+
                             st.success(f"✅ Ruta optimizada: {len(ordenados)} puntos.")
                             c1, c2, c3, c4 = st.columns(4)
- 
+
                             # --- EXCEL PRO DINÁMICO ---
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
@@ -202,25 +202,27 @@ else:
                                 f_calc_minutos = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
                                 ws.cell(row=res_row+5, column=1, value="Tiempo Estimado:")
                                 ws.cell(row=res_row+5, column=2, value=f'=INT({f_calc_minutos}/60) & " h " & MOD({f_calc_minutos},60) & " m"')
-                                 
+                                
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
                                 for r in range(2, last_row + 1):
                                     if int(df_f.iloc[r-2]['Cant_Postes']) > 0:
                                         for cell in ws[r]: cell.fill = fg
                                     elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
- 
+
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
- 
-                            # --- KML MAESTRO CON TRAZO VIAL ---
+
+                            # --- KML MAESTRO CON TRAZO VIAL CORREGIDO ---
                             kml = simplekml.Kml()
                             fld = kml.newfolder(name="SF PANGEA")
                             if geo_trazo:
-                                ls = fld.newlinestring(name="Trayectoria Vial", coords=geo_trazo)
-                                ls.style.linestyle.width = 5
-                                ls.style.linestyle.color = 'ff0000ff' # Rojo Opaco
-                             
+                                # Corrección: Asegurar que las coordenadas sean tuplas (lon, lat)
+                                clean_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls = fld.newlinestring(name="Trayectoria Vial", coords=clean_coords)
+                                ls.style.linestyle.width = 6
+                                ls.style.linestyle.color = 'ff0000ff' # AABBGGRR (Rojo opaco)
+                            
                             for p in ordenados:
                                 pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
@@ -242,10 +244,10 @@ else:
                                 h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
-                             
+                            
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
-                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
- 
+                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/u/0/", use_container_width=True)
+
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -255,9 +257,9 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
- 
+
                     except Exception as e: st.error(f"Error procesando archivo: {e}")
- 
+
         with tab2: # BITÁCORA
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -279,7 +281,7 @@ else:
                     st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
                 else: st.info("Bitácora vacía.")
             except: st.info("Sincronizando...")
- 
+
         with tab3: # PAPELERA MEJORADA CON PURGA DEFINITIVA
             if st.session_state.perfil == "ADMIN":
                 try:
