@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.71", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.72", layout="wide")
 
 st.markdown(
     """
@@ -50,6 +50,7 @@ def get_real_route(coords_list):
     try:
         r = requests.get(url, timeout=3).json()
         if r['code'] == 'Ok':
+            # Invertimos para KML (Lon, Lat)
             return r['routes'][0]['geometry']['coordinates'], r['routes'][0]['distance'] / 1000
     except: return None, None
 
@@ -120,7 +121,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.71")
+        st.info("SF PANGEA v4.8.72")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -211,17 +212,21 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO CON TRAZADO DE RUTA ---
+                            # --- KML MAESTRO (CORRECCIÓN RUTA VISIBLE) ---
                             kml = simplekml.Kml()
+                            # Estilo de línea explícito para My Maps
+                            style_line = simplekml.Style()
+                            style_line.linestyle.color = 'ff0000ff' # Rojo Opaco (AABBGGRR)
+                            style_line.linestyle.width = 7
+
                             fld = kml.newfolder(name="SF PANGEA")
                             
-                            # Trazar la línea de la ruta si existe geo_trazo
+                            # Generar trazado real si OSRM respondió
                             if geo_trazo:
-                                ls = fld.newlinestring(name="Trayectoria Vial (Ruta)")
+                                ls = fld.newlinestring(name="TRAZADO DE RUTA OPTIMIZADA")
                                 ls.coords = geo_trazo
-                                ls.style.linestyle.width = 6
-                                ls.style.linestyle.color = 'ff0000ff' # Rojo intenso (AABBGGRR)
-
+                                ls.style = style_line
+                            
                             for p in ordenados:
                                 pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
@@ -281,7 +286,7 @@ else:
                 else: st.info("Bitácora vacía.")
             except: st.info("Sincronizando...")
 
-        with tab3: # PAPELERA MEJORADA CON PURGA DEFINITIVA
+        with tab3: # PAPELERA
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -301,7 +306,7 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r))
                                     st.success("Restaurado."); time.sleep(1); st.rerun()
                         with col_r3:
-                            if st.button("🔥 VACIAR PAPELERA", help="Borra físicamente todos los datos de la hoja de Google Sheets"):
+                            if st.button("🔥 VACIAR PAPELERA"):
                                 df_vacio = pd.DataFrame(columns=df_tr.columns)
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
                                 st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
