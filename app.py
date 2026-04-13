@@ -212,21 +212,20 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO CON ESTRUCTURA DE CAPAS PARA MY MAPS ---
-                            kml = simplekml.Kml(name=f"SF_PANGEA_{up.name}")
+                            # --- KML MAESTRO PLANO (SIN CARPETAS) PARA UNA SOLA CAPA ---
+                            kml = simplekml.Kml()
                             
-                            # 1. El Trazado se coloca al inicio del documento para prioridad de render
+                            # Insertamos la línea directamente en la raíz del KML
                             if geo_trazo:
-                                route_coords_clean = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                linestring = kml.newlinestring(name="TRAZADO DE RUTA VIAL")
-                                linestring.coords = route_coords_clean
-                                linestring.style.linestyle.width = 6
-                                linestring.style.linestyle.color = simplekml.Color.red # FF0000FF
+                                ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls = kml.newlinestring(name="TRAYECTO VIAL")
+                                ls.coords = ls_coords
+                                ls.style.linestyle.width = 6
+                                ls.style.linestyle.color = 'ff0000ff'
                             
-                            # 2. Los puntos van en su propia carpeta para no interferir con la línea
-                            fld = kml.newfolder(name="PUNTOS DE ATENCION")
+                            # Insertamos los puntos directamente en la raíz del KML
                             for p in ordenados:
-                                pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                                pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
                                 h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
                                 for col in cols_orig:
