@@ -179,7 +179,6 @@ else:
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
                             
-                            # --- LIMPIEZA DE COLUMNAS DUPLICADAS ANTES DE EXPORTAR ---
                             cols_extra_a_quitar = ['ï»¿No_Ruta', 'Maps']
                             columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in cols_extra_a_quitar]
                             df_export = df_f[columnas_finales]
@@ -213,16 +212,19 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO CON TRAZO VIAL CORREGIDO ---
-                            kml = simplekml.Kml()
-                            fld = kml.newfolder(name="SF PANGEA")
-                            if geo_trazo:
-                                # Corrección: Asegurar que las coordenadas sean tuplas (lon, lat)
-                                clean_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                ls = fld.newlinestring(name="Trayectoria Vial", coords=clean_coords)
-                                ls.style.linestyle.width = 6
-                                ls.style.linestyle.color = 'ff0000ff' # AABBGGRR (Rojo opaco)
+                            # --- KML MAESTRO CON ESTRUCTURA DE CAPAS PARA MY MAPS ---
+                            kml = simplekml.Kml(name=f"SF_PANGEA_{up.name}")
                             
+                            # 1. El Trazado se coloca al inicio del documento para prioridad de render
+                            if geo_trazo:
+                                route_coords_clean = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                linestring = kml.newlinestring(name="TRAZADO DE RUTA VIAL")
+                                linestring.coords = route_coords_clean
+                                linestring.style.linestyle.width = 6
+                                linestring.style.linestyle.color = simplekml.Color.red # FF0000FF
+                            
+                            # 2. Los puntos van en su propia carpeta para no interferir con la línea
+                            fld = kml.newfolder(name="PUNTOS DE ATENCION")
                             for p in ordenados:
                                 pnt = fld.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
@@ -246,7 +248,7 @@ else:
                                 pnt.description = h
                             
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
-                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/u/0/", use_container_width=True)
+                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
                                 try:
