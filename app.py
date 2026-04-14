@@ -101,6 +101,10 @@ if "menu" not in st.session_state:
 if "lista_bajas" not in st.session_state:
     st.session_state.lista_bajas = {} # {folio: comentario}
 
+# --- MEJORA PREMIUM: LLAVES PARA LIMPIEZA DE INPUTS ---
+if "input_key" not in st.session_state:
+    st.session_state.input_key = 0
+
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
     col_u, col_p = st.columns(2)
@@ -165,25 +169,27 @@ else:
                 with c_input:
                     st.subheader("⌨️ Captura de Folios")
                     
-                    # CORRECCIÓN PREMIUM: División en dos columnas de entrada específicas
-                    col_f_in, col_r_in = st.columns(2)
-                    with col_f_in:
-                        in_f_val = st.text_input("Digite Folio/Ticket/IMEI:", key="in_folio_baja")
-                    with col_r_in:
-                        in_c_val = st.text_input("Respuesta 127 (Máx 30 car.):", max_chars=30, key="in_resp_baja")
-                    
-                    # Botón para agregar, ya que text_input individual no dispara la acción conjunta fácilmente
-                    if st.button("➕ Agregar a Lista", use_container_width=True):
-                        f_final = in_f_val.strip()
-                        # Lógica por default
-                        c_final = in_c_val.strip() if in_c_val.strip() else "ATENDIDO"
+                    # Formulario para capturar el Enter
+                    with st.form("form_bajas", clear_on_submit=True):
+                        col_f_in, col_r_in = st.columns(2)
+                        with col_f_in:
+                            # Al usar form y clear_on_submit, al dar Enter o click se limpia solo
+                            in_f_val = st.text_input("Digite Folio/Ticket/IMEI:", key=f"f_{st.session_state.input_key}")
+                        with col_r_in:
+                            in_c_val = st.text_input("Respuesta 127 (Máx 30 car.):", max_chars=30, key=f"r_{st.session_state.input_key}")
                         
-                        if f_final:
-                            st.session_state.lista_bajas[f_final] = c_final
-                            st.toast(f"Folio {f_final} agregado con respuesta: {c_final}", icon="✅")
-                            # Nota: Streamlit no limpia los inputs automáticamente al presionar botón, 
-                            # se requiere manejo de estado avanzado para limpiarlos, pero funcionalmente cumple.
-                    
+                        submitted = st.form_submit_button("➕ Agregar a Lista", use_container_width=True)
+                        
+                        if submitted:
+                            f_final = in_f_val.strip()
+                            c_final = in_c_val.strip() if in_c_val.strip() else "ATENDIDO"
+                            
+                            if f_final:
+                                st.session_state.lista_bajas[f_final] = c_final
+                                st.toast(f"Folio {f_final} agregado", icon="✅")
+                                # Forzamos refresco para que se vea en la tabla de al lado
+                                st.rerun()
+
                     st.write("---")
                     if st.button("🗑️ Limpiar Lista Actual"):
                         st.session_state.lista_bajas = {}
@@ -197,6 +203,9 @@ else:
                         
                         # Botón para procesar y descargar
                         if st.button("📥 Generar Documento de Bajas", use_container_width=True):
+                            # Globos solicitados por el usuario
+                            st.balloons()
+                            
                             # Filtrar el dataframe original solo por los folios capturados
                             folios_a_buscar = list(st.session_state.lista_bajas.keys())
                             df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
