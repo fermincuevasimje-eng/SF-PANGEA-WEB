@@ -97,6 +97,9 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
 if "menu" not in st.session_state:
     st.session_state.menu = "Inicio"
+# Estados para el módulo SF2
+if "lista_bajas" not in st.session_state:
+    st.session_state.lista_bajas = {} # {folio: comentario}
 
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
@@ -120,7 +123,7 @@ else:
         st.write("---")
         if st.button("🏠 Inicio", use_container_width=True): st.session_state.menu = "Inicio"
         if st.button("🚀 GdR (Generador de Rutas)", use_container_width=True): st.session_state.menu = "GdR"
-        if st.button("📁 SF2", use_container_width=True): st.session_state.menu = "SF2"
+        if st.button("📁 SF2 (Baja de Folios)", use_container_width=True): st.session_state.menu = "SF2"
         if st.button("📊 SF3", use_container_width=True): st.session_state.menu = "SF3"
         st.write("---")
         if st.session_state.menu == "GdR":
@@ -137,12 +140,82 @@ else:
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
-        st.write("Seleccione el módulo GdR para comenzar con la optimización de rutas.")
+        st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-    elif st.session_state.menu in ["SF2", "SF3"]:
+    elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo {st.session_state.menu}")
         st.success(random.choice(CHISTES))
+
+    elif st.session_state.menu == "SF2":
+        st.title("📁 SF2 - Módulo de Baja de Folios")
+        st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
+        
+        up_sf2 = st.file_uploader("Subir Archivo de Referencia (Excel/CSV)", type=["csv", "xlsx"], key="sf2_up")
+        
+        if up_sf2:
+            try:
+                df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
+                
+                # Identificar columna de folios
+                id_col_sf2 = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
+                
+                c_input, c_lista = st.columns([1, 1])
+                
+                with c_input:
+                    st.subheader("⌨️ Captura de Folios")
+                    input_folio = st.text_input("Digite Folio (o Folio - Comentario) y presione ENTER:", key="input_baja")
+                    
+                    if input_folio:
+                        # Lógica de separación: Folio - Comentario
+                        if "-" in input_folio:
+                            parts = input_folio.split("-", 1)
+                            f_val = parts[0].strip()
+                            c_val = parts[1].strip()[:30] # Limite 30 caracteres
+                        else:
+                            f_val = input_folio.strip()
+                            c_val = "ATENDIDO"
+                        
+                        if f_val:
+                            st.session_state.lista_bajas[f_val] = c_val
+                            st.toast(f"Folio {f_val} agregado", icon="✅")
+                    
+                    if st.button("🗑️ Limpiar Lista Actual"):
+                        st.session_state.lista_bajas = {}
+                        st.rerun()
+
+                with c_lista:
+                    st.subheader("📋 Folios a dar de Baja")
+                    if st.session_state.lista_bajas:
+                        df_resumen_bajas = pd.DataFrame([{"Folio": k, "Respuesta": v} for k, v in st.session_state.lista_bajas.items()])
+                        st.dataframe(df_resumen_bajas, use_container_width=True, hide_index=True)
+                        
+                        # Botón para procesar y descargar
+                        if st.button("📥 Generar Documento de Bajas", use_container_width=True):
+                            # Filtrar el dataframe original solo por los folios capturados
+                            folios_a_buscar = list(st.session_state.lista_bajas.keys())
+                            df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
+                            
+                            # Agregar la columna Respuesta 127
+                            df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].map(st.session_state.lista_bajas)
+                            
+                            # Excel
+                            output_sf2 = io.BytesIO()
+                            with pd.ExcelWriter(output_sf2, engine='openpyxl') as writer:
+                                df_final_bajas.to_excel(writer, index=False, sheet_name='BAJAS_SF')
+                            
+                            st.download_button(
+                                label="📗 Descargar Excel de Bajas",
+                                data=output_sf2.getvalue(),
+                                file_name=f"BAJAS_{up_sf2.name}",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True
+                            )
+                    else:
+                        st.info("Esperando captura de folios...")
+
+            except Exception as e:
+                st.error(f"Error en SF2: {e}")
 
     elif st.session_state.menu == "GdR":
         st.title("🚀 GdR - Generador de Rutas")
@@ -217,7 +290,7 @@ else:
                             st.success(f"✅ Ruta optimizada con éxito.")
                             c1, c2, c3, c4 = st.columns(4)
 
-                            # --- EXCEL PRO DINÁMICO (CORREGIDO) ---
+                            # --- EXCEL PRO DINÁMICO ---
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                                 df_export.to_excel(writer, index=False, sheet_name='Ruta')
@@ -225,7 +298,6 @@ else:
                                 last_row = len(ordenados) + 1
                                 res_row = last_row + 2
                                 ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
-                                # Corrección: Faltaba el primer dato de Total Puntos
                                 ws.cell(row=res_row+1, column=1, value="Total Puntos:"); ws.cell(row=res_row+1, column=2, value=len(ordenados))
                                 ws.cell(row=res_row+2, column=1, value="Total Luminarias:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(C2:C{last_row})")
                                 ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(D2:D{last_row})")
