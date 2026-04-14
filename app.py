@@ -43,20 +43,44 @@ CHISTES = [
     "— ¿Cómo se queda un mago después de comer? — Magordito."
 ]
 
-# --- 2. MOTOR LÓGICO MEJORADO ---
+# --- 2. MOTOR LÓGICO MEJORADO (SEGMENTACIÓN OSRM SENIOR) ---
 def get_real_route(coords_list):
-    """Obtiene el trazo vial real desde OSRM con manejo de errores Senior."""
-    locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
-    url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
-    try:
-        r = requests.get(url, timeout=5) 
-        if r.status_code == 200:
-            data = r.json()
-            if data.get('code') == 'Ok':
-                return data['routes'][0]['geometry']['coordinates'], data['routes'][0]['distance'] / 1000
-        return None, None
-    except Exception: 
-        return None, None
+    """
+    Obtiene el trazo vial real desde OSRM usando segmentación por tramos 
+    para evitar rechazos por URL larga o exceso de puntos.
+    """
+    if len(coords_list) < 2: return None, None
+    
+    full_geometry = []
+    total_dist = 0
+    
+    # Procesamos por parejas de puntos para garantizar el trazo vial
+    for i in range(len(coords_list) - 1):
+        segment = coords_list[i:i+2]
+        # Formato OSRM: lon,lat;lon,lat
+        locs = ";".join([f"{lon},{lat}" for lat, lon in segment])
+        url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
+        
+        try:
+            r = requests.get(url, timeout=8) # Timeout extendido para estabilidad
+            if r.status_code == 200:
+                data = r.json()
+                if data.get('code') == 'Ok':
+                    # Agregamos la geometría del tramo
+                    full_geometry.extend(data['routes'][0]['geometry']['coordinates'])
+                    total_dist += data['routes'][0]['distance'] / 1000
+                else:
+                    # Fallback local si el segmento falla
+                    full_geometry.extend([[segment[0][1], segment[0][0]], [segment[1][1], segment[1][0]]])
+                    total_dist += 1.3
+            else:
+                full_geometry.extend([[segment[0][1], segment[0][0]], [segment[1][1], segment[1][0]]])
+                total_dist += 1.3
+        except Exception:
+            full_geometry.extend([[segment[0][1], segment[0][0]], [segment[1][1], segment[1][0]]])
+            total_dist += 1.3
+            
+    return full_geometry if full_geometry else None, total_dist
 
 def normalizar_texto(texto):
     if not isinstance(texto, str): texto = str(texto)
@@ -159,9 +183,8 @@ else:
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
                             
-                            # MEJORA APLICADA: Optimización Nearest Neighbor iniciando en BASE_COORDS
+                            # Optimización Nearest Neighbor iniciando en BASE_COORDS
                             ordenados = []
-                            # El primer punto es el más cercano a la base
                             last_coord = BASE_COORDS
                             
                             while pts:
@@ -171,14 +194,14 @@ else:
                                 ordenados.append(proximo_punto)
                                 last_coord = (proximo_punto['lat_aux'], proximo_punto['lon_aux'])
 
-                            # MEJORA APLICADA: Fuerza el trazo desde base, pasando por puntos, regresando a base
+                            # Fuerza el trazo desde base, pasando por puntos, regresando a base
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
                             
-                            # INTELIGENCIA DE RUTAS MEJORADA
+                            # INTELIGENCIA DE RUTAS MEJORADA CON SEGMENTACIÓN
                             geo_trazo, dist_real_km = get_real_route(route_coords)
-                            if not dist_real_km: 
+                            if not geo_trazo: 
                                 dist_real_km = (len(ordenados) + 1) * 1.3
-                                st.warning("🛰️ Servidor de rutas fuera de línea. El KML usará trazo directo.")
+                                st.warning("🛰️ Servidor de rutas fuera de línea o saturado. El KML usará trazo directo.")
 
                             total_lums = 0; total_postes = 0; total_cable = 0
                             for i, p in enumerate(ordenados, 1):
@@ -231,7 +254,7 @@ else:
                             # --- KML MAESTRO PLANO ---
                             kml = simplekml.Kml()
                             
-                            # PASO 1: Marcadores de puntos
+                            # Marcadores de puntos
                             for p in ordenados:
                                 pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
@@ -254,7 +277,7 @@ else:
                                 h += "</table>]]>"
                                 pnt.description = h
 
-                            # PASO 2: Trazado vial o lineal (Fallback)
+                            # Trazado vial o lineal (Fallback)
                             if geo_trazo:
                                 ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
                                 ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
