@@ -195,14 +195,15 @@ else:
                             min_totales = ((total_lums + total_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
                             tiempo_abreviado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
 
-                            # --- NUEVA SECCIÓN: MÉTRICAS VISUALES (COLUMNAS) ---
+                            # --- SECCIÓN: MÉTRICAS VISUALES (COLUMNAS ACTUALIZADAS) ---
                             st.subheader("📊 Resumen de Carga de Trabajo")
-                            m1, m2, m3, m4, m5 = st.columns(5)
+                            m1, m2, m3, m4, m5, m6 = st.columns(6)
                             m1.metric("📍 Puntos", len(ordenados))
                             m2.metric("💡 Luminarias", total_lums)
                             m3.metric("🏗️ Postes", total_postes)
-                            m4.metric("🛣️ Distancia", f"{round(dist_real_km, 2)} km")
-                            m5.metric("⏱️ Tiempo Est.", tiempo_abreviado)
+                            m4.metric("🧶 Cable", f"{total_cable} m") # Nueva Columna Métrica
+                            m5.metric("🛣️ Distancia", f"{round(dist_real_km, 2)} km")
+                            m6.metric("⏱️ Tiempo Est.", tiempo_abreviado)
                             st.write("---")
 
                             df_f = pd.DataFrame(ordenados)
@@ -286,7 +287,8 @@ else:
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
+                                    # Registro actualizado con Cable
+                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
                                     n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
