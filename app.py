@@ -49,7 +49,7 @@ def get_real_route(coords_list):
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
     try:
-        r = requests.get(url, timeout=5) # Timeout extendido para mayor estabilidad
+        r = requests.get(url, timeout=5) 
         if r.status_code == 200:
             data = r.json()
             if data.get('code') == 'Ok':
@@ -158,13 +158,20 @@ else:
 
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
-                            idx_lejano = np.argmax(cdist([BASE_COORDS], np.array([[p['lat_aux'], p['lon_aux']] for p in pts]))[0])
-                            ordenados = [pts.pop(idx_lejano)]
+                            
+                            # MEJORA APLICADA: Optimización Nearest Neighbor iniciando en BASE_COORDS
+                            ordenados = []
+                            # El primer punto es el más cercano a la base
+                            last_coord = BASE_COORDS
+                            
                             while pts:
                                 rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
-                                idx = np.argmin(cdist([(ordenados[-1]['lat_aux'], ordenados[-1]['lon_aux'])], rest))
-                                ordenados.append(pts.pop(idx))
+                                idx = np.argmin(cdist([last_coord], rest))
+                                proximo_punto = pts.pop(idx)
+                                ordenados.append(proximo_punto)
+                                last_coord = (proximo_punto['lat_aux'], proximo_punto['lon_aux'])
 
+                            # MEJORA APLICADA: Fuerza el trazo desde base, pasando por puntos, regresando a base
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
                             
                             # INTELIGENCIA DE RUTAS MEJORADA
@@ -192,7 +199,7 @@ else:
                             columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in cols_extra_a_quitar]
                             df_export = df_f[columnas_finales]
 
-                            st.success(f"✅ Ruta optimizada: {len(ordenados)} puntos.")
+                            st.success(f"✅ Ruta optimizada: {len(ordenados)} puntos con inicio/fin en Base.")
                             c1, c2, c3, c4 = st.columns(4)
 
                             # --- EXCEL PRO DINÁMICO ---
@@ -221,7 +228,7 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO PLANO CON REFUERZO DE TRAZO ---
+                            # --- KML MAESTRO PLANO ---
                             kml = simplekml.Kml()
                             
                             # PASO 1: Marcadores de puntos
@@ -250,19 +257,18 @@ else:
                             # PASO 2: Trazado vial o lineal (Fallback)
                             if geo_trazo:
                                 ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO")
+                                ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
                                 ls.coords = ls_coords
                                 ls.style.linestyle.width = 6
                                 ls.style.linestyle.color = 'ff0000ff'
                             else:
-                                # Si OSRM falla, trazamos línea recta uniendo los puntos ordenados
                                 ls = kml.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
                                 ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
                                 ls.style.linestyle.width = 4
-                                ls.style.linestyle.color = 'ff00ffff' # Magenta para diferenciar fallback
+                                ls.style.linestyle.color = 'ff00ffff'
                             
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
-                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/u/0/", use_container_width=True)
+                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
                                 try:
@@ -298,7 +304,7 @@ else:
                 else: st.info("Bitácora vacía.")
             except: st.info("Sincronizando...")
 
-        with tab3: # PAPELERA MEJORADA CON PURGA DEFINITIVA
+        with tab3: # PAPELERA MEJORADA
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -317,7 +323,7 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r))
                                     st.success("Restaurado."); time.sleep(1); st.rerun()
                         with col_r3:
-                            if st.button("🔥 VACIAR PAPELERA", help="Borra físicamente todos los datos de la hoja de Google Sheets"):
+                            if st.button("🔥 VACIAR PAPELERA"):
                                 df_vacio = pd.DataFrame(columns=df_tr.columns)
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
                                 st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
