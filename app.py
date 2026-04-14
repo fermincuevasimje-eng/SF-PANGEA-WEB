@@ -45,13 +45,18 @@ CHISTES = [
 
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
+    """Obtiene el trazo vial real desde OSRM con manejo de errores Senior."""
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
     try:
-        r = requests.get(url, timeout=3).json()
-        if r['code'] == 'Ok':
-            return r['routes'][0]['geometry']['coordinates'], r['routes'][0]['distance'] / 1000
-    except: return None, None
+        r = requests.get(url, timeout=5) # Timeout extendido para mayor estabilidad
+        if r.status_code == 200:
+            data = r.json()
+            if data.get('code') == 'Ok':
+                return data['routes'][0]['geometry']['coordinates'], data['routes'][0]['distance'] / 1000
+        return None, None
+    except Exception: 
+        return None, None
 
 def normalizar_texto(texto):
     if not isinstance(texto, str): texto = str(texto)
@@ -161,8 +166,12 @@ else:
                                 ordenados.append(pts.pop(idx))
 
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
+                            
+                            # INTELIGENCIA DE RUTAS MEJORADA
                             geo_trazo, dist_real_km = get_real_route(route_coords)
-                            if not dist_real_km: dist_real_km = (len(ordenados) + 1) * 1.3
+                            if not dist_real_km: 
+                                dist_real_km = (len(ordenados) + 1) * 1.3
+                                st.warning("🛰️ Servidor de rutas fuera de línea. El KML usará trazo directo.")
 
                             total_lums = 0; total_postes = 0; total_cable = 0
                             for i, p in enumerate(ordenados, 1):
@@ -212,10 +221,10 @@ else:
                             c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO PLANO (ORDENADO PARA UNA SOLA CAPA) ---
+                            # --- KML MAESTRO PLANO CON REFUERZO DE TRAZO ---
                             kml = simplekml.Kml()
                             
-                            # PASO 1: Insertamos PRIMERO los puntos para que queden arriba en la lista
+                            # PASO 1: Marcadores de puntos
                             for p in ordenados:
                                 pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
@@ -238,16 +247,22 @@ else:
                                 h += "</table>]]>"
                                 pnt.description = h
 
-                            # PASO 2: Insertamos AL FINAL el trazado para que aparezca al final de la lista de My Maps
+                            # PASO 2: Trazado vial o lineal (Fallback)
                             if geo_trazo:
                                 ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
                                 ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO")
                                 ls.coords = ls_coords
                                 ls.style.linestyle.width = 6
                                 ls.style.linestyle.color = 'ff0000ff'
+                            else:
+                                # Si OSRM falla, trazamos línea recta uniendo los puntos ordenados
+                                ls = kml.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
+                                ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
+                                ls.style.linestyle.width = 4
+                                ls.style.linestyle.color = 'ff00ffff' # Magenta para diferenciar fallback
                             
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
-                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
+                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/u/0/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
                                 try:
