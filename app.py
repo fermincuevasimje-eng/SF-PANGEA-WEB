@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.70", layout="wide")
+st.set_page_config(page_title="SF PANGEA v4.8.75", layout="wide")
 
 st.markdown(
     """
@@ -24,6 +24,11 @@ st.markdown(
         z-index: -1;
         pointer-events: none;
         font-weight: bold;
+    }
+    /* Estilo para las métricas para que resalten */
+    [data-testid="stMetricValue"] {
+        font-size: 28px;
+        color: #1F4E78;
     }
     </style>
     """,
@@ -45,7 +50,6 @@ CHISTES = [
 
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
-    """Obtiene el trazo vial real desde OSRM con manejo de errores Senior."""
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
     try:
@@ -126,7 +130,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.70")
+        st.info("SF PANGEA v4.8.75")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
@@ -158,10 +162,7 @@ else:
 
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
-                            
-                            # MEJORA APLICADA: Optimización Nearest Neighbor iniciando en BASE_COORDS
                             ordenados = []
-                            # El primer punto es el más cercano a la base
                             last_coord = BASE_COORDS
                             
                             while pts:
@@ -171,11 +172,9 @@ else:
                                 ordenados.append(proximo_punto)
                                 last_coord = (proximo_punto['lat_aux'], proximo_punto['lon_aux'])
 
-                            # MEJORA APLICADA: Fuerza el trazo desde base, pasando por puntos, regresando a base
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
-                            
-                            # INTELIGENCIA DE RUTAS MEJORADA
                             geo_trazo, dist_real_km = get_real_route(route_coords)
+                            
                             if not dist_real_km: 
                                 dist_real_km = (len(ordenados) + 1) * 1.3
                                 st.warning("🛰️ Servidor de rutas fuera de línea. El KML usará trazo directo.")
@@ -189,34 +188,40 @@ else:
                                 total_lums += p['Cant_Luminarias']; total_postes += p['Cant_Postes']; total_cable += p['Cant_Cable_m']
 
                             min_totales = ((total_lums + total_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
-                            tiempo_abreviado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
+                            tiempo_abreviado = f"{int(min_totales // 60)}h {int(min_totales % 60)}m"
+
+                            # --- PROPUESTA SENIOR: VISUAL METRICS CARDS ---
+                            st.markdown("### 📊 Resumen de Ruta Operativa")
+                            m1, m2, m3, m4, m5 = st.columns(5)
+                            m1.metric("📍 Puntos", f"{len(ordenados)}")
+                            m2.metric("💡 Luminarias", f"{total_lums}")
+                            m3.metric("🏗️ Postes", f"{total_postes}")
+                            m4.metric("🛣️ Distancia", f"{round(dist_real_km, 2)} km")
+                            m5.metric("⏳ Tiempo Est.", tiempo_abreviado)
+                            st.write("---")
 
                             df_f = pd.DataFrame(ordenados)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
-                            
-                            cols_extra_a_quitar = ['ï»¿No_Ruta', 'Maps']
-                            columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in cols_extra_a_quitar]
+                            columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in ['ï»¿No_Ruta', 'Maps']]
                             df_export = df_f[columnas_finales]
 
-                            st.success(f"✅ Ruta optimizada: {len(ordenados)} puntos con inicio/fin en Base.")
+                            # Botones de Acción
                             c1, c2, c3, c4 = st.columns(4)
-
-                            # --- EXCEL PRO DINÁMICO ---
+                            
+                            # Excel Pro
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                                 df_export.to_excel(writer, index=False, sheet_name='Ruta')
                                 ws = writer.sheets['Ruta']
                                 last_row = len(ordenados) + 1
                                 res_row = last_row + 2
-                                ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
-                                ws.cell(row=res_row+1, column=1, value="Total Luminarias:"); ws.cell(row=res_row+1, column=2, value=f"=SUM(C2:C{last_row})")
-                                ws.cell(row=res_row+2, column=1, value="Total Postes:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(D2:D{last_row})")
-                                ws.cell(row=res_row+3, column=1, value="Total Cable:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(E2:E{last_row})")
+                                ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO ---")
+                                ws.cell(row=res_row+1, column=1, value="Total Luminarias:"); ws.cell(row=res_row+1, column=2, value=total_lums)
+                                ws.cell(row=res_row+2, column=1, value="Total Postes:"); ws.cell(row=res_row+2, column=2, value=total_postes)
+                                ws.cell(row=res_row+3, column=1, value="Total Cable:"); ws.cell(row=res_row+3, column=2, value=total_cable)
                                 ws.cell(row=res_row+4, column=1, value="Distancia:"); ws.cell(row=res_row+4, column=2, value=f"{round(dist_real_km,2)} km")
-                                f_calc_minutos = f"ROUND(((B{res_row+1}+B{res_row+2})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
-                                ws.cell(row=res_row+5, column=1, value="Tiempo Estimado:")
-                                ws.cell(row=res_row+5, column=2, value=f'=INT({f_calc_minutos}/60) & " h " & MOD({f_calc_minutos},60) & " m"')
+                                ws.cell(row=res_row+5, column=1, value="Tiempo Estimado:"); ws.cell(row=res_row+5, column=2, value=tiempo_abreviado)
                                 
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
                                 for r in range(2, last_row + 1):
@@ -225,13 +230,11 @@ else:
                                     elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
 
-                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
-                            c2.download_button("📊 CSV Estático", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
+                            c1.download_button("📗 Excel Pro", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
+                            c2.download_button("📊 CSV", df_export.to_csv(index=False).encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO PLANO ---
+                            # KML
                             kml = simplekml.Kml()
-                            
-                            # PASO 1: Marcadores de puntos
                             for p in ordenados:
                                 pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
@@ -239,30 +242,20 @@ else:
                                 for col in cols_orig:
                                     val = str(p.get(col, '')).strip()
                                     if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
-                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
-                                h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
-                                h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{total_postes}</td></tr>"
-                                h += f"<tr><td><b>Total Cable Ruta:</b></td><td>{total_cable} m</td></tr>"
-                                h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
-                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
+                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>RESUMEN SF</b></td></tr>"
+                                h += f"<tr><td><b>No. Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
+                                h += f"<tr><td><b>Distancia:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                                h += f"<tr><td><b>Tiempo:</b></td><td>{tiempo_abreviado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
 
-                            # PASO 2: Trazado vial o lineal (Fallback)
                             if geo_trazo:
-                                ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
-                                ls.coords = ls_coords
+                                ls = kml.newlinestring(name="TRAYECTO VIAL")
+                                ls.coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
                                 ls.style.linestyle.width = 6
                                 ls.style.linestyle.color = 'ff0000ff'
                             else:
-                                ls = kml.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
+                                ls = kml.newlinestring(name="TRAYECTO LINEAL")
                                 ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
                                 ls.style.linestyle.width = 4
                                 ls.style.linestyle.color = 'ff00ffff'
@@ -304,7 +297,7 @@ else:
                 else: st.info("Bitácora vacía.")
             except: st.info("Sincronizando...")
 
-        with tab3: # PAPELERA MEJORADA
+        with tab3: # PAPELERA
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
