@@ -164,22 +164,27 @@ else:
                 
                 with c_input:
                     st.subheader("⌨️ Captura de Folios")
-                    input_folio = st.text_input("Digite Folio (o Folio - Comentario) y presione ENTER:", key="input_baja")
                     
-                    if input_folio:
-                        # Lógica de separación: Folio - Comentario
-                        if "-" in input_folio:
-                            parts = input_folio.split("-", 1)
-                            f_val = parts[0].strip()
-                            c_val = parts[1].strip()[:30] # Limite 30 caracteres
-                        else:
-                            f_val = input_folio.strip()
-                            c_val = "ATENDIDO"
+                    # CORRECCIÓN PREMIUM: División en dos columnas de entrada específicas
+                    col_f_in, col_r_in = st.columns(2)
+                    with col_f_in:
+                        in_f_val = st.text_input("Digite Folio/Ticket/IMEI:", key="in_folio_baja")
+                    with col_r_in:
+                        in_c_val = st.text_input("Respuesta 127 (Máx 30 car.):", max_chars=30, key="in_resp_baja")
+                    
+                    # Botón para agregar, ya que text_input individual no dispara la acción conjunta fácilmente
+                    if st.button("➕ Agregar a Lista", use_container_width=True):
+                        f_final = in_f_val.strip()
+                        # Lógica por default
+                        c_final = in_c_val.strip() if in_c_val.strip() else "ATENDIDO"
                         
-                        if f_val:
-                            st.session_state.lista_bajas[f_val] = c_val
-                            st.toast(f"Folio {f_val} agregado", icon="✅")
+                        if f_final:
+                            st.session_state.lista_bajas[f_final] = c_final
+                            st.toast(f"Folio {f_final} agregado con respuesta: {c_final}", icon="✅")
+                            # Nota: Streamlit no limpia los inputs automáticamente al presionar botón, 
+                            # se requiere manejo de estado avanzado para limpiarlos, pero funcionalmente cumple.
                     
+                    st.write("---")
                     if st.button("🗑️ Limpiar Lista Actual"):
                         st.session_state.lista_bajas = {}
                         st.rerun()
@@ -187,7 +192,7 @@ else:
                 with c_lista:
                     st.subheader("📋 Folios a dar de Baja")
                     if st.session_state.lista_bajas:
-                        df_resumen_bajas = pd.DataFrame([{"Folio": k, "Respuesta": v} for k, v in st.session_state.lista_bajas.items()])
+                        df_resumen_bajas = pd.DataFrame([{"Folio": k, "Respuesta 127": v} for k, v in st.session_state.lista_bajas.items()])
                         st.dataframe(df_resumen_bajas, use_container_width=True, hide_index=True)
                         
                         # Botón para procesar y descargar
@@ -196,7 +201,7 @@ else:
                             folios_a_buscar = list(st.session_state.lista_bajas.keys())
                             df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
                             
-                            # Agregar la columna Respuesta 127
+                            # Agregar la columna Respuesta 127 mapeando desde el estado
                             df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].map(st.session_state.lista_bajas)
                             
                             # Excel
