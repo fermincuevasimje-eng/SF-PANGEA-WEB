@@ -166,33 +166,53 @@ else:
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
         if up_cap:
             try:
+                # --- MOTOR DE CARGA OPTIMIZADO SF ---
                 df_c = pd.read_excel(up_cap) if up_cap.name.endswith('.xlsx') else pd.read_csv(up_cap)
                 c1, c2 = st.columns(2)
-                with c1: sel_del = st.selectbox("Seleccione Delegación:", ["TODAS"] + sorted(list(CATALOGO_TOLUCA.keys())))
+                with c1: 
+                    sel_del = st.selectbox("Seleccione Delegación:", ["TODAS"] + sorted(list(CATALOGO_TOLUCA.keys())))
                 with c2: 
                     opciones_utb = CATALOGO_TOLUCA.get(sel_del, []) if sel_del != "TODAS" else []
                     sel_utb = st.selectbox("Seleccione UTB:", ["TODAS"] + sorted(opciones_utb))
-                # Lógica de filtrado normalizado
-                df_c['del_norm'] = df_c.iloc[:, 22].apply(normalizar_texto) # Columna W (Delegación)
-                df_c['utb_norm'] = df_c.iloc[:, 23].apply(normalizar_texto) # Columna X (UTB)
+                
+                # --- MOTOR DE NORMALIZACIÓN Y AGRUPACIÓN PREMIUM ---
+                # Pre-procesamiento para acelerar índices
+                df_c['del_norm'] = df_c.iloc[:, 22].astype(str).apply(normalizar_texto) 
+                df_c['utb_norm'] = df_c.iloc[:, 23].astype(str).apply(normalizar_texto) 
+                
                 df_f = df_c.copy()
-                if sel_del != "TODAS": df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS": df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
-                # Métricas según columnas AD(29), AE(30), AF(31), AN(39)
-                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').sum()
-                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').sum()
-                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').sum()
-                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').sum()
-                st.markdown("---")
+                if sel_del != "TODAS": 
+                    df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS": 
+                    df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
+                
+                # --- EXTRACCIÓN DE MÉTRICAS (Columnas AD, AE, AF, AN) ---
+                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').fillna(0).sum()
+                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').fillna(0).sum()
+                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').fillna(0).sum()
+                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').fillna(0).sum()
+                
+                st.markdown("""<div style='background-color: #f0f2f6; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
+                                <h3 style='margin-top: 0;'>📊 Resumen de Productividad Territorial</h3></div>""", unsafe_allow_html=True)
+                
                 met1, met2, met3, met4 = st.columns(4)
                 met1.metric("🔧 Rehabilitaciones", int(m_rehab))
                 met2.metric("🧹 Mantenimientos", int(m_manto))
                 met3.metric("💡 Sustituciones", int(m_sust))
                 met4.metric("➕ Ampliaciones", int(m_ampli))
-                st.markdown("---")
-                st.dataframe(df_f.iloc[:, [6, 22, 23, 29, 30, 31, 39]], use_container_width=True)
-            except Exception as e: st.error(f"Error procesando captura: {e}")
-        else: st.info("Esperando carga de archivo de captura...")
+                
+                st.markdown("--- ")
+                st.write("🔍 **Registros Operativos (Vista Parcial):**")
+                # Columnas: Fecha(4), Calle(19), Delegacion(22), UTB(23), AD(29), AE(30), AF(31), AN(39)
+                cols_v = [4, 19, 22, 23, 29, 30, 31, 39]
+                st.dataframe(df_f.iloc[:, cols_v], use_container_width=True)
+                
+            except Exception as e: 
+                st.error(f"Error crítico en el motor de métricas: {e}")
+                st.info("Asegúrese de que el archivo de captura respete el formato estándar de la Dirección.")
+        else: 
+            st.info("💡 Módulo SF3 Activo. Por favor, cargue el archivo de Captura Diaria para generar los indicadores territoriales.")
+            st.warning("⚠️ El catálogo de Delegaciones y UTBs ya se encuentra precargado en el sistema.")
 
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
