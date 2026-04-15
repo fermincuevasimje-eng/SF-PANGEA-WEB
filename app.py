@@ -148,8 +148,42 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo {st.session_state.menu}")
-        st.success(random.choice(CHISTES))
+        st.title(f"📊 Módulo {st.session_state.menu} - Análisis Territorial")
+        c1, c2 = st.columns(2)
+        with c1: up_utb = st.file_uploader("1. Cargar Catálogo Delegaciones/UTB", type=["xlsx", "csv"])
+        with c2: up_cap = st.file_uploader("2. Cargar Archivo de Captura Diaria", type=["xlsx", "csv"])
+        if up_utb and up_cap:
+            try:
+                df_u = pd.read_excel(up_utb).fillna(method='ffill') if up_utb.name.endswith('.xlsx') else pd.read_csv(up_utb).fillna(method='ffill')
+                df_c = pd.read_excel(up_cap) if up_cap.name.endswith('.xlsx') else pd.read_csv(up_cap)
+                del_col = next(c for c in df_u.columns if "DELEGACION" in c.upper())
+                utb_col = next(c for c in df_u.columns if "UTB" in c.upper() and "UNIDAD" in c.upper())
+                lista_delegaciones = sorted(df_u[del_col].unique())
+                sel_del = st.selectbox("Seleccione Delegación:", ["TODAS"] + list(lista_delegaciones))
+                df_u_sub = df_u if sel_del == "TODAS" else df_u[df_u[del_col] == sel_del]
+                lista_utb = sorted(df_u_sub[utb_col].unique())
+                sel_utb = st.selectbox("Seleccione UTB (Subíndice):", ["TODAS"] + list(lista_utb))
+                # Filtrado de Captura (Insensible a acentos/mayúsculas)
+                df_c['del_norm'] = df_c.iloc[:, 22].apply(normalizar_texto) # Columna W (Delegación)
+                df_c['utb_norm'] = df_c.iloc[:, 23].apply(normalizar_texto) # Columna X (UTB)
+                df_f = df_c.copy()
+                if sel_del != "TODAS": df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS": df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
+                # Métricas Columnas AD, AE, AF, AN (Índices 29, 30, 31, 39)
+                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').sum()
+                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').sum()
+                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').sum()
+                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').sum()
+                st.write("---")
+                met1, met2, met3, met4 = st.columns(4)
+                met1.metric("🔧 Rehabilitaciones", int(m_rehab))
+                met2.metric("🧹 Mantenimientos", int(m_manto))
+                met3.metric("💡 Sustituciones", int(m_sust))
+                met4.metric("➕ Ampliaciones", int(m_ampli))
+                st.write("---")
+                st.dataframe(df_f.iloc[:, [6, 22, 23, 29, 30, 31, 39]], use_container_width=True)
+            except Exception as e: st.error(f"Error en índices: {e}")
+        else: st.info("Por favor, cargue ambos archivos para activar los índices.")
 
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
