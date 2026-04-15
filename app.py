@@ -101,6 +101,10 @@ if "menu" not in st.session_state:
 if "lista_bajas" not in st.session_state:
     st.session_state.lista_bajas = {} # {folio: comentario}
 
+# --- NUEVO ESTADO PARA GDR MANUAL ---
+if "lista_ruta_manual" not in st.session_state:
+    st.session_state.lista_ruta_manual = []
+
 # --- MEJORA PREMIUM: LLAVES PARA LIMPIEZA DE INPUTS ---
 if "input_key" not in st.session_state:
     st.session_state.input_key = 0
@@ -242,14 +246,68 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
+                # --- NUEVA SECCIÓN: CAPTURA DESDE BASE GLOBAL ---
+                st.subheader("📂 Opción 1: Carga Directa")
                 up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
+                
+                st.markdown("---")
+                st.subheader("⌨️ Opción 2: Generador desde Base Global")
+                up_raw = st.file_uploader("Subir Archivo 'En Crudo' (Referencia Global)", type=["csv", "xlsx"], key="up_raw_gdr")
+                
+                df_target = None
+                nombre_archivo_final = "Ruta_SF"
+
+                # Lógica A: Si se sube archivo directo (Opción 1)
                 if up:
                     try:
-                        df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
-                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
-                        res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-                        df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
-                        df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
+                        df_target = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
+                        nombre_archivo_final = up.name
+                    except Exception as e: st.error(f"Error en carga directa: {e}")
+
+                # Lógica B: Si se sube archivo crudo (Opción 2)
+                if up_raw:
+                    try:
+                        df_raw_db = pd.read_excel(up_raw, dtype=str).fillna("") if up_raw.name.endswith('.xlsx') else pd.read_csv(up_raw, encoding='latin-1', dtype=str).fillna("")
+                        id_col_raw = next((c for c in df_raw_db.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_raw_db.columns[0])
+                        
+                        with st.form("form_gdr_manual", clear_on_submit=True):
+                            col_f_gdr, col_b_gdr = st.columns([3, 1])
+                            with col_f_gdr:
+                                in_f_gdr = st.text_input("Capture Folio/Ticket para agregar a la ruta:")
+                            with col_b_gdr:
+                                sub_gdr = st.form_submit_button("➕ Agregar a Lista")
+                            
+                            if sub_gdr:
+                                f_val = in_f_gdr.strip()
+                                if f_val:
+                                    if f_val in df_raw_db[id_col_raw].astype(str).values:
+                                        if f_val not in st.session_state.lista_ruta_manual:
+                                            st.session_state.lista_ruta_manual.append(f_val)
+                                            st.toast(f"Punto {f_val} agregado a la lista", icon="📍")
+                                            st.rerun()
+                                        else: st.warning("Este folio ya está en la lista.")
+                                    else: st.error("El folio no existe en el archivo crudo.")
+
+                        if st.session_state.lista_ruta_manual:
+                            st.write(f"📍 Puntos capturados: {len(st.session_state.lista_ruta_manual)}")
+                            c_m1, c_m2 = st.columns(2)
+                            if c_m1.button("🗑️ Vaciar Lista de Ruta"):
+                                st.session_state.lista_ruta_manual = []
+                                st.rerun()
+                            if c_m2.button("🗺️ GENERAR RUTA DESDE LISTA", use_container_width=True):
+                                # Extraemos solo los folios capturados de la base global
+                                df_target = df_raw_db[df_raw_db[id_col_raw].astype(str).isin(st.session_state.lista_ruta_manual)].copy()
+                                nombre_archivo_final = f"Ruta_Manual_{len(st.session_state.lista_ruta_manual)}.xlsx"
+
+                    except Exception as e: st.error(f"Error en base global: {e}")
+
+                # --- MOTOR DE PROCESAMIENTO GDR (UNIFICADO) ---
+                if df_target is not None:
+                    try:
+                        id_col = next((c for c in df_target.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_target.columns[0])
+                        res_gps = df_target.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4) )', " ".join(r.astype(str))), axis=1)
+                        df_target['lat_aux'], df_target['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
+                        df_v = df_target.dropna(subset=['lat_aux']).reset_index(drop=True)
 
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
@@ -299,12 +357,13 @@ else:
 
                             df_f = pd.DataFrame(ordenados)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
-                            cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
+                            cols_orig = [c for c in df_target.columns if c not in ['lat_aux', 'lon_aux']]
                             cols_extra_a_quitar = ['ï»¿No_Ruta', 'Maps']
                             columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in cols_extra_a_quitar]
                             df_export = df_f[columnas_finales]
 
                             st.success(f"✅ Ruta optimizada con éxito.")
+                            st.balloons()
                             c1, c2, c3, c4 = st.columns(4)
 
                             # --- EXCEL PRO DINÁMICO ---
@@ -331,7 +390,7 @@ else:
                                     elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
 
-                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
+                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{nombre_archivo_final}.xlsx", use_container_width=True)
                             
                             # CSV CORREGIDO
                             csv_buffer = io.StringIO()
@@ -343,7 +402,7 @@ else:
                             csv_buffer.write(f"Total Cable:,{total_cable} m\n")
                             csv_buffer.write(f"Distancia Total:,{round(dist_real_km,2)} km\n")
                             csv_buffer.write(f"Tiempo Estimado:,{tiempo_abreviado}\n")
-                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
+                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{nombre_archivo_final}.csv", use_container_width=True)
 
                             # --- KML MAESTRO PLANO ---
                             kml = simplekml.Kml()
@@ -381,7 +440,7 @@ else:
                                 ls.style.linestyle.width = 4
                                 ls.style.linestyle.color = 'ff00ffff'
                             
-                            c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
+                            c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{nombre_archivo_final}.kml", use_container_width=True)
                             c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
@@ -389,7 +448,7 @@ else:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
                                     info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": nombre_archivo_final, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
@@ -406,7 +465,7 @@ else:
                     if st.session_state.perfil == "ADMIN":
                         c_sel, c_del = st.columns([3, 1])
                         with c_sel: ids_e = st.multiselect("ID para mover a papelera:", df_bt_v["ID_Reg"].tolist())
-                        with c_del:
+                        with col_del := c_del:
                             if st.button("🗑️ Mover"):
                                 if ids_e:
                                     idx_e = df_bt_v[df_bt_v["ID_Reg"].isin(ids_e)].index
