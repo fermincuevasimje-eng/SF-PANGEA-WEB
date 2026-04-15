@@ -101,10 +101,6 @@ if "menu" not in st.session_state:
 if "lista_bajas" not in st.session_state:
     st.session_state.lista_bajas = {} # {folio: comentario}
 
-# --- NUEVO ESTADO PARA GDR MANUAL ---
-if "lista_ruta_manual" not in st.session_state:
-    st.session_state.lista_ruta_manual = []
-
 # --- MEJORA PREMIUM: LLAVES PARA LIMPIEZA DE INPUTS ---
 if "input_key" not in st.session_state:
     st.session_state.input_key = 0
@@ -173,6 +169,7 @@ else:
                 with c_input:
                     st.subheader("⌨️ Captura de Folios")
                     
+                    # Formulario para capturar el Enter
                     with st.form("form_bajas", clear_on_submit=True):
                         col_f_in, col_r_in = st.columns(2)
                         with col_f_in:
@@ -187,12 +184,15 @@ else:
                             c_final = in_c_val.strip() if in_c_val.strip() else "ATENDIDO"
                             
                             if f_final:
+                                # --- CANDADO DE VALIDACIÓN PREMIUM ---
+                                # Se busca el folio exactamente en la columna identificada del DataFrame de referencia
                                 if f_final in df_ref[id_col_sf2].astype(str).values:
                                     st.session_state.lista_bajas[f_final] = c_final
                                     st.toast(f"Folio {f_final} validado", icon="✅")
                                     st.rerun()
                                 else:
                                     st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
+                                # --------------------------------------
 
                     st.write("---")
                     if st.button("🗑️ Limpiar Lista Actual"):
@@ -205,12 +205,18 @@ else:
                         df_resumen_bajas = pd.DataFrame([{"Folio": k, "Respuesta 127": v} for k, v in st.session_state.lista_bajas.items()])
                         st.dataframe(df_resumen_bajas, use_container_width=True, hide_index=True)
                         
+                        # Botón para procesar y descargar
                         if st.button("📥 Generar Documento de Bajas", use_container_width=True):
                             st.balloons()
+                            
+                            # Filtrar el dataframe original solo por los folios capturados
                             folios_a_buscar = list(st.session_state.lista_bajas.keys())
                             df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
+                            
+                            # Agregar la columna Respuesta 127 mapeando desde el estado
                             df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].map(st.session_state.lista_bajas)
                             
+                            # Excel
                             output_sf2 = io.BytesIO()
                             with pd.ExcelWriter(output_sf2, engine='openpyxl') as writer:
                                 df_final_bajas.to_excel(writer, index=False, sheet_name='BAJAS_SF')
@@ -236,73 +242,21 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                # --- INTEGRACIÓN OPCIÓN 1 Y 2 ---
-                st.subheader("📂 Opción 1: Carga Directa (Ruta Definida)")
                 up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
-                
-                st.markdown("---")
-                st.subheader("⌨️ Opción 2: Generador desde Base Global (Crudo)")
-                up_raw = st.file_uploader("Subir Base Global 'En Crudo'", type=["csv", "xlsx"], key="up_raw_gdr")
-                
-                df_target = None
-                nombre_archivo_final = "SF_PANGEA_RUTA"
-
-                # LÓGICA OPCIÓN 1
                 if up:
                     try:
-                        df_target = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
-                        nombre_archivo_final = up.name
-                    except Exception as e:
-                        st.error(f"Error en Opción 1: {e}")
-
-                # LÓGICA OPCIÓN 2
-                if up_raw:
-                    try:
-                        df_raw_db = pd.read_excel(up_raw, dtype=str).fillna("") if up_raw.name.endswith('.xlsx') else pd.read_csv(up_raw, encoding='latin-1', dtype=str).fillna("")
-                        id_col_raw = next((c for c in df_raw_db.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_raw_db.columns[0])
-                        
-                        with st.form("form_gdr_manual", clear_on_submit=True):
-                            col_f_gdr, col_b_gdr = st.columns([3, 1])
-                            with col_f_gdr:
-                                in_f_gdr = st.text_input("Capture Folio/Ticket para agregar a la ruta:")
-                            with col_b_gdr:
-                                sub_gdr = st.form_submit_button("➕ Agregar a Lista")
-                            
-                            if sub_gdr:
-                                f_val = in_f_gdr.strip()
-                                if f_val:
-                                    if f_val in df_raw_db[id_col_raw].astype(str).values:
-                                        if f_val not in st.session_state.lista_ruta_manual:
-                                            st.session_state.lista_ruta_manual.append(f_val)
-                                            st.toast(f"Punto {f_val} agregado", icon="📍")
-                                            st.rerun()
-                                        else: st.warning("Ya está en la lista.")
-                                    else: st.error("No existe en el archivo crudo.")
-
-                        if st.session_state.lista_ruta_manual:
-                            st.write(f"📍 Puntos capturados: {len(st.session_state.lista_ruta_manual)}")
-                            c_m1, c_m2 = st.columns(2)
-                            if c_m1.button("🗑️ Vaciar Lista de Ruta"):
-                                st.session_state.lista_ruta_manual = []
-                                st.rerun()
-                            if c_m2.button("🗺️ GENERAR RUTA DESDE LISTA", use_container_width=True):
-                                df_target = df_raw_db[df_raw_db[id_col_raw].astype(str).isin(st.session_state.lista_ruta_manual)].copy()
-                                nombre_archivo_final = f"Ruta_Manual_{len(st.session_state.lista_ruta_manual)}.xlsx"
-
-                    except Exception as e:
-                        st.error(f"Error en Opción 2: {e}")
-
-                # --- MOTOR DE PROCESAMIENTO GDR (UNIFICADO) ---
-                if df_target is not None:
-                    try:
-                        id_col = next((c for c in df_target.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_target.columns[0])
-                        res_gps = df_target.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-                        df_target['lat_aux'], df_target['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
-                        df_v = df_target.dropna(subset=['lat_aux']).reset_index(drop=True)
+                        df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
+                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
+                        res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
+                        df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
+                        df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
 
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
-                            ordenados_temp, last_coord = [], BASE_COORDS
+                            
+                            # MOTOR DE OPTIMIZACIÓN
+                            ordenados_temp = []
+                            last_coord = BASE_COORDS
                             
                             while pts:
                                 rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
@@ -311,14 +265,17 @@ else:
                                 ordenados_temp.append(proximo_punto)
                                 last_coord = (proximo_punto['lat_aux'], proximo_punto['lon_aux'])
 
+                            # CORRECCIÓN LOGÍSTICA: El punto 1 es el más lejano
                             ordenados = ordenados_temp[::-1]
+
+                            # TRAZO VIAL
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
                             geo_trazo, dist_real_km = get_real_route(route_coords)
                             if not dist_real_km: 
                                 dist_real_km = (len(ordenados) + 1) * 1.3
-                                st.warning("🛰️ Servidor de rutas fuera de línea. Trazo directo.")
+                                st.warning("🛰️ Servidor de rutas fuera de línea. El KML usará trazo directo.")
 
-                            total_lums, total_postes, total_cable = 0, 0, 0
+                            total_lums = 0; total_postes = 0; total_cable = 0
                             for i, p in enumerate(ordenados, 1):
                                 p['No_Ruta'], p['ID_Pangea_Nombre'] = i, p[id_col]
                                 p['Cant_Luminarias'] = extraer_carga_robusta(p, 'lum') or (1 if extraer_carga_robusta(p, 'poste')==0 and extraer_carga_robusta(p, 'cable')==0 else 0)
@@ -329,23 +286,33 @@ else:
                             min_totales = ((total_lums + total_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
                             tiempo_abreviado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
 
+                            # --- SECCIÓN: MÉTRICAS VISUALES ---
                             st.subheader("📊 Resumen de Carga de Trabajo")
                             m1, m2, m3, m4, m5, m6 = st.columns(6)
-                            m1.metric("📍 Puntos", len(ordenados)); m2.metric("💡 Luminarias", total_lums); m3.metric("🏗️ Postes", total_postes)
-                            m4.metric("🧶 Cable", f"{total_cable} m"); m5.metric("🛣️ Distancia", f"{round(dist_real_km, 2)} km"); m6.metric("⏱️ Tiempo Est.", tiempo_abreviado)
-                            
+                            m1.metric("📍 Puntos", len(ordenados))
+                            m2.metric("💡 Luminarias", total_lums)
+                            m3.metric("🏗️ Postes", total_postes)
+                            m4.metric("🧶 Cable", f"{total_cable} m")
+                            m5.metric("🛣️ Distancia", f"{round(dist_real_km, 2)} km")
+                            m6.metric("⏱️ Tiempo Est.", tiempo_abreviado)
+                            st.write("---")
+
                             df_f = pd.DataFrame(ordenados)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
-                            cols_orig = [c for c in df_target.columns if c not in ['lat_aux', 'lon_aux']]
-                            df_export = df_f[cols_vits + [c for c in cols_orig if c != id_col and c not in ['ï»¿No_Ruta', 'Maps']]]
+                            cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
+                            cols_extra_a_quitar = ['ï»¿No_Ruta', 'Maps']
+                            columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in cols_extra_a_quitar]
+                            df_export = df_f[columnas_finales]
 
-                            st.success(f"✅ Ruta optimizada con éxito."); st.balloons()
+                            st.success(f"✅ Ruta optimizada con éxito.")
                             c1, c2, c3, c4 = st.columns(4)
 
+                            # --- EXCEL PRO DINÁMICO ---
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                                 df_export.to_excel(writer, index=False, sheet_name='Ruta')
-                                ws, last_row = writer.sheets['Ruta'], len(ordenados) + 1
+                                ws = writer.sheets['Ruta']
+                                last_row = len(ordenados) + 1
                                 res_row = last_row + 2
                                 ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
                                 ws.cell(row=res_row+1, column=1, value="Total Puntos:"); ws.cell(row=res_row+1, column=2, value=len(ordenados))
@@ -353,52 +320,81 @@ else:
                                 ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(D2:D{last_row})")
                                 ws.cell(row=res_row+4, column=1, value="Total Cable:"); ws.cell(row=res_row+4, column=2, value=f"=SUM(E2:E{last_row})")
                                 ws.cell(row=res_row+5, column=1, value="Distancia:"); ws.cell(row=res_row+5, column=2, value=f"{round(dist_real_km,2)} km")
-                                f_calc = f"ROUND(((B{res_row+2}+B{res_row+3})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
-                                ws.cell(row=res_row+6, column=1, value="Tiempo Estimado:"); ws.cell(row=res_row+6, column=2, value=f'=INT({f_calc}/60) & " h " & MOD({f_calc},60) & " m"')
-                                fg, fa = PatternFill(start_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", fill_type="solid")
+                                f_calc_minutos = f"ROUND(((B{res_row+2}+B{res_row+3})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
+                                ws.cell(row=res_row+6, column=1, value="Tiempo Estimado:")
+                                ws.cell(row=res_row+6, column=2, value=f'=INT({f_calc_minutos}/60) & " h " & MOD({f_calc_minutos},60) & " m"')
+                                
+                                fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
                                 for r in range(2, last_row + 1):
                                     if int(df_f.iloc[r-2]['Cant_Postes']) > 0:
                                         for cell in ws[r]: cell.fill = fg
                                     elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
 
-                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{nombre_archivo_final}.xlsx", use_container_width=True)
+                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             
+                            # CSV CORREGIDO
                             csv_buffer = io.StringIO()
                             df_export.to_csv(csv_buffer, index=False)
-                            csv_buffer.write(f"\n--- RESUMEN OPERATIVO DINÁMICO ---\nTotal Puntos:,{len(ordenados)}\nLuminarias:,{total_lums}\nPostes:,{total_postes}\nCable:,{total_cable} m\nDistancia:,{round(dist_real_km,2)} km\nTiempo:,{tiempo_abreviado}")
-                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{nombre_archivo_final}.csv", use_container_width=True)
+                            csv_buffer.write(f"\n--- RESUMEN OPERATIVO DINÁMICO ---\n")
+                            csv_buffer.write(f"Total Puntos:,{len(ordenados)}\n")
+                            csv_buffer.write(f"Total Luminarias:,{total_lums}\n")
+                            csv_buffer.write(f"Total Postes:,{total_postes}\n")
+                            csv_buffer.write(f"Total Cable:,{total_cable} m\n")
+                            csv_buffer.write(f"Distancia Total:,{round(dist_real_km,2)} km\n")
+                            csv_buffer.write(f"Tiempo Estimado:,{tiempo_abreviado}\n")
+                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
+                            # --- KML MAESTRO PLANO ---
                             kml = simplekml.Kml()
                             for p in ordenados:
                                 pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
                                 h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
-                                for col in cols_orig: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{str(p.get(col,''))}</td></tr>"
-                                h += f"<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
+                                for col in cols_orig:
+                                    val = str(p.get(col, '')).strip()
+                                    if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
+                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
+                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
+                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
+                                h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
+                                h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{total_postes}</td></tr>"
+                                h += f"<tr><td><b>Total Cable Ruta:</b></td><td>{total_cable} m</td></tr>"
+                                h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
+
                             if geo_trazo:
-                                ls = kml.newlinestring(name="TRAZO VIAL")
-                                ls.coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                ls.style.linestyle.width, ls.style.linestyle.color = 6, 'ff0000ff'
+                                ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
+                                ls.coords = ls_coords
+                                ls.style.linestyle.width = 6
+                                ls.style.linestyle.color = 'ff0000ff'
+                            else:
+                                ls = kml.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
+                                ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
+                                ls.style.linestyle.width = 4
+                                ls.style.linestyle.color = 'ff00ffff'
                             
-                            c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{nombre_archivo_final}.kml", use_container_width=True)
+                            c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
                             c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": nombre_archivo_final, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": tiempo_abreviado}])
+                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                    st.success("¡Registrado en Bitácora!")
-                                except Exception as e: st.error(f"Error Bitácora: {e}")
-                    except Exception as e: st.error(f"Error Motor: {e}")
+                                    st.balloons(); st.success("¡Bitácora actualizada!")
+                                except Exception as e: st.error(f"Error GSheets: {e}")
+
+                    except Exception as e: st.error(f"Error procesando archivo: {e}")
 
         with tab2: # BITÁCORA
             try:
@@ -409,19 +405,20 @@ else:
                     df_bt_v.insert(0, "ID_Reg", range(1, len(df_bt_v) + 1))
                     if st.session_state.perfil == "ADMIN":
                         c_sel, c_del = st.columns([3, 1])
-                        ids_e = c_sel.multiselect("ID para mover:", df_bt_v["ID_Reg"].tolist())
-                        if c_del.button("🗑️ Mover"):
-                            if ids_e:
-                                idx_e = df_bt_v[df_bt_v["ID_Reg"].isin(ids_e)].index
-                                df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
-                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[idx_e]], ignore_index=True))
-                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(idx_e))
-                                st.rerun()
+                        with c_sel: ids_e = st.multiselect("ID para mover a papelera:", df_bt_v["ID_Reg"].tolist())
+                        with c_del:
+                            if st.button("🗑️ Mover"):
+                                if ids_e:
+                                    idx_e = df_bt_v[df_bt_v["ID_Reg"].isin(ids_e)].index
+                                    df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[idx_e]], ignore_index=True))
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(idx_e))
+                                    st.success("Movido."); time.sleep(1); st.rerun()
                     st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
                 else: st.info("Bitácora vacía.")
             except: st.info("Sincronizando...")
 
-        with tab3: # PAPELERA
+        with tab3: # PAPELERA MEJORADA
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -429,17 +426,21 @@ else:
                     if not df_tr.empty:
                         df_tr_v = df_tr.copy()
                         df_tr_v.insert(0, "ID_Reg", range(1, len(df_tr_v) + 1))
-                        c_r1, c_r2, c_r3 = st.columns([2, 1, 1])
-                        ids_r = c_r1.multiselect("ID para restaurar:", df_tr_v["ID_Reg"].tolist())
-                        if c_r2.button("♻️ Restaurar") and ids_r:
-                            idx_r = df_tr_v[df_tr_v["ID_Reg"].isin(ids_r)].index
-                            df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                            conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[idx_r]], ignore_index=True))
-                            conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r))
-                            st.rerun()
-                        if c_r3.button("🔥 VACIAR"):
-                            conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.DataFrame(columns=df_tr.columns))
-                            st.rerun()
+                        col_r1, col_r2, col_r3 = st.columns([2, 1, 1])
+                        with col_r1: ids_r = st.multiselect("ID para restaurar:", df_tr_v["ID_Reg"].tolist())
+                        with col_r2: 
+                            if st.button("♻️ Restaurar"):
+                                if ids_r:
+                                    idx_r = df_tr_v[df_tr_v["ID_Reg"].isin(ids_r)].index
+                                    df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[idx_r]], ignore_index=True))
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r))
+                                    st.success("Restaurado."); time.sleep(1); st.rerun()
+                        with col_r3:
+                            if st.button("🔥 VACIAR PAPELERA"):
+                                df_vacio = pd.DataFrame(columns=df_tr.columns)
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
+                                st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
                         st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
                     else: st.info("Papelera vacía.")
-                except: st.info("Cargando...")
+                except: st.info("Cargando papelera...")
