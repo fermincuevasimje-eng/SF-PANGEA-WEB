@@ -48,6 +48,20 @@ CHISTES = [
     "— ¿Cómo se queda un mago después de comer? — Magordito."
 ]
 
+# --- CATALOGO ESTATICO DE DELEGACIONES (SF PREMIUM DATA) ---
+CATALOGO_TOLUCA = {
+    "CENTRO HISTORICO": ["CENTRO", "SANTA CLARA", "5 DE MAYO", "FRANCISCO MURGUIA", "MERCED Y ALAMEDA"],
+    "BARRIO TRADICIONALES": ["SANTA BARBARA", "EL COPORO", "BARRIO DE LA RETAMA", "SAN MIGUEL APINAHUISCO", "UNION", "SAN LUIS OBISPO"],
+    "ARBOL DE LAS MANITAS": ["BARRIO DE ZOPILOCALCO SUR", "BARRIO DE ZOPILOCALCO NORTE", "LOMAS ALTAS", "HUITZILA Y DOCTORES", "NIÑOS HEROES (PENSIONES)"],
+    "LA MAQUINITA": ["RANCHO LA MORA", "LOS ANGELES", "CARLOS HANK Y LOS FRAILES", "GUADALUPE Y CLUB JARDIN", "BARRIO DE TLACOPA"],
+    "INDEPENDENCIA": ["REFORMA Y FERROCARRILES", "METEORO", "INDEPENDENCIA", "SAN SEBASTIAN"],
+    "SANTA MARIA TLALMIMILOLPAN": ["CENTRO", "BARRIO DEL COECILLO", "EL CARMEN"],
+    "SAN FELIPE TLALMIMILOLPAN": ["CENTRO", "SAN JUAN", "SAN ANTONIO", "SAN JOSE"],
+    "SANTA ANA TLAPALTITLAN": ["16 DE SEPTIEMBRE", "PINO SUAREZ", "DEL PANTEON", "INDEPENDENCIA"],
+    "SANTIAGO MILTEPEC": ["MILTEPEC CENTRO", "MILTEPEC SUR", "MILTEPEC NORTE"],
+    "SANTIAGO TLACOTEPEC": ["DEL CENTRO", "SANTA MARIA", "SHINGADE", "CRISTO REY"]
+}
+
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
     """Obtiene el trazo vial real desde OSRM con manejo de errores Senior."""
@@ -66,7 +80,7 @@ def get_real_route(coords_list):
 def normalizar_texto(texto):
     if not isinstance(texto, str): texto = str(texto)
     texto = "".join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
-    return texto.lower()
+    return texto.lower().strip()
 
 def extraer_carga_robusta(punto_dict, tipo):
     d_letras = {'un ':'1 ','uno ':'1 ','una ':'1 ','dos ':'2 ','tres ':'3 ','cuatro ':'4 ','cinco ':'5 '}
@@ -148,42 +162,37 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        st.title(f"📊 Módulo {st.session_state.menu} - Análisis Territorial")
-        c1, c2 = st.columns(2)
-        with c1: up_utb = st.file_uploader("1. Cargar Catálogo Delegaciones/UTB", type=["xlsx", "csv"])
-        with c2: up_cap = st.file_uploader("2. Cargar Archivo de Captura Diaria", type=["xlsx", "csv"])
-        if up_utb and up_cap:
+        st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
+        up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
+        if up_cap:
             try:
-                df_u = pd.read_excel(up_utb).fillna(method='ffill') if up_utb.name.endswith('.xlsx') else pd.read_csv(up_utb).fillna(method='ffill')
                 df_c = pd.read_excel(up_cap) if up_cap.name.endswith('.xlsx') else pd.read_csv(up_cap)
-                del_col = next(c for c in df_u.columns if "DELEGACION" in c.upper())
-                utb_col = next(c for c in df_u.columns if "UTB" in c.upper() and "UNIDAD" in c.upper())
-                lista_delegaciones = sorted(df_u[del_col].unique())
-                sel_del = st.selectbox("Seleccione Delegación:", ["TODAS"] + list(lista_delegaciones))
-                df_u_sub = df_u if sel_del == "TODAS" else df_u[df_u[del_col] == sel_del]
-                lista_utb = sorted(df_u_sub[utb_col].unique())
-                sel_utb = st.selectbox("Seleccione UTB (Subíndice):", ["TODAS"] + list(lista_utb))
-                # Filtrado de Captura (Insensible a acentos/mayúsculas)
+                c1, c2 = st.columns(2)
+                with c1: sel_del = st.selectbox("Seleccione Delegación:", ["TODAS"] + sorted(list(CATALOGO_TOLUCA.keys())))
+                with c2: 
+                    opciones_utb = CATALOGO_TOLUCA.get(sel_del, []) if sel_del != "TODAS" else []
+                    sel_utb = st.selectbox("Seleccione UTB:", ["TODAS"] + sorted(opciones_utb))
+                # Lógica de filtrado normalizado
                 df_c['del_norm'] = df_c.iloc[:, 22].apply(normalizar_texto) # Columna W (Delegación)
                 df_c['utb_norm'] = df_c.iloc[:, 23].apply(normalizar_texto) # Columna X (UTB)
                 df_f = df_c.copy()
                 if sel_del != "TODAS": df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
                 if sel_utb != "TODAS": df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
-                # Métricas Columnas AD, AE, AF, AN (Índices 29, 30, 31, 39)
+                # Métricas según columnas AD(29), AE(30), AF(31), AN(39)
                 m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').sum()
                 m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').sum()
                 m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').sum()
                 m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').sum()
-                st.write("---")
+                st.markdown("---")
                 met1, met2, met3, met4 = st.columns(4)
                 met1.metric("🔧 Rehabilitaciones", int(m_rehab))
                 met2.metric("🧹 Mantenimientos", int(m_manto))
                 met3.metric("💡 Sustituciones", int(m_sust))
                 met4.metric("➕ Ampliaciones", int(m_ampli))
-                st.write("---")
+                st.markdown("---")
                 st.dataframe(df_f.iloc[:, [6, 22, 23, 29, 30, 31, 39]], use_container_width=True)
-            except Exception as e: st.error(f"Error en índices: {e}")
-        else: st.info("Por favor, cargue ambos archivos para activar los índices.")
+            except Exception as e: st.error(f"Error procesando captura: {e}")
+        else: st.info("Esperando carga de archivo de captura...")
 
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
