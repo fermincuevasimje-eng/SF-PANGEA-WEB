@@ -173,8 +173,7 @@ else:
                     with st.form("form_bajas", clear_on_submit=True):
                         col_f_in, col_r_in = st.columns(2)
                         with col_f_in:
-                            # Al usar form y clear_on_submit, al dar Enter o click se limpia solo
-                            in_f_val = st.text_input("Digite Folio/Ticket/IMEI:", key=f"f_{st.session_state.input_key}")
+                            in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
                         with col_r_in:
                             in_c_val = st.text_input("Respuesta 127 (Máx 30 car.):", max_chars=30, key=f"r_{st.session_state.input_key}")
                         
@@ -185,10 +184,15 @@ else:
                             c_final = in_c_val.strip() if in_c_val.strip() else "ATENDIDO"
                             
                             if f_final:
-                                st.session_state.lista_bajas[f_final] = c_final
-                                st.toast(f"Folio {f_final} agregado", icon="✅")
-                                # Forzamos refresco para que se vea en la tabla de al lado
-                                st.rerun()
+                                # --- CANDADO DE VALIDACIÓN PREMIUM ---
+                                # Se busca el folio exactamente en la columna identificada del DataFrame de referencia
+                                if f_final in df_ref[id_col_sf2].astype(str).values:
+                                    st.session_state.lista_bajas[f_final] = c_final
+                                    st.toast(f"Folio {f_final} validado", icon="✅")
+                                    st.rerun()
+                                else:
+                                    st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
+                                # --------------------------------------
 
                     st.write("---")
                     if st.button("🗑️ Limpiar Lista Actual"):
@@ -203,7 +207,6 @@ else:
                         
                         # Botón para procesar y descargar
                         if st.button("📥 Generar Documento de Bajas", use_container_width=True):
-                            # Globos solicitados por el usuario
                             st.balloons()
                             
                             # Filtrar el dataframe original solo por los folios capturados
