@@ -214,8 +214,22 @@ else:
                 # Creamos una copia para la vista de tabla
                 df_vista = df_f.iloc[:, cols_indices].copy()
                 
-                # Asignamos la fila 0 como encabezado y luego la quitamos de los datos
-                df_vista.columns = df_vista.iloc[0]
+                # Extraemos los nombres de la fila 0
+                nombres_columnas = df_vista.iloc[0].astype(str).tolist()
+                
+                # Diccionario de limpieza: "Nombre Largo": "Nombre Corto"
+                mapeo_nombres = {
+                    "REHABILITACIÓN DE ALUMBRADO PÚBLICO": "REHABILITACIÓN",
+                    "MANTENIMIENTO DE ALUMBRADO PÚBLICO": "MANTENIMIENTO",
+                    "SUSTITUCIÓN DE LUMINARIAS": "SUSTITUCIÓN",
+                    "AMPLIACIÓN DE ALUMBRADO PÚBLICO": "AMPLIACIÓN"
+                }
+                
+                # Aplicamos la limpieza: si el nombre está en la lista larga, ponemos el corto
+                nombres_limpios = [mapeo_nombres.get(nombre, nombre) for nombre in nombres_columnas]
+                
+                # Asignamos los nombres limpios y quitamos la fila 0 de los datos
+                df_vista.columns = nombres_limpios
                 df_vista = df_vista.drop(df_vista.index[0])
                 
                 # Mostramos la tabla con sus nuevos títulos fijos
