@@ -191,7 +191,7 @@ else:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
                 
-                # --- SELECTORES INTELIGENTES ---
+              # --- SELECTORES INTELIGENTES ---
                 col_d, col_u = st.columns(2)
                 
                 with col_d:
@@ -199,15 +199,13 @@ else:
                     sel_del = st.selectbox("📍 Seleccione Delegación:", lista_delegaciones)
                 
                 with col_u:
-                    # Si se elige una delegación, filtramos las UTBs de esa delegación
                     if sel_del != "TODAS":
                         opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
                     else:
-                        # Si no hay delegación, mostramos todas las UTBs del mapa
                         opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
                     
                     sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb)
-
+                    sel_del = MAPA_UTB_DEL.get(sel_utb, "TODAS")
                 # --- Lógica de Seguridad para el Filtrado ---
                 # Si el usuario elige una UTB que pertenece a otra delegación, 
                 # forzamos que la delegación sea la correcta.
