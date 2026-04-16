@@ -74,13 +74,10 @@ CATALOGO_MAESTRO = {
     "CACALOMACAN": ["CENTRO", "EL CALVARIO", "SAN JOSÉ", "SAN PEDRO"],
     "CAPULTITLAN": ["CENTRO", "MANZANA NORTE", "MANZANA SUR"],
     "SAN FELIPE TLALMIMILOLPAN": ["CENTRO", "SAN JUAN", "SAN ANTONIO", "SAN JOSE"],
-    "TLACHICHILPA": ["CENTRO", "BARRIO DEL COECILLO", "EL CARMEN"]
+   "TLACHICHILPA": ["CENTRO", "BARRIO DEL COECILLO", "EL CARMEN"]
 }
 
-# Creación automática del buscador inteligente
 MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lista}
-
-CATALOGO_MAESTRO, MAPA_UTB_DEL = generar_catalogos_fijos()
 
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
