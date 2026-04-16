@@ -186,12 +186,12 @@ else:
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
-        if up_cap:
+if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
                 
-                # --- SELECTORES INTELIGENTES ---
+                # --- SELECTORES EN ORDEN: DELEGACIÓN -> UTB ---
                 col_d, col_u = st.columns(2)
                 
                 with col_d:
@@ -203,53 +203,38 @@ else:
                         opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
                     else:
                         opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                    
-                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb)                # forzamos que la delegación sea la correcta.
-                if sel_utb != "TODAS" and sel_del == "TODAS":
-                    sel_del = MAPA_UTB_DEL.get(sel_utb, "TODAS")
+                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb)
+
+                # --- FILTRADO DE DATOS ---
+                df_f = df_c.copy()
+                if sel_del != "TODAS":
+                    df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS":
+                    df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
+
+                # --- CÁLCULO DE MÉTRICAS (Basado en tus columnas del CSV) ---
+                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').fillna(0).sum()
+                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').fillna(0).sum()
+                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').fillna(0).sum()
+                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').fillna(0).sum()
                 
+                # --- VISUALIZACIÓN DE MÉTRICAS ---
+                st.markdown("### 📊 Resumen de Productividad Territorial")
                 met1, met2, met3, met4 = st.columns(4)
                 met1.metric("🔧 Rehabilitaciones", int(m_rehab))
                 met2.metric("🧹 Mantenimientos", int(m_manto))
                 met3.metric("💡 Sustituciones", int(m_sust))
                 met4.metric("➕ Ampliaciones", int(m_ampli))
                 
-                st.markdown("--- ")
-                st.write("🔍 **Registros Operativos (Vista Parcial):**")
-                # Columnas: Fecha(4), Calle(19), Delegacion(22), UTB(23), AD(29), AE(30), AF(31), AN(39)
-                # Definimos las columnas y extraemos los nombres reales de la fila 0
+                st.markdown("---")
+                st.write("🔍 **Registros Operativos (Vista Tabla):**")
                 cols_indices = [4, 19, 22, 23, 29, 30, 31, 39]
-                
-                # Creamos una copia para la vista de tabla
                 df_vista = df_f.iloc[:, cols_indices].copy()
-                
-               # Definimos los índices de las columnas que queremos ver
-                cols_indices = [4, 19, 22, 23, 29, 30, 31, 39]
-                
-                # Creamos la tabla con los datos filtrados
-                df_vista = df_f.iloc[:, cols_indices].copy()
-                
-                # Definimos los nombres oficiales de forma manual para evitar errores
-                df_vista.columns = [
-                    "FECHA", 
-                    "UBICACIÓN / CALLE", 
-                    "DELEGACIÓN", 
-                    "UTB", 
-                    "REHABILITACIÓN", 
-                    "MANTENIMIENTO", 
-                    "SUSTITUCIÓN", 
-                    "AMPLIACIÓN"
-                ]
-                
-                # Mostramos la tabla limpia
+                df_vista.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
                 st.dataframe(df_vista, use_container_width=True, hide_index=True)
                 
-            except Exception as e: 
-                st.error(f"Error crítico en el motor de métricas: {e}")
-                st.info("Asegúrese de que el archivo de captura respete el formato estándar de la Dirección.")
-        else: 
-            st.info("💡 Módulo SF3 Activo. Por favor, cargue el archivo de Captura Diaria para generar los indicadores territoriales.")
-            st.warning("⚠️ El catálogo de Delegaciones y UTBs ya se encuentra precargado en el sistema.")
+            except Exception as e:
+                st.error(f"Error en SF3: {e}")
 
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
