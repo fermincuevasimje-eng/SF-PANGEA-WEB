@@ -183,10 +183,11 @@ else:
         st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-    elif st.session_state.menu == "SF3":
+elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
-if up_cap:
+        
+        if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
@@ -212,13 +213,13 @@ if up_cap:
                 if sel_utb != "TODAS":
                     df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
 
-                # --- CÁLCULO DE MÉTRICAS (Basado en tus columnas del CSV) ---
+                # --- CÁLCULO DE MÉTRICAS ---
                 m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').fillna(0).sum()
                 m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').fillna(0).sum()
                 m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').fillna(0).sum()
                 m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').fillna(0).sum()
                 
-                # --- VISUALIZACIÓN DE MÉTRICAS ---
+                # --- VISUALIZACIÓN ---
                 st.markdown("### 📊 Resumen de Productividad Territorial")
                 met1, met2, met3, met4 = st.columns(4)
                 met1.metric("🔧 Rehabilitaciones", int(m_rehab))
@@ -235,7 +236,8 @@ if up_cap:
                 
             except Exception as e:
                 st.error(f"Error en SF3: {e}")
-
+        else:
+            st.info("💡 Módulo SF3 Activo. Por favor, cargue el archivo de Captura Diaria.")
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
