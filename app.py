@@ -208,8 +208,18 @@ else:
                 st.markdown("--- ")
                 st.write("🔍 **Registros Operativos (Vista Parcial):**")
                 # Columnas: Fecha(4), Calle(19), Delegacion(22), UTB(23), AD(29), AE(30), AF(31), AN(39)
-                cols_v = [4, 19, 22, 23, 29, 30, 31, 39]
-                st.dataframe(df_f.iloc[:, cols_v], use_container_width=True)
+                # Definimos las columnas y extraemos los nombres reales de la fila 0
+                cols_indices = [4, 19, 22, 23, 29, 30, 31, 39]
+                
+                # Creamos una copia para la vista de tabla
+                df_vista = df_f.iloc[:, cols_indices].copy()
+                
+                # Asignamos la fila 0 como encabezado y luego la quitamos de los datos
+                df_vista.columns = df_vista.iloc[0]
+                df_vista = df_vista.drop(df_vista.index[0])
+                
+                # Mostramos la tabla con sus nuevos títulos fijos
+                st.dataframe(df_vista, use_container_width=True, hide_index=True)
                 
             except Exception as e: 
                 st.error(f"Error crítico en el motor de métricas: {e}")
