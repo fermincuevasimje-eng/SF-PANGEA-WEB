@@ -192,26 +192,27 @@ else:
                 df_c = load_massive_data(up_cap, ext)
                 
                 # --- SELECTORES INTELIGENTES ---
-                col_u, col_d = st.columns(2)
-                lista_utbs_totales = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                
-                with col_u:
-                    sel_utb = st.selectbox("🔍 Buscar por UTB (Colonia):", lista_utbs_totales)
+                col_d, col_u = st.columns(2)
                 
                 with col_d:
-                    sugerencia_del = "TODAS"
-                    if sel_utb != "TODAS":
-                        sugerencia_del = MAPA_UTB_DEL.get(sel_utb, "TODAS")
-                    
                     lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                    
-                    # Intentamos pre-seleccionar la delegación sugerida
-                    if sugerencia_del in lista_delegaciones:
-                        idx_pred = lista_delegaciones.index(sugerencia_del)
+                    sel_del = st.selectbox("📍 Seleccione Delegación:", lista_delegaciones)
+                
+                with col_u:
+                    # Si se elige una delegación, filtramos las UTBs de esa delegación
+                    if sel_del != "TODAS":
+                        opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
                     else:
-                        idx_pred = 0
-                        
-                    sel_del = st.selectbox("📍 Delegación Correspondiente:", lista_delegaciones, index=idx_pred)
+                        # Si no hay delegación, mostramos todas las UTBs del mapa
+                        opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+                    
+                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb)
+
+                # --- Lógica de Seguridad para el Filtrado ---
+                # Si el usuario elige una UTB que pertenece a otra delegación, 
+                # forzamos que la delegación sea la correcta.
+                if sel_utb != "TODAS" and sel_del == "TODAS":
+                    sel_del = MAPA_UTB_DEL.get(sel_utb, "TODAS")
                 
                 met1, met2, met3, met4 = st.columns(4)
                 met1.metric("🔧 Rehabilitaciones", int(m_rehab))
