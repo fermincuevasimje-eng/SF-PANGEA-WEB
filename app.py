@@ -186,14 +186,10 @@ else:
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
-        if up_cap:
+       if up_cap:
             try:
-            # --- MOTOR DE CARGA OPTIMIZADO SF ---
-            ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
-            df_c = load_massive_data(up_cap, ext)
-                
-            # --- SELECTORES INTELIGENTES ---
-              = st.selectbox("📍 Delegación Correspondiente:", lista_delegaciones, index=idx_pred)
+                # Todo este bloque debe llevar una sangría extra hacia la derecha
+                 
                     
                 # --- MOTOR DE NORMALIZACIÓN Y AGRUPACIÓN PREMIUM ---
                 # Pre-procesamiento para acelerar índices
