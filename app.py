@@ -278,12 +278,12 @@ if up_cap:
                                 else:
                                     st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
                                 # --------------------------------------
-
+    
                     st.write("---")
                     if st.button("🗑️ Limpiar Lista Actual"):
                         st.session_state.lista_bajas = {}
                         st.rerun()
-
+    
                 with c_lista:
                     st.subheader("📋 Folios a dar de Baja")
                     if st.session_state.lista_bajas:
@@ -315,10 +315,10 @@ if up_cap:
                             )
                     else:
                         st.info("Esperando captura de folios...")
-
+    
             except Exception as e:
                 st.error(f"Error en SF2: {e}")
-
+    
     elif st.session_state.menu == "GdR":
         st.title("🚀 GdR - Generador de Rutas")
         tab1, tab2, tab3 = st.tabs(["🆕 Nueva Ruta", "📂 Bitácora", "🗑️ Papelera"])
