@@ -105,7 +105,12 @@ def extraer_carga_robusta(punto_dict, tipo):
         return 0
     m = re.search(patrones[tipo], t_norm)
     return int(m.group(1)) if m else 0
-
+@st.cache_data
+def load_massive_data(file, extension):
+    df = pd.read_excel(file) if extension == 'xlsx' else pd.read_csv(file)
+    df['del_norm'] = df.iloc[:, 22].astype(str).apply(normalizar_texto)
+    df['utb_norm'] = df.iloc[:, 23].astype(str).apply(normalizar_texto)
+    return df
 # --- 3. AUTENTICACIÓN Y ESTADO ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
@@ -167,7 +172,8 @@ else:
         if up_cap:
             try:
                 # --- MOTOR DE CARGA OPTIMIZADO SF ---
-                df_c = pd.read_excel(up_cap) if up_cap.name.endswith('.xlsx') else pd.read_csv(up_cap)
+                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
+                df_c = load_massive_data(up_cap, ext)
                 c1, c2 = st.columns(2)
                 with c1: 
                     sel_del = st.selectbox("Seleccione Delegación:", ["TODAS"] + sorted(list(CATALOGO_TOLUCA.keys())))
@@ -177,8 +183,6 @@ else:
                 
                 # --- MOTOR DE NORMALIZACIÓN Y AGRUPACIÓN PREMIUM ---
                 # Pre-procesamiento para acelerar índices
-                df_c['del_norm'] = df_c.iloc[:, 22].astype(str).apply(normalizar_texto) 
-                df_c['utb_norm'] = df_c.iloc[:, 23].astype(str).apply(normalizar_texto) 
                 
                 df_f = df_c.copy()
                 if sel_del != "TODAS": 
