@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA v4.8.70", layout="wide")
+st.set_page_config(page_title="SF PANGEA V1", layout="wide")
 
 st.markdown(
     """
@@ -152,7 +152,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA v4.8.70")
+        st.info("SF PANGEA V1")
 
     # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
