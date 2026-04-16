@@ -188,26 +188,30 @@ else:
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
        if up_cap:
             try:
-                # Todo este bloque debe llevar una sangría extra hacia la derecha
-                 
+                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
+                df_c = load_massive_data(up_cap, ext)
+                
+                # --- SELECTORES INTELIGENTES ---
+                col_u, col_d = st.columns(2)
+                lista_utbs_totales = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+                
+                with col_u:
+                    sel_utb = st.selectbox("🔍 Buscar por UTB (Colonia):", lista_utbs_totales)
+                
+                with col_d:
+                    sugerencia_del = "TODAS"
+                    if sel_utb != "TODAS":
+                        sugerencia_del = MAPA_UTB_DEL.get(sel_utb, "TODAS")
                     
-                # --- MOTOR DE NORMALIZACIÓN Y AGRUPACIÓN PREMIUM ---
-                # Pre-procesamiento para acelerar índices
-                
-                df_f = df_c.copy()
-                if sel_del != "TODAS": 
-                    df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS": 
-                    df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
-                
-                # --- EXTRACCIÓN DE MÉTRICAS (Columnas AD, AE, AF, AN) ---
-                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').fillna(0).sum()
-                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').fillna(0).sum()
-                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').fillna(0).sum()
-                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').fillna(0).sum()
-                
-                st.markdown("""<div style='background-color: #f0f2f6; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
-                                <h3 style='margin-top: 0;'>📊 Resumen de Productividad Territorial</h3></div>""", unsafe_allow_html=True)
+                    lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+                    
+                    # Intentamos pre-seleccionar la delegación sugerida
+                    if sugerencia_del in lista_delegaciones:
+                        idx_pred = lista_delegaciones.index(sugerencia_del)
+                    else:
+                        idx_pred = 0
+                        
+                    sel_del = st.selectbox("📍 Delegación Correspondiente:", lista_delegaciones, index=idx_pred)
                 
                 met1, met2, met3, met4 = st.columns(4)
                 met1.metric("🔧 Rehabilitaciones", int(m_rehab))
