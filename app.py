@@ -214,25 +214,25 @@ else:
                 # Creamos una copia para la vista de tabla
                 df_vista = df_f.iloc[:, cols_indices].copy()
                 
-                # Extraemos los nombres de la fila 0
-                nombres_columnas = df_vista.iloc[0].astype(str).tolist()
+               # Definimos los índices de las columnas que queremos ver
+                cols_indices = [4, 19, 22, 23, 29, 30, 31, 39]
                 
-                # Diccionario de limpieza: "Nombre Largo": "Nombre Corto"
-                mapeo_nombres = {
-                    "REHABILITACIÓN DE ALUMBRADO PÚBLICO": "REHABILITACIÓN",
-                    "MANTENIMIENTO DE ALUMBRADO PÚBLICO": "MANTENIMIENTO",
-                    "SUSTITUCIÓN DE LUMINARIAS": "SUSTITUCIÓN",
-                    "AMPLIACIÓN DE ALUMBRADO PÚBLICO": "AMPLIACIÓN"
-                }
+                # Creamos la tabla con los datos filtrados
+                df_vista = df_f.iloc[:, cols_indices].copy()
                 
-                # Aplicamos la limpieza: si el nombre está en la lista larga, ponemos el corto
-                nombres_limpios = [mapeo_nombres.get(nombre, nombre) for nombre in nombres_columnas]
+                # Definimos los nombres oficiales de forma manual para evitar errores
+                df_vista.columns = [
+                    "FECHA", 
+                    "UBICACIÓN / CALLE", 
+                    "DELEGACIÓN", 
+                    "UTB", 
+                    "REHABILITACIÓN", 
+                    "MANTENIMIENTO", 
+                    "SUSTITUCIÓN", 
+                    "AMPLIACIÓN"
+                ]
                 
-                # Asignamos los nombres limpios y quitamos la fila 0 de los datos
-                df_vista.columns = nombres_limpios
-                df_vista = df_vista.drop(df_vista.index[0])
-                
-                # Mostramos la tabla con sus nuevos títulos fijos
+                # Mostramos la tabla limpia
                 st.dataframe(df_vista, use_container_width=True, hide_index=True)
                 
             except Exception as e: 
