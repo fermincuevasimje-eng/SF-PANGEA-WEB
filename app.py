@@ -188,32 +188,13 @@ else:
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
         if up_cap:
             try:
-                # --- MOTOR DE CARGA OPTIMIZADO SF ---
-                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
-                df_c = load_massive_data(up_cap, ext)
-               col_u, col_d = st.columns(2)
+            # --- MOTOR DE CARGA OPTIMIZADO SF ---
+            ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
+            df_c = load_massive_data(up_cap, ext)
                 
-                # Lista de todas las UTBs (de las 48 delegaciones)
-                lista_utbs_totales = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                
-                with col_u:
-                    sel_utb = st.selectbox("🔍 Buscar por UTB (Colonia):", lista_utbs_totales)
-                
-                with col_d:
-                    # Lógica de detección automática
-                    sugerencia_del = "TODAS"
-                    if sel_utb != "TODAS":
-                        sugerencia_del = MAPA_UTB_DEL.get(sel_utb, "TODAS")
+            # --- SELECTORES INTELIGENTES ---
+              = st.selectbox("📍 Delegación Correspondiente:", lista_delegaciones, index=idx_pred)
                     
-                    lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                    
-                    try:
-                        idx_predeterminado = lista_delegaciones.index(sugerencia_del)
-                    except:
-                        idx_predeterminado = 0
-                        
-                    sel_del = st.selectbox("📍 Delegación Correspondiente:", lista_delegaciones, index=idx_predeterminado)
-                
                 # --- MOTOR DE NORMALIZACIÓN Y AGRUPACIÓN PREMIUM ---
                 # Pre-procesamiento para acelerar índices
                 
