@@ -48,19 +48,21 @@ CHISTES = [
     "— ¿Cómo se queda un mago después de comer? — Magordito."
 ]
 
-# --- CATALOGO ESTATICO DE DELEGACIONES (SF PREMIUM DATA) ---
-CATALOGO_TOLUCA = {
-    "CENTRO HISTORICO": ["CENTRO", "SANTA CLARA", "5 DE MAYO", "FRANCISCO MURGUIA", "MERCED Y ALAMEDA"],
-    "BARRIO TRADICIONALES": ["SANTA BARBARA", "EL COPORO", "BARRIO DE LA RETAMA", "SAN MIGUEL APINAHUISCO", "UNION", "SAN LUIS OBISPO"],
-    "ARBOL DE LAS MANITAS": ["BARRIO DE ZOPILOCALCO SUR", "BARRIO DE ZOPILOCALCO NORTE", "LOMAS ALTAS", "HUITZILA Y DOCTORES", "NIÑOS HEROES (PENSIONES)"],
-    "LA MAQUINITA": ["RANCHO LA MORA", "LOS ANGELES", "CARLOS HANK Y LOS FRAILES", "GUADALUPE Y CLUB JARDIN", "BARRIO DE TLACOPA"],
-    "INDEPENDENCIA": ["REFORMA Y FERROCARRILES", "METEORO", "INDEPENDENCIA", "SAN SEBASTIAN"],
-    "SANTA MARIA TLALMIMILOLPAN": ["CENTRO", "BARRIO DEL COECILLO", "EL CARMEN"],
-    "SAN FELIPE TLALMIMILOLPAN": ["CENTRO", "SAN JUAN", "SAN ANTONIO", "SAN JOSE"],
-    "SANTA ANA TLAPALTITLAN": ["16 DE SEPTIEMBRE", "PINO SUAREZ", "DEL PANTEON", "INDEPENDENCIA"],
-    "SANTIAGO MILTEPEC": ["MILTEPEC CENTRO", "MILTEPEC SUR", "MILTEPEC NORTE"],
-    "SANTIAGO TLACOTEPEC": ["DEL CENTRO", "SANTA MARIA", "SHINGADE", "CRISTO REY"]
-}
+# --- MOTOR DE CATÁLOGO MAESTRO AUTOMÁTICO ---
+@st.cache_data
+def generar_catalogos_fijos():
+    url = "https://raw.githubusercontent.com/fermincuevasimje-eng/SF-PANGEA-WEB/main/deleyutb.xlsx%20-%20Hoja1.csv"
+    try:
+        df_cat = pd.read_csv(url)
+        df_cat['DELEGACION'] = df_cat['DELEGACION'].ffill().str.strip()
+        df_cat['UTB'] = df_cat['UTB'].str.strip()
+        cat_maestro = df_cat.groupby('DELEGACION')['UTB'].apply(list).to_dict()
+        mapa_inv = pd.Series(df_cat.DELEGACION.values, index=df_cat.UTB).to_dict()
+        return cat_maestro, mapa_inv
+    except:
+        return {}, {}
+
+CATALOGO_MAESTRO, MAPA_UTB_DEL = generar_catalogos_fijos()
 
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
@@ -174,12 +176,28 @@ else:
                 # --- MOTOR DE CARGA OPTIMIZADO SF ---
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
-                c1, c2 = st.columns(2)
-                with c1: 
-                    sel_del = st.selectbox("Seleccione Delegación:", ["TODAS"] + sorted(list(CATALOGO_TOLUCA.keys())))
-                with c2: 
-                    opciones_utb = CATALOGO_TOLUCA.get(sel_del, []) if sel_del != "TODAS" else []
-                    sel_utb = st.selectbox("Seleccione UTB:", ["TODAS"] + sorted(opciones_utb))
+               col_u, col_d = st.columns(2)
+                
+                # Lista de todas las UTBs (de las 48 delegaciones)
+                lista_utbs_totales = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+                
+                with col_u:
+                    sel_utb = st.selectbox("🔍 Buscar por UTB (Colonia):", lista_utbs_totales)
+                
+                with col_d:
+                    # Lógica de detección automática
+                    sugerencia_del = "TODAS"
+                    if sel_utb != "TODAS":
+                        sugerencia_del = MAPA_UTB_DEL.get(sel_utb, "TODAS")
+                    
+                    lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+                    
+                    try:
+                        idx_predeterminado = lista_delegaciones.index(sugerencia_del)
+                    except:
+                        idx_predeterminado = 0
+                        
+                    sel_del = st.selectbox("📍 Delegación Correspondiente:", lista_delegaciones, index=idx_predeterminado)
                 
                 # --- MOTOR DE NORMALIZACIÓN Y AGRUPACIÓN PREMIUM ---
                 # Pre-procesamiento para acelerar índices
