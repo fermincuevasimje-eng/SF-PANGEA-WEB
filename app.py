@@ -220,14 +220,28 @@ else:
         st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-    elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
-        up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
-        
-        if up_cap:
-            try:
-                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
-                df_c = load_massive_data(up_cap, ext)
+# --- NUEVO: PANEL DE CAPTURA ÁGIL ---
+                with st.expander("📝 REGISTRAR NUEVA ACTIVIDAD DE CAMPO", expanded=False):
+                    st.markdown("##### Ingrese los datos de la última atención")
+                    c_form1, c_form2, c_form3, c_form4 = st.columns(4)
+                    
+                    with c_form1:
+                        n_rehab = st.number_input("Rehabilitaciones", min_value=0, step=1, key="in_rehab")
+                    with c_form2:
+                        n_manto = st.number_input("Mantenimientos", min_value=0, step=1, key="in_manto")
+                    with c_form3:
+                        n_sust = st.number_input("Sustituciones", min_value=0, step=1, key="in_sust")
+                    with c_form4:
+                        n_ampli = st.number_input("Ampliaciones", min_value=0, step=1, key="in_ampli")
+                    
+                    if st.button("💾 AGREGAR A MÉTRICAS ACTUALES", use_container_width=True):
+                        # Aquí el sistema sumará estos valores "al aire" para tus métricas
+                        st.session_state.suma_extra = {
+                            "rehab": n_rehab, "manto": n_manto, "sust": n_sust, "ampli": n_ampli
+                        }
+                        st.toast("Datos integrados temporalmente", icon="⚡")
+
+                st.markdown("---")
                 
                 # --- SELECTORES EN ORDEN: DELEGACIÓN -> UTB ---
                 col_d, col_u = st.columns(2)
