@@ -221,64 +221,103 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo SF3 - Métricas Diarias")
-        up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
+        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
+
+        # --- PANEL DE CAPTURA MANUAL (11 CAMPOS ORDENADOS) ---
+        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
+            with st.form("captura_sf3", clear_on_submit=True):
+                # Fila 1: Datos de Identificación
+                c1, c2, c3 = st.columns(3)
+                with c1: f_fecha = st.date_input("1. Fecha de Atención")
+                with c2: f_ot = st.text_input("2. O.T.")
+                with c3: f_calle = st.text_input("3. Calle")
+
+                # Fila 2: Territorio
+                c4, c5, c6 = st.columns(3)
+                with c4: f_del = st.selectbox("4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
+                with c5: f_utb = st.selectbox("5. UTB", sorted(CATALOGO_MAESTRO.get(f_del, [])))
+                with c6: f_folio = st.text_input("6. Folio / Ticket / IMEI")
+
+                # Fila 3: Cantidades (Métricas)
+                st.markdown("---")
+                m1, m2, m3, m4 = st.columns(4)
+                with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
+                with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
+                with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
+                with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
+
+                # Fila 4: Observaciones
+                f_obs = st.text_area("11. Observaciones", placeholder="Escriba aquí los detalles adicionales de la atención...")
+
+                if st.form_submit_button("🚀 GUARDAR REGISTRO Y ACTUALIZAR", use_container_width=True):
+                    if "manual_db" not in st.session_state: st.session_state.manual_db = []
+                    
+                    st.session_state.manual_db.append({
+                        "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
+                        "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
+                        "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
+                    })
+                    st.toast(f"O.T. {f_ot} registrada con éxito", icon="✅")
+
+        st.markdown("---")
         
+        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS COMBINADAS ---
+        up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"])
+        
+        # Inicializamos acumuladores
+        total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
+        df_final_vista = pd.DataFrame()
+
+        # 1. Sumamos lo manual si existe
+        if "manual_db" in st.session_state and st.session_state.manual_db:
+            df_manual = pd.DataFrame(st.session_state.manual_db)
+            total_rehab += df_manual["REHAB"].sum()
+            total_manto += df_manual["MANTO"].sum()
+            total_sust += df_manual["SUST"].sum()
+            total_ampli += df_manual["AMPLI"].sum()
+            df_final_vista = df_manual.copy()
+
+        # 2. Sumamos lo del archivo si existe
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
                 
-                # --- PANEL DE CAPTURA ÁGIL (DISEÑO MODERNO) ---
-                with st.expander("📝 REGISTRAR NUEVA ACTIVIDAD DE CAMPO", expanded=False):
-                    st.markdown("##### Ingrese los datos de la última atención")
-                    c_f1, c_f2, c_f3, c_f4 = st.columns(4)
-                    with c_f1: n_rehab = st.number_input("Rehabilitaciones", min_value=0, step=1, key="in_rehab")
-                    with c_f2: n_manto = st.number_input("Mantenimientos", min_value=0, step=1, key="in_manto")
-                    with c_f3: n_sust = st.number_input("Sustituciones", min_value=0, step=1, key="in_sust")
-                    with c_f4: n_ampli = st.number_input("Ampliaciones", min_value=0, step=1, key="in_ampli")
-                    
-                    if st.button("💾 AGREGAR A MÉTRICAS ACTUALES", use_container_width=True):
-                        st.session_state.suma_extra = {"rehab": n_rehab, "manto": n_manto, "sust": n_sust, "ampli": n_ampli}
-                        st.toast("Datos integrados con éxito", icon="⚡")
+                # Filtros rápidos para el archivo
+                col_f1, col_f2 = st.columns(2)
+                with col_f1: sel_del = st.selectbox("📍 Filtrar Archivo por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())))
+                with col_f2: sel_utb = st.selectbox("🔍 Filtrar Archivo por UTB:", ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys()))))
 
-                st.markdown("---")
-                col_d, col_u = st.columns(2)
-                with col_d:
-                    lista_del = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                    sel_del = st.selectbox("📍 Seleccione Delegación:", lista_del)
-                with col_u:
-                    opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb)
+                df_filt = df_c.copy()
+                if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
 
-                df_f = df_c.copy()
-                if sel_del != "TODAS": df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS": df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
+                total_rehab += pd.to_numeric(df_filt.iloc[:, 29], errors='coerce').fillna(0).sum()
+                total_manto += pd.to_numeric(df_filt.iloc[:, 30], errors='coerce').fillna(0).sum()
+                total_sust += pd.to_numeric(df_filt.iloc[:, 31], errors='coerce').fillna(0).sum()
+                total_ampli += pd.to_numeric(df_filt.iloc[:, 39], errors='coerce').fillna(0).sum()
+                
+                # Unimos vistas (simplificado)
+                df_archivo_v = df_filt.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
+                df_archivo_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+                df_final_vista = pd.concat([df_final_vista, df_archivo_v], ignore_index=True)
 
-                # CÁLCULO DE MÉTRICAS (EXCEL + CAPTURA MANUAL)
-                ex = st.session_state.get("suma_extra", {"rehab":0, "manto":0, "sust":0, "ampli":0})
-                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').fillna(0).sum() + ex["rehab"]
-                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').fillna(0).sum() + ex["manto"]
-                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').fillna(0).sum() + ex["sust"]
-                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').fillna(0).sum() + ex["ampli"]
-                
-                st.markdown("### 📊 Resumen de Productividad Territorial")
-                met1, met2, met3, met4 = st.columns(4)
-                met1.metric("🔧 Rehabilitaciones", int(m_rehab))
-                met2.metric("🧹 Mantenimientos", int(m_manto))
-                met3.metric("💡 Sustituciones", int(m_sust))
-                met4.metric("➕ Ampliaciones", int(m_ampli))
-                
-                st.markdown("---")
-                st.write("🔍 **Registros Operativos (Vista Tabla):**")
-                df_vista = df_f.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_vista.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                st.dataframe(df_vista, use_container_width=True, hide_index=True)
-                
-            except Exception as e:
-                st.error(f"Error en SF3: {e}")
+            except Exception as e: st.error(f"Error procesando archivo: {e}")
+
+        # 3. Despliegue de Resultados
+        st.markdown("### 📊 Resumen Consolidado (Manual + Archivo)")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("🔧 Rehabilitaciones", int(total_rehab))
+        m2.metric("🧹 Mantenimientos", int(total_manto))
+        m3.metric("💡 Sustituciones", int(total_sust))
+        m4.metric("➕ Ampliaciones", int(total_ampli))
+
+        if not df_final_vista.empty:
+            st.markdown("---")
+            st.write("🔍 **Detalle de Actividades:**")
+            st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
         else:
-            st.info("💡 Módulo SF3 Activo. Por favor, cargue el archivo de Captura Diaria para comenzar.")
+            st.info("Esperando captura manual o carga de archivo para mostrar datos.")
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
