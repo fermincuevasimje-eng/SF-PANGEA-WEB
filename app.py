@@ -48,35 +48,31 @@ CHISTES = [
     "— ¿Cómo se queda un mago después de comer? — Magordito."
 ]
 
-# --- CARGA DEL CATÁLOGO PERMANENTE (DESDE DELEUTB.csv) ---
+# --- CARGA DEL CATÁLOGO DINÁMICO (DELEGACIONES Y UTB) ---
 @st.cache_data
 def cargar_catalogo_csv():
     try:
-        # Lee el archivo que subiste a GitHub
+        # Busca el archivo que subiste a tu repositorio
         df_cat = pd.read_csv("DELEUTB.csv")
         
-        # Limpieza profesional de datos
+        # Limpieza: Todo a mayúsculas y sin espacios extras
         df_cat['DELEGACION'] = df_cat['DELEGACION'].astype(str).str.strip().str.upper()
         df_cat['UTB'] = df_cat['UTB'].astype(str).str.strip().str.upper()
         
-        # Agrupamos: Delegación -> Lista de sus UTBs
+        # Agrupamos los datos para los selectores
         cat_dict = df_cat.groupby('DELEGACION')['UTB'].apply(list).to_dict()
         
-        # Mapa inverso para el buscador de UTBs
+        # Mapa para cruce de información
         mapa_inv = {utb: dl for dl, lista in cat_dict.items() for utb in lista}
         
         return cat_dict, mapa_inv
     except Exception as e:
-        st.error(f"⚠️ Error al leer el catálogo: {e}")
-        # Retorno de seguridad por si el archivo falla
-        return {"ERROR": []}, {}
+        # Si el archivo falla, muestra el error pero no rompe la app
+        st.error(f"⚠️ Error al cargar DELEUTB.csv: {e}")
+        return {"ERROR EN ARCHIVO": []}, {}
 
-# Ejecutamos la carga global para que esté disponible en toda la App
+# Ejecutamos la carga para activar el catálogo real de Toluca
 CATALOGO_MAESTRO, MAPA_UTB_DEL = cargar_catalogo_csv()
-
-# Ejecutamos la carga al iniciar la app
-CATALOGO_MAESTRO, MAPA_UTB_DEL = cargar_catalogo_permanente()
-
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
     """Obtiene el trazo vial real desde OSRM con manejo de errores Senior."""
