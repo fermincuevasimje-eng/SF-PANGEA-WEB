@@ -221,9 +221,9 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
 # --- NUEVO: PANEL DE CAPTURA ÁGIL ---
-                with st.expander("📝 REGISTRAR NUEVA ACTIVIDAD DE CAMPO", expanded=False):
-                    st.markdown("##### Ingrese los datos de la última atención")
-                    c_form1, c_form2, c_form3, c_form4 = st.columns(4)
+                    with st.expander("📝 REGISTRAR NUEVA ACTIVIDAD DE CAMPO", expanded=False):
+                        st.markdown("##### Ingrese los datos de la última atención")
+                        c_form1, c_form2, c_form3, c_form4 = st.columns(4)
                     
                     with c_form1:
                         n_rehab = st.number_input("Rehabilitaciones", min_value=0, step=1, key="in_rehab")
