@@ -222,13 +222,13 @@ else:
 
 st.title(f"🛠️ Módulo SF3 - Métricas Diarias")
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
-        
+            
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
                 
-                # --- PANEL DE CAPTURA ÁGIL ---
+                # --- PANEL DE CAPTURA ÁGIL (DISEÑO MODERNO) ---
                 with st.expander("📝 REGISTRAR NUEVA ACTIVIDAD DE CAMPO", expanded=False):
                     st.markdown("##### Ingrese los datos de la última atención")
                     c_f1, c_f2, c_f3, c_f4 = st.columns(4)
@@ -273,6 +273,10 @@ st.title(f"🛠️ Módulo SF3 - Métricas Diarias")
                 df_vista = df_f.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
                 df_vista.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
                 st.dataframe(df_vista, use_container_width=True, hide_index=True)
+                
+            except Exception as e: st.error(f"Error en SF3: {e}")
+        else:
+            st.info("💡 Módulo SF3 Activo. Cargue el archivo de Captura Diaria para comenzar.")
                 
             except Exception as e: st.error(f"Error en SF3: {e}")
         else:
