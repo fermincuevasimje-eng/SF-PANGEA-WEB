@@ -278,6 +278,10 @@ st.title(f"🛠️ Módulo SF3 - Métricas Diarias")
         else:
             st.info("💡 Módulo SF3 Activo. Cargue el archivo de Captura Diaria.")
                 
+            except Exception as e: st.error(f"Error en SF3: {e}")
+        else:
+            st.info("💡 Módulo SF3 Activo. Cargue el archivo de Captura Diaria.")
+                
             except Exception as e:
                 st.error(f"Error en SF3: {e}")
         else:
