@@ -283,14 +283,30 @@ else:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
                 
-                # Filtros rápidos para el archivo
+               # --- FILTROS INTELIGENTES CON CRUCE AUTOMÁTICO ---
                 col_f1, col_f2 = st.columns(2)
-                with col_f1: sel_del = st.selectbox("📍 Filtrar Archivo por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())))
-                with col_f2: sel_utb = st.selectbox("🔍 Filtrar Archivo por UTB:", ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys()))))
+                
+                with col_f2: # Empezamos por la UTB para que el cruce sea lógico
+                    todas_utbs = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia) directamente:", todas_utbs)
 
+                with col_f1:
+                    # Si seleccionaste una UTB, el sistema "adivina" la delegación
+                    if sel_utb != "TODAS":
+                        delegacion_sugerida = MAPA_UTB_DEL.get(sel_utb, "TODAS")
+                        lista_del = [delegacion_sugerida]
+                        st.info(f"📍 Delegación detectada: **{delegacion_sugerida}**")
+                    else:
+                        lista_del = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+                    
+                    sel_del = st.selectbox("📍 Filtrar por Delegación:", lista_del)
+
+                # APLICACIÓN DE FILTRO AL ARCHIVO
                 df_filt = df_c.copy()
-                if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
+                if sel_del != "TODAS":
+                    df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS":
+                    df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
 
                 total_rehab += pd.to_numeric(df_filt.iloc[:, 29], errors='coerce').fillna(0).sum()
                 total_manto += pd.to_numeric(df_filt.iloc[:, 30], errors='coerce').fillna(0).sum()
