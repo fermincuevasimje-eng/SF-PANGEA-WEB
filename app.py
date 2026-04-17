@@ -220,52 +220,9 @@ else:
         st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
-
-        # --- PANEL DE CAPTURA MANUAL (ORDENADO Y PULIDO) ---
-        with st.expander("➕ REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
-            with st.form("captura_sf3", clear_on_submit=True):
-                # Fila 1: Datos de Control y Ubicación
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    f_fecha = st.date_input("1. Fecha de Atención")
-                    f_del = st.selectbox("4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
-                with c2:
-                    f_ot = st.text_input("2. O.T.")
-                    f_utb = st.selectbox("5. UTB", sorted(CATALOGO_MAESTRO.get(f_del, [])))
-                with c3:
-                    f_calle = st.text_input("3. Calle")
-                    f_folio = st.text_input("6. Folio / Ticket / IMEI")
-
-                # Fila 2: Métricas de Trabajo
-                st.markdown("---")
-                m1, m2, m3, m4 = st.columns(4)
-                with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
-                with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
-                with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
-                with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
-
-                # Fila 3: Observaciones y Envío
-                f_obs = st.text_area("11. Observaciones", placeholder="Escriba aquí detalles adicionales...")
-
-                if st.form_submit_button("🚀 REGISTRAR Y SUMAR A MÉTRICAS", use_container_width=True):
-                    if "capturas_manuales" not in st.session_state:
-                        st.session_state.capturas_manuales = []
-                    
-                    nuevo_reg = {
-                        "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), 
-                        "CALLE": f_calle.upper(), "DELEGACIÓN": f_del, "UTB": f_utb,
-                        "FOLIO": f_folio.upper(), "REHAB": f_rehab, "MANTO": f_manto, 
-                        "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
-                    }
-                    st.session_state.capturas_manuales.append(nuevo_reg)
-                    st.toast(f"Registro O.T. {f_ot} guardado", icon="✅")
-
-        st.markdown("---")
-        
-        # ABAJO EL CARGADOR DE ARCHIVO
-        up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura para suma masiva", type=["csv", "xlsx"])
+    elif st.session_state.menu == "SF3":
+        st.title(f"🛠️ Módulo SF3 - Métricas Diarias")
+        up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
         
         if up_cap:
             try:
