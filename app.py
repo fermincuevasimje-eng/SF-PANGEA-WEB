@@ -124,9 +124,21 @@ def extraer_carga_robusta(punto_dict, tipo):
     return int(m.group(1)) if m else 0
 @st.cache_data
 def load_massive_data(file, extension):
+    # 1. Leemos el archivo
     df = pd.read_excel(file) if extension == 'xlsx' else pd.read_csv(file)
+    
+    # 2. PARCHE DE VELOCIDAD: Eliminamos filas que estén totalmente vacías
+    # Esto ignora las 27,000 filas "fantasma" de Excel
+    df = df.dropna(how='all').reset_index(drop=True)
+    
+    # 3. SEGURIDAD EXTRA: Si la primera columna (Folio/Fecha) está vacía, se elimina la fila
+    df = df[df.iloc[:, 0].astype(str).str.strip() != "nan"]
+    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
+
+    # 4. Procesamos solo los datos reales
     df['del_norm'] = df.iloc[:, 22].astype(str).apply(normalizar_texto)
     df['utb_norm'] = df.iloc[:, 23].astype(str).apply(normalizar_texto)
+    
     return df
 # --- 3. AUTENTICACIÓN Y ESTADO ---
 if "autenticado" not in st.session_state:
