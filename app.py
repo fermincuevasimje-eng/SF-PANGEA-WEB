@@ -221,8 +221,47 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo SF3 - Métricas Diarias")
-        up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
+        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
+
+        # --- PANEL DE CAPTURA MANUAL (PASO ANTERIOR) ---
+        with st.expander("➕ REGISTRAR NUEVA ATENCIÓN (MANUAL)", expanded=True):
+            with st.form("captura_sf3", clear_on_submit=True):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    f_folio = st.text_input("1. Ticket / Folio / IMEI")
+                    f_rehab = st.number_input("6. Rehabilitaciones", min_value=0, step=1)
+                with c2:
+                    f_fecha = st.date_input("2. Fecha de Atención")
+                    f_manto = st.number_input("7. Mantenimientos", min_value=0, step=1)
+                with c3:
+                    f_calle = st.text_input("3. Calle")
+                    f_sust = st.number_input("8. Sustituciones", min_value=0, step=1)
+                
+                c4, c5, c6 = st.columns(3)
+                with c4:
+                    f_del = st.selectbox("4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
+                with c5:
+                    f_utb = st.selectbox("5. UTB", sorted(CATALOGO_MAESTRO.get(f_del, [])))
+                with c6:
+                    f_ampli = st.number_input("9. Ampliaciones", min_value=0, step=1)
+
+                if st.form_submit_button("🚀 REGISTRAR Y SUMAR A MÉTRICAS", use_container_width=True):
+                    # Guardamos el registro completo en una lista en la sesión
+                    if "capturas_manuales" not in st.session_state:
+                        st.session_state.capturas_manuales = []
+                    
+                    nuevo_reg = {
+                        "FECHA": f_fecha.strftime("%d/%m/%Y"), "CALLE": f_calle.upper(),
+                        "DELEGACIÓN": f_del, "UTB": f_utb,
+                        "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli
+                    }
+                    st.session_state.capturas_manuales.append(nuevo_reg)
+                    st.toast(f"Folio {f_folio} registrado con éxito", icon="✅")
+
+        st.markdown("---")
+        
+        # ABAJO EL CARGADOR DE ARCHIVO
+        up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura para suma masiva", type=["csv", "xlsx"])
         
         if up_cap:
             try:
