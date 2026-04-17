@@ -238,13 +238,13 @@ else:
                 cols_indices = [4, 19, 22, 23, 29, 30, 31, 39]
                 df_vista = df_f.iloc[:, cols_indices].copy()
                 df_vista.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                st.dataframe(df_vista, use_container_width=True, hide_index=True)
+               st.dataframe(df_vista, use_container_width=True, hide_index=True)
                 
             except Exception as e:
                 st.error(f"Error en SF3: {e}")
         else:
             st.info("💡 Módulo SF3 Activo. Por favor, cargue el archivo de Captura Diaria.")
-    elif st.session_state.menu == "SF2":
+elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
         
