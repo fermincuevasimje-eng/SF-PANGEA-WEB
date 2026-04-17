@@ -288,43 +288,45 @@ else:
              # --- FILTROS CON SINCRONIZACIÓN BIDIRECCIONAL ---
               # --- FILTROS CON JERARQUÍA Y SINCRONIZACIÓN TOTAL ---
                 # --- FILTROS CON SINCRONIZACIÓN TOTAL BIDIRECCIONAL ---
+                # --- FUNCIÓN DE SINCRONIZACIÓN MAESTRA ---
+                def actualizar_delegacion():
+                    utb_sel = st.session_state.selector_utb_global
+                    if utb_sel != "TODAS":
+                        del_auto = MAPA_UTB_DEL.get(utb_sel, "TODAS")
+                        st.session_state.sel_del_f = del_auto
+
+                # --- FILTROS CON SINCRONIZACIÓN TOTAL ---
                 col_f1, col_f2 = st.columns(2)
                 
-                # 1. LÓGICA DE DETECCIÓN: ¿Qué quiere hacer el usuario?
                 lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                
-                # Si el usuario elige una UTB en el buscador global
-                utb_seleccionada = st.session_state.get("selector_utb_global", "TODAS")
-                
-                indice_del_auto = 0
-                if utb_seleccionada != "TODAS":
-                    # Buscamos a qué delegación pertenece esa UTB
-                    del_pertenece = MAPA_UTB_DEL.get(utb_seleccionada, "TODAS")
-                    if del_pertenece in lista_delegaciones:
-                        indice_del_auto = lista_delegaciones.index(del_pertenece)
 
-                # 2. SELECTOR DE DELEGACIÓN (Se actualiza solo si eliges UTB)
+                with col_f2:
+                    # Selector de UTB con Callback (Dispara la actualización)
+                    todas_utbs = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+                    sel_utb = st.selectbox(
+                        "🔍 Seleccione UTB (Colonia):", 
+                        todas_utbs, 
+                        key="selector_utb_global",
+                        on_change=actualizar_delegacion
+                    )
+
                 with col_f1:
+                    # Selector de Delegación Dinámico
+                    # Si no hay valor en el estado, ponemos "TODAS"
+                    if "sel_del_f" not in st.session_state:
+                        st.session_state.sel_del_f = "TODAS"
+                    
+                    # Buscamos el índice actual para que el selector se mueva físicamente
+                    try:
+                        idx_actual = lista_delegaciones.index(st.session_state.sel_del_f)
+                    except:
+                        idx_actual = 0
+
                     sel_del = st.selectbox(
                         "📍 Filtrar por Delegación:", 
                         lista_delegaciones, 
-                        index=indice_del_auto, 
-                        key="sel_del_f"
-                    )
-
-                # 3. SELECTOR DE UTB (Se recorta si eliges Delegación)
-                with col_f2:
-                    if sel_del != "TODAS":
-                        # Si hay delegación, solo mostramos sus UTBs para evitar errores
-                        opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
-                    else:
-                        # Si no hay delegación, mostramos las 280 para búsqueda libre
-                        opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                    
-                    sel_utb = st.selectbox(
-                        "🔍 Seleccione UTB (Colonia):", 
-                        opciones_utb, 
-                        key="selector_utb_global"
+                        index=idx_actual,
+                        key="sel_del_manual"
                     )
 
                 # --- APLICACIÓN FINAL DE FILTROS ---
