@@ -48,29 +48,31 @@ CHISTES = [
     "— ¿Cómo se queda un mago después de comer? — Magordito."
 ]
 
-# --- CARGA DEL CATÁLOGO DESDE EL REPOSITORIO ---
+# --- CARGA DEL CATÁLOGO PERMANENTE (DESDE DELEUTB.csv) ---
 @st.cache_data
-def cargar_catalogo_permanente():
+def cargar_catalogo_csv():
     try:
-        # Intenta leer el archivo que subiste al servidor
+        # Lee el archivo que subiste a GitHub
         df_cat = pd.read_csv("DELEUTB.csv")
         
-        # Limpieza de espacios en blanco (trim)
-        df_cat['DELEGACION'] = df_cat['DELEGACION'].str.strip()
-        df_cat['UTB'] = df_cat['UTB'].str.strip()
+        # Limpieza profesional de datos
+        df_cat['DELEGACION'] = df_cat['DELEGACION'].astype(str).str.strip().str.upper()
+        df_cat['UTB'] = df_cat['UTB'].astype(str).str.strip().str.upper()
         
         # Agrupamos: Delegación -> Lista de sus UTBs
         cat_dict = df_cat.groupby('DELEGACION')['UTB'].apply(list).to_dict()
         
-        # Mapa inverso: UTB -> Delegación (para filtros cruzados)
+        # Mapa inverso para el buscador de UTBs
         mapa_inv = {utb: dl for dl, lista in cat_dict.items() for utb in lista}
         
         return cat_dict, mapa_inv
     except Exception as e:
-        # Si el archivo no está, el sistema te avisa pero sigue funcionando con lo mínimo
-        st.error(f"⚠️ No se encontró DELEUTB.csv en el servidor. Cargando catálogo básico.")
-        cat_basico = {"TODAS": []}
-        return cat_basico, {}
+        st.error(f"⚠️ Error al leer el catálogo: {e}")
+        # Retorno de seguridad por si el archivo falla
+        return {"ERROR": []}, {}
+
+# Ejecutamos la carga global para que esté disponible en toda la App
+CATALOGO_MAESTRO, MAPA_UTB_DEL = cargar_catalogo_csv()
 
 # Ejecutamos la carga al iniciar la app
 CATALOGO_MAESTRO, MAPA_UTB_DEL = cargar_catalogo_permanente()
