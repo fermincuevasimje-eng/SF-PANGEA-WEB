@@ -48,31 +48,37 @@ CHISTES = [
     "— ¿Cómo se queda un mago después de comer? — Magordito."
 ]
 
-# --- CARGA DEL CATÁLOGO DINÁMICO (DELEGACIONES Y UTB) ---
-@st.cache_data
-def cargar_catalogo_csv():
-    try:
-        # Busca el archivo que subiste a tu repositorio
-        df_cat = pd.read_csv("DELEUTB.csv")
-        
-        # Limpieza: Todo a mayúsculas y sin espacios extras
-        df_cat['DELEGACION'] = df_cat['DELEGACION'].astype(str).str.strip().str.upper()
-        df_cat['UTB'] = df_cat['UTB'].astype(str).str.strip().str.upper()
-        
-        # Agrupamos los datos para los selectores
-        cat_dict = df_cat.groupby('DELEGACION')['UTB'].apply(list).to_dict()
-        
-        # Mapa para cruce de información
-        mapa_inv = {utb: dl for dl, lista in cat_dict.items() for utb in lista}
-        
-        return cat_dict, mapa_inv
-    except Exception as e:
-        # Si el archivo falla, muestra el error pero no rompe la app
-        st.error(f"⚠️ Error al cargar DELEUTB.csv: {e}")
-        return {"ERROR EN ARCHIVO": []}, {}
+# --- CATÁLOGO MAESTRO (ADN FIJO DE SF PANGEA) ---
+CATALOGO_MAESTRO = {
+    "CENTRO HISTORICO": ["CENTRO", "SANTA CLARA", "5 DE MAYO", "FRANCISCO MURGUIA (EL RANCHITO)", "LA MERCED ( ALAMEDA)"],
+    "BARRIO TRADICIONALES": ["SANTA BARBARA", "EL COPORO", "LA RETAMA", "SAN MIGUEL APINAHUISCO", "UNION", "SAN LUIS OBISPO"],
+    "ARBOL DE LAS MANITAS": ["ZOPILOCALCO SUR", "ZOPILOCALCO NORTE", "LOMAS ALTAS", "HUITZILA Y DOCTORES", "NIÑOS HEROES (PENSIONES)"],
+    "LA MAQUINITA": ["RANCHO LA MORA", "LOS ANGELES", "CARLOS HANK Y LOS FRAILES", "GUADALUPE, CLUB JARDIN Y LA MAGDALENA", "TLACOPA"],
+    "INDEPENDENCIA": ["REFORMA Y FERROCARRILES NACIONALES (SAN JUAN BAUTISTA)", "METEORO", "INDEPENDENCIA", "LAS TORRES (CIENTIFICOS)", "SAN JUAN BUENAVISTA"],
+    "SAN SEBASTIAN": ["VALLE VERDE Y TERMINAL", "PROGRESO", "IZCALLI IPIEM", "SAN SEBASTIAN Y VERTICE", "IZCALLI TOLUCA", "SALVADOR SANCHEZ COLIN", "COMISION FEDERAL DE ELECTRICIDAD", "VALLE DON CAMILO"],
+    "UNIVERSIDAD": ["UNIVERSIDAD", "CUAUHTEMOC", "AMERICAS", "ALTAMIRANO"],
+    "SANTA MARIA DE LAS ROSAS": ["SANTA MARIA DE LAS ROSAS", "NUEVA SANTA MARIA DE LAS ROSAS", "UNIDAD VICTORIA"],
+    "SANTIAGO MILTEPEC": ["MILTEPEC CENTRO", "MILTEPEC SUR", "MILTEPEC NORTE"],
+    "SANTA CRUZ ATZCAPOTZALTONGO": ["SANTA CRUZ SUR", "SANTA CRUZ NORTE", "EX HACIENDA LA MAGDALENA"],
+    "SANTA MARIA TOTOLTEPEC": ["CENTRO", "EL COECILLO", "HEROES", "PASEO TOTOLTEPEC", "EL OLIMPO", "EL CARMEN TOTOLTEPEC"],
+    "SANTIAGO TLACOTEPEC": ["DEL CENTRO", "SANTA MARIA", "SHINGADE", "CRISTO REY"],
+    "SAN PEDRO TOTOLTEPEC": ["DEL CENTRO", "MANZANA SUR", "DEL PANTEON", "GEOVILLAS", "FRANCISCO I. MADERO", "LA GALIA", "NUEVA SAN FRANCISCO", "SAN MIGUEL TOTOLTEPEC", "BORDO DE LAS CANASTAS", "SAN FRANCISCO TOTOLTEPEC", "GUADALUPE TOTOLTEPEC", "SAN BLAS TOTOLTEPEC", "LA CONSTITUCION TOTOLTEPEC", "ARROYO VISTA HERMOSA"],
+    "SANTA ANA TLAPALTITLAN": ["16 DE SEPTIEMBRE", "PINO SUAREZ", "DEL PANTEON", "INDEPENDENCIA", "SANTA MARIA SUR", "SANTA MARIA NORTE", "BUENAVISTA"],
+    "SAN PABLO AUTOPAN": ["CENTRO", "DE JESUS 1A SECCION", "DE JESUS 2A SECCION", "OJO DE AGUA", "AVIACION AUTOPAN", "SAN CARLOS AUTOPAN", "SAN DIEGO LINARES", "REAL DE SAN PABLO", "XICALTEPEC B EL CAJON", "JICALTEPEC AUTOPAN"],
+    "SAN LORENZO TEPALTITLAN": ["CENTRO", "LAS FLORES", "SAN ISIDRO", "LOS ANGELES"],
+    "SAN MATEO OTZACATIPAN": ["CENTRO", "LAZARO CARDENAS", "SANTA ROSA"],
+    "SAN CRISTOBAL HUICHOCHITLAN": ["CENTRO", "LA TRINIDAD", "SAN SALVADOR", "SAN GABRIEL"],
+    "SAN ANDRES CUEXCONTITLAN": ["SECCION 1", "SECCION 2", "SECCION 3", "SECCION 4", "SECCION 5", "SECCION 6", "SECCION 7"],
+    "SAN ANTONIO BUENAVISTA": ["CENTRO", "LA JOYA"],
+    "SAN BUENAVENTURA": ["CENTRO", "GUADALUPE", "SANTA CRUZ", "LA MAGDALENA"],
+    "CACALOMACAN": ["CENTRO", "EL CALVARIO", "SAN JOSÉ", "SAN PEDRO"],
+    "CAPULTITLAN": ["CENTRO", "MANZANA NORTE", "MANZANA SUR"],
+    "SAN FELIPE TLALMIMILOLPAN": ["CENTRO", "SAN JUAN", "SAN ANTONIO", "SAN JOSE"],
+   "TLACHICHILPA": ["CENTRO", "BARRIO DEL COECILLO", "EL CARMEN"]
+}
 
-# Ejecutamos la carga para activar el catálogo real de Toluca
-CATALOGO_MAESTRO, MAPA_UTB_DEL = cargar_catalogo_csv()
+MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lista}
+
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
     """Obtiene el trazo vial real desde OSRM con manejo de errores Senior."""
@@ -118,21 +124,9 @@ def extraer_carga_robusta(punto_dict, tipo):
     return int(m.group(1)) if m else 0
 @st.cache_data
 def load_massive_data(file, extension):
-    # 1. Leemos el archivo
     df = pd.read_excel(file) if extension == 'xlsx' else pd.read_csv(file)
-    
-    # 2. PARCHE DE VELOCIDAD: Eliminamos filas que estén totalmente vacías
-    # Esto ignora las 27,000 filas "fantasma" de Excel
-    df = df.dropna(how='all').reset_index(drop=True)
-    
-    # 3. SEGURIDAD EXTRA: Si la primera columna (Folio/Fecha) está vacía, se elimina la fila
-    df = df[df.iloc[:, 0].astype(str).str.strip() != "nan"]
-    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
-
-    # 4. Procesamos solo los datos reales
     df['del_norm'] = df.iloc[:, 22].astype(str).apply(normalizar_texto)
     df['utb_norm'] = df.iloc[:, 23].astype(str).apply(normalizar_texto)
-    
     return df
 # --- 3. AUTENTICACIÓN Y ESTADO ---
 if "autenticado" not in st.session_state:
@@ -182,16 +176,16 @@ else:
             st.rerun()
         st.info("SF PANGEA V1")
 
-    # --- 5. CUERPO LÓGICO ---
-        if st.session_state.menu == "Inicio":
-            st.title("👋 Bienvenido a SF PANGEA")
-            st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
-            st.write("Seleccione un módulo en el menú lateral para comenzar.")
-            st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
-    
-        elif st.session_state.menu == "SF3":
-            st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
-            up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
+  # --- 5. CUERPO LÓGICO ---
+    if st.session_state.menu == "Inicio":
+        st.title("👋 Bienvenido a SF PANGEA")
+        st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
+        st.write("Seleccione un módulo en el menú lateral para comenzar.")
+        st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
+
+    elif st.session_state.menu == "SF3":
+        st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
+        up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
         
         if up_cap:
             try:
@@ -238,13 +232,13 @@ else:
                 cols_indices = [4, 19, 22, 23, 29, 30, 31, 39]
                 df_vista = df_f.iloc[:, cols_indices].copy()
                 df_vista.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-               st.dataframe(df_vista, use_container_width=True, hide_index=True)
+                st.dataframe(df_vista, use_container_width=True, hide_index=True)
                 
             except Exception as e:
                 st.error(f"Error en SF3: {e}")
         else:
             st.info("💡 Módulo SF3 Activo. Por favor, cargue el archivo de Captura Diaria.")
-elif st.session_state.menu == "SF2":
+    elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
         
