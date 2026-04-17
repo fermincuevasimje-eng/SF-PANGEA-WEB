@@ -124,9 +124,22 @@ def extraer_carga_robusta(punto_dict, tipo):
     return int(m.group(1)) if m else 0
 @st.cache_data
 def load_massive_data(file, extension):
-    df = pd.read_excel(file) if extension == 'xlsx' else pd.read_csv(file)
+    # 1. Leemos el archivo
+    df = pd.read_excel(file, engine='openpyxl') if extension == 'xlsx' else pd.read_csv(file)
+    
+    # 2. EL PARCHE: Eliminamos de inmediato filas que estén totalmente vacías
+    df = df.dropna(how='all').reset_index(drop=True)
+    
+    # 3. CORTE QUIRÚRGICO: Si la primera columna (Folio/Fecha) está vacía, dejamos de leer.
+    # Esto es lo que elimina el retraso de las 27,000 filas.
+    df = df[df.iloc[:, 0].astype(str).str.strip() != "nan"]
+    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
+    df = df[df.iloc[:, 0].notna()]
+
+    # 4. Procesamos solo las columnas de Delegación y UTB que tienen datos reales
     df['del_norm'] = df.iloc[:, 22].astype(str).apply(normalizar_texto)
     df['utb_norm'] = df.iloc[:, 23].astype(str).apply(normalizar_texto)
+    
     return df
 # --- 3. AUTENTICACIÓN Y ESTADO ---
 if "autenticado" not in st.session_state:
