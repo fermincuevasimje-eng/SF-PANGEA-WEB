@@ -220,8 +220,7 @@ else:
         st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-    elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
+st.title(f"🛠️ Módulo SF3 - Métricas Diarias")
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
         
         if up_cap:
@@ -229,34 +228,39 @@ else:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
                 
-                # --- SELECTORES EN ORDEN: DELEGACIÓN -> UTB ---
+                # --- PANEL DE CAPTURA ÁGIL ---
+                with st.expander("📝 REGISTRAR NUEVA ACTIVIDAD DE CAMPO", expanded=False):
+                    st.markdown("##### Ingrese los datos de la última atención")
+                    c_f1, c_f2, c_f3, c_f4 = st.columns(4)
+                    with c_f1: n_rehab = st.number_input("Rehabilitaciones", min_value=0, step=1, key="in_rehab")
+                    with c_f2: n_manto = st.number_input("Mantenimientos", min_value=0, step=1, key="in_manto")
+                    with c_f3: n_sust = st.number_input("Sustituciones", min_value=0, step=1, key="in_sust")
+                    with c_f4: n_ampli = st.number_input("Ampliaciones", min_value=0, step=1, key="in_ampli")
+                    
+                    if st.button("💾 AGREGAR A MÉTRICAS ACTUALES", use_container_width=True):
+                        st.session_state.suma_extra = {"rehab": n_rehab, "manto": n_manto, "sust": n_sust, "ampli": n_ampli}
+                        st.toast("Datos integrados con éxito", icon="⚡")
+
+                st.markdown("---")
                 col_d, col_u = st.columns(2)
-                
                 with col_d:
-                    lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                    sel_del = st.selectbox("📍 Seleccione Delegación:", lista_delegaciones)
-                
+                    lista_del = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+                    sel_del = st.selectbox("📍 Seleccione Delegación:", lista_del)
                 with col_u:
-                    if sel_del != "TODAS":
-                        opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
-                    else:
-                        opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+                    opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
                     sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb)
 
-                # --- FILTRADO DE DATOS ---
                 df_f = df_c.copy()
-                if sel_del != "TODAS":
-                    df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS":
-                    df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
+                if sel_del != "TODAS": df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS": df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
 
-                # --- CÁLCULO DE MÉTRICAS ---
-                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').fillna(0).sum()
-                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').fillna(0).sum()
-                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').fillna(0).sum()
-                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').fillna(0).sum()
+                # CÁLCULO (EXCEL + MANUAL)
+                ex = st.session_state.get("suma_extra", {"rehab":0, "manto":0, "sust":0, "ampli":0})
+                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').fillna(0).sum() + ex["rehab"]
+                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').fillna(0).sum() + ex["manto"]
+                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').fillna(0).sum() + ex["sust"]
+                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').fillna(0).sum() + ex["ampli"]
                 
-                # --- VISUALIZACIÓN ---
                 st.markdown("### 📊 Resumen de Productividad Territorial")
                 met1, met2, met3, met4 = st.columns(4)
                 met1.metric("🔧 Rehabilitaciones", int(m_rehab))
@@ -266,10 +270,13 @@ else:
                 
                 st.markdown("---")
                 st.write("🔍 **Registros Operativos (Vista Tabla):**")
-                cols_indices = [4, 19, 22, 23, 29, 30, 31, 39]
-                df_vista = df_f.iloc[:, cols_indices].copy()
+                df_vista = df_f.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
                 df_vista.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
                 st.dataframe(df_vista, use_container_width=True, hide_index=True)
+                
+            except Exception as e: st.error(f"Error en SF3: {e}")
+        else:
+            st.info("💡 Módulo SF3 Activo. Cargue el archivo de Captura Diaria.")
                 
             except Exception as e:
                 st.error(f"Error en SF3: {e}")
