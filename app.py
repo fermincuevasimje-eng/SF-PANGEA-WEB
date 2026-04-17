@@ -286,30 +286,30 @@ else:
                # --- FILTROS INTELIGENTES CON CRUCE AUTOMÁTICO ---
                # --- FILTROS CON JERARQUÍA INTELIGENTE ---
              # --- FILTROS CON SINCRONIZACIÓN BIDIRECCIONAL ---
+              # --- FILTROS CON JERARQUÍA Y SINCRONIZACIÓN TOTAL ---
                 col_f1, col_f2 = st.columns(2)
                 
-                # Pre-cálculo para la sincronización automática
-                if "utb_anterior" not in st.session_state:
-                    st.session_state.utb_anterior = "TODAS"
-
-                # 1. Selector de UTB (Buscador Global)
-                with col_f2:
-                    todas_utbs = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", todas_utbs, key="selector_utb_global")
-
-                # 2. Lógica de "Salto" Automático de Delegación
                 with col_f1:
                     lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
                     
-                    # Si el usuario cambió la UTB, calculamos cuál es su delegación
-                    indice_del_auto = 0 # Por defecto "TODAS"
-                    if sel_utb != "TODAS":
-                        del_pertenece = MAPA_UTB_DEL.get(sel_utb, "TODAS")
+                    # Si el usuario ya eligió una UTB específica en el otro buscador, 
+                    # forzamos a que la delegación sea la correcta.
+                    idx_del_auto = 0
+                    if st.session_state.get("selector_utb_global", "TODAS") != "TODAS":
+                        del_pertenece = MAPA_UTB_DEL.get(st.session_state.selector_utb_global, "TODAS")
                         if del_pertenece in lista_delegaciones:
-                            indice_del_auto = lista_delegaciones.index(del_pertenece)
+                            idx_del_auto = lista_delegaciones.index(del_pertenece)
                     
-                    # El selector de delegación ahora tiene un "index" dinámico
-                    sel_del = st.selectbox("📍 Filtrar por Delegación:", lista_delegaciones, index=indice_del_auto)
+                    sel_del = st.selectbox("📍 Filtrar por Delegación:", lista_delegaciones, index=idx_del_auto, key="sel_del_final")
+
+                with col_f2:
+                    # LÓGICA DINÁMICA: Si hay delegación, solo sus UTB. Si no, las 280.
+                    if sel_del != "TODAS":
+                        opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
+                    else:
+                        opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+                    
+                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb, key="selector_utb_global")
 
                 # --- APLICACIÓN DE FILTROS AL DATAFRAME ---
                 df_filt = df_c.copy()
