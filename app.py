@@ -182,13 +182,13 @@ else:
             st.rerun()
         st.info("SF PANGEA V1")
 
-  # --- 5. CUERPO LÓGICO ---
+    # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
         st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
-
+    
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
         up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
