@@ -182,23 +182,23 @@ else:
             st.rerun()
         st.info("SF PANGEA V1")
 
-   # --- 5. CUERPO LÓGICO --- (Línea 178 aprox)
-    if st.session_state.menu == "Inicio":
-        st.title("👋 Bienvenido a SF PANGEA")
-        st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
-        st.write("Seleccione un módulo en el menú lateral para comenzar.")
-        st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
-
-    elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
-        up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
+    # --- 5. CUERPO LÓGICO ---
+        if st.session_state.menu == "Inicio":
+            st.title("👋 Bienvenido a SF PANGEA")
+            st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
+            st.write("Seleccione un módulo en el menú lateral para comenzar.")
+            st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
+    
+        elif st.session_state.menu == "SF3":
+            st.title(f"🛠️ Módulo {st.session_state.menu} - Métricas Diarias")
+            up_cap = st.file_uploader("Cargar Archivo de Captura (xlsx/csv)", type=["csv", "xlsx"])
         
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
                 
-                # --- SELECTORES EN ORDEN ---
+                # --- SELECTORES EN ORDEN: DELEGACIÓN -> UTB ---
                 col_d, col_u = st.columns(2)
                 
                 with col_d:
@@ -211,10 +211,42 @@ else:
                     else:
                         opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
                     sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb)
-                # ... (resto de tu lógica de SF3)
 
+                # --- FILTRADO DE DATOS ---
+                df_f = df_c.copy()
+                if sel_del != "TODAS":
+                    df_f = df_f[df_f['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS":
+                    df_f = df_f[df_f['utb_norm'] == normalizar_texto(sel_utb)]
+
+                # --- CÁLCULO DE MÉTRICAS ---
+                m_rehab = pd.to_numeric(df_f.iloc[:, 29], errors='coerce').fillna(0).sum()
+                m_manto = pd.to_numeric(df_f.iloc[:, 30], errors='coerce').fillna(0).sum()
+                m_sust = pd.to_numeric(df_f.iloc[:, 31], errors='coerce').fillna(0).sum()
+                m_ampli = pd.to_numeric(df_f.iloc[:, 39], errors='coerce').fillna(0).sum()
+                
+                # --- VISUALIZACIÓN ---
+                st.markdown("### 📊 Resumen de Productividad Territorial")
+                met1, met2, met3, met4 = st.columns(4)
+                met1.metric("🔧 Rehabilitaciones", int(m_rehab))
+                met2.metric("🧹 Mantenimientos", int(m_manto))
+                met3.metric("💡 Sustituciones", int(m_sust))
+                met4.metric("➕ Ampliaciones", int(m_ampli))
+                
+                st.markdown("---")
+                st.write("🔍 **Registros Operativos (Vista Tabla):**")
+                cols_indices = [4, 19, 22, 23, 29, 30, 31, 39]
+                df_vista = df_f.iloc[:, cols_indices].copy()
+                df_vista.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+                st.dataframe(df_vista, use_container_width=True, hide_index=True)
+                
+            except Exception as e:
+                st.error(f"Error en SF3: {e}")
+        else:
+            st.info("💡 Módulo SF3 Activo. Por favor, cargue el archivo de Captura Diaria.")
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
+        st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
         
         up_sf2 = st.file_uploader("Subir Archivo de Referencia (Excel/CSV)", type=["csv", "xlsx"], key="sf2_up")
         
