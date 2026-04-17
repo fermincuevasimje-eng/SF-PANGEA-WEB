@@ -284,24 +284,30 @@ else:
                 df_c = load_massive_data(up_cap, ext)
                 
                # --- FILTROS INTELIGENTES CON CRUCE AUTOMÁTICO ---
+               # --- FILTROS CON JERARQUÍA INTELIGENTE ---
                 col_f1, col_f2 = st.columns(2)
                 
-                with col_f2: # Empezamos por la UTB para que el cruce sea lógico
-                    todas_utbs = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia) directamente:", todas_utbs)
-
                 with col_f1:
-                    # Si seleccionaste una UTB, el sistema "adivina" la delegación
-                    if sel_utb != "TODAS":
-                        delegacion_sugerida = MAPA_UTB_DEL.get(sel_utb, "TODAS")
-                        lista_del = [delegacion_sugerida]
-                        st.info(f"📍 Delegación detectada: **{delegacion_sugerida}**")
-                    else:
-                        lista_del = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                    
-                    sel_del = st.selectbox("📍 Filtrar por Delegación:", lista_del)
+                    lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+                    sel_del = st.selectbox("📍 Filtrar por Delegación:", lista_delegaciones)
 
-                # APLICACIÓN DE FILTRO AL ARCHIVO
+                with col_f2:
+                    # LÓGICA DE FILTRADO DINÁMICO DE UTB
+                    if sel_del != "TODAS":
+                        # Si hay delegación, SOLO mostramos sus UTBs
+                        opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
+                    else:
+                        # Si no hay delegación, mostramos las 280 para búsqueda libre
+                        opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+                    
+                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb)
+
+                # --- AUTO-DETECCIÓN DE DELEGACIÓN (Si se elige UTB primero) ---
+                if sel_del == "TODAS" and sel_utb != "TODAS":
+                    sel_del = MAPA_UTB_DEL.get(sel_utb, "TODAS")
+                    st.info(f"📍 UTB detectada en Delegación: **{sel_del}**")
+
+                # APLICACIÓN DE FILTRO FINAL AL DATAFRAME
                 df_filt = df_c.copy()
                 if sel_del != "TODAS":
                     df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
