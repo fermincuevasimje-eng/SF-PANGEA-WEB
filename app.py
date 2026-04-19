@@ -221,7 +221,7 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-from datetime import datetime
+ffrom datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
         # --- FORMULARIO MANUAL ---
@@ -283,7 +283,10 @@ from datetime import datetime
         df_p = pd.DataFrame()
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_p = pd.DataFrame(st.session_state.manual_db)
-            t_rehab, t_manto, t_sust, t_ampli = df_p["REHAB"].sum(), df_p["MANTO"].sum(), df_p["SUST"].sum(), df_p["AMPLI"].sum()
+            t_rehab = df_p["REHAB"].sum()
+            t_manto = df_p["MANTO"].sum()
+            t_sust = df_p["SUST"].sum()
+            t_ampli = df_p["AMPLI"].sum()
 
         st.markdown("### 📊 Totales")
         met1, met2, met3, met4 = st.columns(4)
