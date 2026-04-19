@@ -221,97 +221,78 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-      st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
+from datetime import datetime
+        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- FORMULARIO MANUAL CONECTADO AL CATÁLOGO ---
+        # --- FORMULARIO MANUAL ---
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
             with st.form("captura_sf3", clear_on_submit=True):
-                # Fila 1: Control
                 c1, c2, c3 = st.columns(3)
                 with c1: f_fecha = st.date_input("1. Fecha de Atención")
                 with c2: f_ot = st.text_input("2. O.T. (Folio O.T)")
                 with c3: f_calle = st.text_input("3. Calle")
 
-                # Fila 2: Territorio (AQUÍ ESTÁ LA CONEXIÓN QUE BUSCABAS)
                 c4, c5, c6 = st.columns(3)
                 with c4: 
                     lista_48 = sorted(list(CATALOGO_MAESTRO.keys()))
-                    f_del = st.selectbox("4. Delegación", lista_48, key="f_del_manual")
+                    f_del = st.selectbox("4. Delegación", lista_48, key="f_del_form")
                 with c5: 
-                    # Vincula las UTB de la delegación elegida arriba
-                    lista_utb_vinculada = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                    f_utb = st.selectbox("5. UTB", lista_utb_vinculada, key="f_utb_manual")
+                    lista_utb_v = sorted(CATALOGO_MAESTRO.get(f_del, []))
+                    f_utb = st.selectbox("5. UTB", lista_utb_v, key="f_utb_form")
                 with c6: 
                     f_folio = st.text_input("6. Folio / Ticket / IMEI (Vale)")
 
-                # Fila 3: Métricas
                 st.markdown("---")
                 m1, m2, m3, m4 = st.columns(4)
-                with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
-                with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
-                with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
-                with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
+                with m1: f_rehab = st.number_input("7. Rehab", min_value=0, step=1)
+                with m2: f_manto = st.number_input("8. Manto", min_value=0, step=1)
+                with m3: f_sust = st.number_input("9. Sust", min_value=0, step=1)
+                with m4: f_ampli = st.number_input("10. Ampli", min_value=0, step=1)
 
                 f_obs = st.text_area("11. Observaciones")
 
-                if st.form_submit_button("🚀 GUARDAR Y ACTUALIZAR REPORTE", use_container_width=True):
+                if st.form_submit_button("🚀 GUARDAR Y ACTUALIZAR", use_container_width=True):
                     if "manual_db" not in st.session_state: st.session_state.manual_db = []
-                    
-                    registro = {
+                    reg = {
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
                         "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
                     }
-                    st.session_state.manual_db.append(registro)
-
+                    st.session_state.manual_db.append(reg)
                     try:
                         from openpyxl import load_workbook
                         wb = load_workbook("CAPTURA.xlsx")
                         ws = wb.active
-                        next_r = ws.max_row + 1
-                        if next_r < 3: next_r = 3
-
-                        # --- MAPEO AL EXCEL FÍSICO ---
-                        ws[f'E{next_r}'] = f_fecha.strftime("%Y-%m-%d")
-                        ws[f'G{next_r}'] = f_ot.upper()
-                        ws[f'T{next_r}'] = f_calle.upper()
-                        ws[f'W{next_r}'] = f_del.upper()
-                        ws[f'X{next_r}'] = f_utb.upper()
-                        ws[f'F{next_r}'] = f_folio.upper()
-                        ws[f'AC{next_r}'] = f_rehab
-                        ws[f'AD{next_r}'] = f_manto
-                        ws[f'AE{next_r}'] = f_sust
-                        ws[f'AL{next_r}'] = f_ampli
-                        ws[f'EK{next_r}'] = f_obs.upper()
-
+                        nr = ws.max_row + 1
+                        if nr < 3: nr = 3
+                        ws[f'E{nr}'], ws[f'G{nr}'], ws[f'T{nr}'] = f_fecha.strftime("%Y-%m-%d"), f_ot.upper(), f_calle.upper()
+                        ws[f'W{nr}'], ws[f'X{nr}'], ws[f'F{nr}'] = f_del.upper(), f_utb.upper(), f_folio.upper()
+                        ws[f'AC{nr}'], ws[f'AD{nr}'], ws[f'AE{nr}'], ws[f'AL{nr}'] = f_rehab, f_manto, f_sust, f_ampli
+                        ws[f'EK{nr}'] = f_obs.upper()
                         wb.save("CAPTURA.xlsx")
-                        st.toast(f"O.T. {f_ot} sincronizada con éxito", icon="✅")
+                        st.toast(f"O.T. {f_ot} guardada", icon="✅")
                     except Exception as e:
-                        st.error(f"Error en archivo físico: {e}")
+                        st.error(f"Error Excel: {e}")
 
-        # --- DESCARGA Y TABLERO ---
+        # --- TABLERO Y DESCARGA ---
         if st.session_state.get("manual_db"):
             with open("CAPTURA.xlsx", "rb") as f:
-                st.download_button(label="📥 DESCARGAR REPORTE FÍSICO (.XLSX)", data=f, file_name=f"REPORTE_DAP.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                st.download_button("📥 DESCARGAR REPORTE", f, "CAPTURAS.xlsx", use_container_width=True)
 
-        st.markdown("---")
         t_rehab, t_manto, t_sust, t_ampli = 0, 0, 0, 0
-        df_para_tabla = pd.DataFrame()
-
+        df_p = pd.DataFrame()
         if "manual_db" in st.session_state and st.session_state.manual_db:
-            df_m = pd.DataFrame(st.session_state.manual_db)
-            t_rehab, t_manto, t_sust, t_ampli = df_m["REHAB"].sum(), df_m["MANTO"].sum(), df_m["SUST"].sum(), df_m["AMPLI"].sum()
-            df_para_tabla = df_m.copy()
+            df_p = pd.DataFrame(st.session_state.manual_db)
+            t_rehab, t_manto, t_sust, t_ampli = df_p["REHAB"].sum(), df_p["MANTO"].sum(), df_p["SUST"].sum(), df_p["AMPLI"].sum()
 
-        st.markdown("### 📊 Totales Combinados")
-        met_c1, met_c2, met_c3, met_c4 = st.columns(4)
-        met_c1.metric("🔧 Rehab", int(t_rehab))
-        met_c2.metric("🧹 Manto", int(t_manto))
-        met_c3.metric("💡 Sust", int(t_sust))
-        met_c4.metric("➕ Ampli", int(t_ampli))
-
-        if not df_para_tabla.empty:
-            st.dataframe(df_para_tabla, use_container_width=True, hide_index=True)
+        st.markdown("### 📊 Totales")
+        met1, met2, met3, met4 = st.columns(4)
+        met1.metric("🔧 Rehab", int(t_rehab))
+        met2.metric("🧹 Manto", int(t_manto))
+        met3.metric("💡 Sust", int(t_sust))
+        met4.metric("➕ Ampli", int(t_ampli))
+        if not df_p.empty:
+            st.dataframe(df_p, use_container_width=True, hide_index=True)
         else:
             st.info("Esperando captura manual o carga de archivo para mostrar datos.")
     elif st.session_state.menu == "SF2":
