@@ -221,30 +221,30 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        from datetime import datetime
+from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- FORMULARIO MANUAL ---
-        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
+        # --- 1. CARGA MASIVA ---
+        up_cap = st.file_uploader("📂 Cargar Archivo de Captura (CSV/XLSX)", type=["csv", "xlsx"])
+        
+        # --- 2. FORMULARIO MANUAL (PRODUCTO FÍSICO) ---
+        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO MANUAL)", expanded=True):
             with st.form("captura_sf3", clear_on_submit=True):
-                # Fila 1: Identificación
                 c1, c2, c3 = st.columns(3)
                 with c1: f_fecha = st.date_input("1. Fecha de Atención")
                 with c2: f_ot = st.text_input("2. O.T. (Folio O.T)")
                 with c3: f_calle = st.text_input("3. Calle")
 
-                # Fila 2: Territorio (48 Delegaciones Conectadas)
                 c4, c5, c6 = st.columns(3)
                 with c4: 
                     lista_48 = sorted(list(CATALOGO_MAESTRO.keys()))
-                    f_del = st.selectbox("4. Delegación", lista_48, key="f_del_form")
+                    f_del = st.selectbox("4. Delegación", lista_48, key="f_del_sf3")
                 with c5: 
                     lista_utb_v = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                    f_utb = st.selectbox("5. UTB", lista_utb_v, key="f_utb_form")
+                    f_utb = st.selectbox("5. UTB", lista_utb_v, key="f_utb_sf3")
                 with c6: 
                     f_folio = st.text_input("6. Folio / Ticket / IMEI (Vale)")
 
-                # Fila 3: Métricas
                 st.markdown("---")
                 m1, m2, m3, m4 = st.columns(4)
                 with m1: f_rehab = st.number_input("7. Rehab", min_value=0, step=1)
@@ -254,7 +254,7 @@ else:
 
                 f_obs = st.text_area("11. Observaciones")
 
-                if st.form_submit_button("🚀 GUARDAR Y ACTUALIZAR", use_container_width=True):
+                if st.form_submit_button("🚀 GUARDAR EN CAPTURA.XLSX", use_container_width=True):
                     if "manual_db" not in st.session_state: st.session_state.manual_db = []
                     reg = {
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
@@ -268,36 +268,48 @@ else:
                         ws = wb.active
                         nr = ws.max_row + 1
                         if nr < 3: nr = 3
-                        # Inyección de datos
+                        # Inyección en columnas exactas
                         ws[f'E{nr}'], ws[f'G{nr}'], ws[f'T{nr}'] = f_fecha.strftime("%Y-%m-%d"), f_ot.upper(), f_calle.upper()
                         ws[f'W{nr}'], ws[f'X{nr}'], ws[f'F{nr}'] = f_del.upper(), f_utb.upper(), f_folio.upper()
                         ws[f'AC{nr}'], ws[f'AD{nr}'], ws[f'AE{nr}'], ws[f'AL{nr}'] = f_rehab, f_manto, f_sust, f_ampli
                         ws[f'EK{nr}'] = f_obs.upper()
                         wb.save("CAPTURA.xlsx")
-                        st.toast(f"O.T. {f_ot} guardada", icon="✅")
+                        st.toast(f"O.T. {f_ot} sincronizada", icon="✅")
                     except Exception as e:
                         st.error(f"Error Excel: {e}")
 
-        # --- TABLERO Y DESCARGA ---
-        if st.session_state.get("manual_db"):
-            with open("CAPTURA.xlsx", "rb") as f:
-                st.download_button("📥 DESCARGAR REPORTE ACTUALIZADO", f, "CAPTURA_DAP.xlsx", use_container_width=True)
-
-        st.markdown("---")
+        # --- 3. TABLERO DE RESULTADOS ---
         t_rehab, t_manto, t_sust, t_ampli = 0, 0, 0, 0
-        df_p = pd.DataFrame()
-        if "manual_db" in st.session_state and st.session_state.manual_db:
-            df_p = pd.DataFrame(st.session_state.manual_db)
-            t_rehab, t_manto, t_sust, t_ampli = df_p["REHAB"].sum(), df_p["MANTO"].sum(), df_p["SUST"].sum(), df_p["AMPLI"].sum()
+        df_final_vista = pd.DataFrame()
 
-        st.markdown("### 📊 Totales Consolidados")
+        if "manual_db" in st.session_state and st.session_state.manual_db:
+            df_m = pd.DataFrame(st.session_state.manual_db)
+            t_rehab, t_manto, t_sust, t_ampli = df_m["REHAB"].sum(), df_m["MANTO"].sum(), df_m["SUST"].sum(), df_m["AMPLI"].sum()
+            df_final_vista = df_m.copy()
+
+        if up_cap:
+            try:
+                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
+                df_c = load_massive_data(up_cap, ext)
+                t_rehab += pd.to_numeric(df_c.iloc[:, 28], errors='coerce').fillna(0).sum()
+                t_manto += pd.to_numeric(df_c.iloc[:, 29], errors='coerce').fillna(0).sum()
+                t_sust += pd.to_numeric(df_c.iloc[:, 30], errors='coerce').fillna(0).sum()
+                t_ampli += pd.to_numeric(df_c.iloc[:, 37], errors='coerce').fillna(0).sum()
+                df_final_vista = pd.concat([df_final_vista, df_c], ignore_index=True)
+            except:
+                st.warning("Aguardando carga masiva...")
+
+        st.markdown("### 📊 Totales Combinados")
         met1, met2, met3, met4 = st.columns(4)
         met1.metric("🔧 Rehab", int(t_rehab))
         met2.metric("🧹 Manto", int(t_manto))
         met3.metric("💡 Sust", int(t_sust))
         met4.metric("➕ Ampli", int(t_ampli))
-        if not df_p.empty:
-            st.dataframe(df_p, use_container_width=True, hide_index=True)
+
+        if not df_final_vista.empty:
+            st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
+            with open("CAPTURA.xlsx", "rb") as f:
+                st.download_button("📥 DESCARGAR REPORTE FÍSICO (.XLSX)", f, "CAPTURA_FINAL.xlsx", use_container_width=True)
         else:
             st.info("Esperando captura manual o carga de archivo para mostrar datos.")
     elif st.session_state.menu == "SF2":
