@@ -268,25 +268,30 @@ from datetime import datetime
                         ws = wb.active
                         nr = ws.max_row + 1
                         if nr < 3: nr = 3
-                        # Inyección en columnas exactas
+                        # Inyección en columnas institucionales (E, G, T, W, X, F, AC, AD, AE, AL, EK)
                         ws[f'E{nr}'], ws[f'G{nr}'], ws[f'T{nr}'] = f_fecha.strftime("%Y-%m-%d"), f_ot.upper(), f_calle.upper()
                         ws[f'W{nr}'], ws[f'X{nr}'], ws[f'F{nr}'] = f_del.upper(), f_utb.upper(), f_folio.upper()
                         ws[f'AC{nr}'], ws[f'AD{nr}'], ws[f'AE{nr}'], ws[f'AL{nr}'] = f_rehab, f_manto, f_sust, f_ampli
                         ws[f'EK{nr}'] = f_obs.upper()
                         wb.save("CAPTURA.xlsx")
-                        st.toast(f"O.T. {f_ot} sincronizada", icon="✅")
+                        st.toast(f"O.T. {f_ot} sincronizada con éxito", icon="✅")
                     except Exception as e:
-                        st.error(f"Error Excel: {e}")
+                        st.error(f"Error al escribir en Excel: {e}")
 
         # --- 3. TABLERO DE RESULTADOS ---
         t_rehab, t_manto, t_sust, t_ampli = 0, 0, 0, 0
         df_final_vista = pd.DataFrame()
 
+        # Sumar lo manual
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_m = pd.DataFrame(st.session_state.manual_db)
-            t_rehab, t_manto, t_sust, t_ampli = df_m["REHAB"].sum(), df_m["MANTO"].sum(), df_m["SUST"].sum(), df_m["AMPLI"].sum()
+            t_rehab += df_m["REHAB"].sum()
+            t_manto += df_m["MANTO"].sum()
+            t_sust += df_m["SUST"].sum()
+            t_ampli += df_m["AMPLI"].sum()
             df_final_vista = df_m.copy()
 
+        # Sumar lo del archivo cargado (Usando tu función original load_massive_data)
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
@@ -297,7 +302,7 @@ from datetime import datetime
                 t_ampli += pd.to_numeric(df_c.iloc[:, 37], errors='coerce').fillna(0).sum()
                 df_final_vista = pd.concat([df_final_vista, df_c], ignore_index=True)
             except:
-                st.warning("Aguardando carga masiva...")
+                st.warning("Procesando archivo masivo...")
 
         st.markdown("### 📊 Totales Combinados")
         met1, met2, met3, met4 = st.columns(4)
@@ -309,9 +314,7 @@ from datetime import datetime
         if not df_final_vista.empty:
             st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
             with open("CAPTURA.xlsx", "rb") as f:
-                st.download_button("📥 DESCARGAR REPORTE FÍSICO (.XLSX)", f, "CAPTURA_FINAL.xlsx", use_container_width=True)
-        else:
-            st.info("Esperando captura manual o carga de archivo para mostrar datos.")
+                st.download_button("📥 DESCARGAR REPORTE FÍSICO ACTUALIZADO", f, "CAPTURA_FINAL.xlsx", use_container_width=True)
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
