@@ -224,7 +224,7 @@ else:
         from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- 1. CAPTURA MANUAL (Contraído por default para limpieza) ---
+        # --- 1. CAPTURA MANUAL (Contraído por default) ---
         with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=False):
             c1, c2, c3 = st.columns(3)
             with c1: f_fecha = st.date_input("1. Fecha de Atención")
@@ -232,13 +232,9 @@ else:
             with c3: f_calle = st.text_input("3. Calle")
 
             c4, c5, c6 = st.columns(3)
-            with c4: 
-                f_del_man = st.selectbox("4. Delegación Manual", sorted(list(CATALOGO_MAESTRO.keys())), key="S3_DEL_MAN")
-            with c5: 
-                opciones_utb_man = sorted(CATALOGO_MAESTRO.get(f_del_man, []))
-                f_utb_man = st.selectbox("5. UTB Manual", opciones_utb_man, key="S4_UTB_MAN")
-            with c6: 
-                f_folio = st.text_input("6. Ticket / IMEI")
+            with c4: f_del_man = st.selectbox("4. Delegación Manual", sorted(list(CATALOGO_MAESTRO.keys())), key="S3_DEL_MAN")
+            with c5: f_utb_man = st.selectbox("5. UTB Manual", sorted(CATALOGO_MAESTRO.get(f_del_man, [])), key="S4_UTB_MAN")
+            with c6: f_folio = st.text_input("6. Ticket / IMEI")
 
             with st.form("captura_sf3_met"):
                 st.markdown("---")
@@ -258,7 +254,7 @@ else:
                     })
                     st.toast(f"Registro en {f_utb_man} guardado", icon="✅")
 
-        # --- 2. CARGA MASIVA Y FILTROS REACTIVOS ---
+        # --- 2. CARGA MASIVA Y FILTROS ---
         st.markdown("---")
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo Masivo", type=["csv", "xlsx"])
         
@@ -268,27 +264,22 @@ else:
         col_m1, col_m2 = st.columns(2)
         with col_m1:
             def sync_del_masiva():
-                utb_sel = st.session_state.S2_MAS
-                if utb_sel != "TODAS": st.session_state.S1_MAS = MAPA_UTB_DEL.get(utb_sel, "TODAS")
+                if st.session_state.S2_MAS != "TODAS": st.session_state.S1_MAS = MAPA_UTB_DEL.get(st.session_state.S2_MAS, "TODAS")
             sel_del_masiva = st.selectbox("📍 Filtrar Archivo por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="S1_MAS")
         with col_m2:
             lista_utb_m = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del_masiva, [])) if sel_del_masiva != "TODAS" else ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
             sel_utb_masiva = st.selectbox("🔍 Filtrar Archivo por UTB:", lista_utb_m, key="S2_MAS", on_change=sync_del_masiva)
 
-        # --- 3. PROCESAMIENTO UNIFICADO (CRÍTICO PARA MÉTRICAS) ---
+        # --- 3. PROCESAMIENTO (DATA INDEPENDIENTE) ---
         t_rehab, t_manto, t_sust, t_ampli = 0, 0, 0, 0
-        df_final = pd.DataFrame()
+        df_solo_manual = pd.DataFrame()
+        df_solo_archivo = pd.DataFrame()
 
-        # Primero sumamos lo Manual
+        # Procesar Manual
         if "manual_db" in st.session_state and st.session_state.manual_db:
-            df_m = pd.DataFrame(st.session_state.manual_db)
-            t_rehab += df_m["REHAB"].sum()
-            t_manto += df_m["MANTO"].sum()
-            t_sust += df_m["SUST"].sum()
-            t_ampli += df_m["AMPLI"].sum()
-            df_final = df_m.copy()
+            df_solo_manual = pd.DataFrame(st.session_state.manual_db)
 
-        # Segundo procesamos el Archivo (Inmediato)
+        # Procesar Archivo
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
@@ -296,33 +287,52 @@ else:
                 if sel_del_masiva != "TODAS": df_c = df_c[df_c['del_norm'] == normalizar_texto(sel_del_masiva)]
                 if sel_utb_masiva != "TODAS": df_c = df_c[df_c['utb_norm'] == normalizar_texto(sel_utb_masiva)]
                 
-                # Sumamos valores del Excel
-                t_rehab += pd.to_numeric(df_c.iloc[:, 29], errors='coerce').fillna(0).sum()
-                t_manto += pd.to_numeric(df_c.iloc[:, 30], errors='coerce').fillna(0).sum()
-                t_sust += pd.to_numeric(df_c.iloc[:, 31], errors='coerce').fillna(0).sum()
-                t_ampli += pd.to_numeric(df_c.iloc[:, 39], errors='coerce').fillna(0).sum()
-                
-                # Preparamos vista simplificada para unir a la tabla
-                df_v = df_c.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                df_final = pd.concat([df_final, df_v], ignore_index=True)
-            except Exception as e:
-                st.error(f"Error procesando archivo: {e}")
+                df_solo_archivo = df_c.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
+                df_solo_archivo.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+            except Exception as e: st.error(f"Error: {e}")
 
-        # --- 4. PANEL DE RESULTADOS CONSOLIDADOS ---
-        st.markdown("### 📊 Totales (Manual + Masivo)")
+        # Consolidación y Limpieza (Punto #2: Rellenar con 0)
+        df_unificado = pd.concat([df_solo_manual, df_solo_archivo], ignore_index=True)
+        if not df_unificado.empty:
+            cols_num = ["REHAB", "MANTO", "SUST", "AMPLI"]
+            for col in cols_num:
+                df_unificado[col] = pd.to_numeric(df_unificado[col], errors='coerce').fillna(0).astype(int)
+            
+            # Totales para métricas
+            t_rehab = df_unificado["REHAB"].sum()
+            t_manto = df_unificado["MANTO"].sum()
+            t_sust = df_unificado["SUST"].sum()
+            t_ampli = df_unificado["AMPLI"].sum()
+
+            # Punto #1: Columna Consecutivo
+            df_unificado.insert(0, "No.", range(1, len(df_unificado) + 1))
+
+        # --- 4. PANEL DE RESULTADOS Y TRIPLE DESCARGA ---
+        st.markdown("### 📊 Resumen de Sesión")
         r1, r2, r3, r4 = st.columns(4)
-        r1.metric("🔧 Rehab", int(t_rehab))
-        r2.metric("🧹 Manto", int(t_manto))
-        r3.metric("💡 Sust", int(t_sust))
-        r4.metric("➕ Ampli", int(t_ampli))
+        r1.metric("🔧 Rehab", int(t_rehab)); r2.metric("🧹 Manto", int(t_manto))
+        r3.metric("💡 Sust", int(t_sust)); r4.metric("➕ Ampli", int(t_ampli))
 
-        if not df_final.empty:
-            st.dataframe(df_final, use_container_width=True, hide_index=True)
-            out = io.BytesIO()
-            with pd.ExcelWriter(out, engine='openpyxl') as w:
-                df_final.to_excel(w, index=False, sheet_name='SF3_REPORTE')
-            st.download_button("📥 DESCARGAR REPORTE DE SESIÓN", out.getvalue(), f"SF3_PANGEA_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True)
+        if not df_unificado.empty:
+            st.dataframe(df_unificado, use_container_width=True, hide_index=True)
+            
+            st.markdown("### 📥 Centro de Descargas")
+            d1, d2, d3 = st.columns(3)
+            
+            def to_excel(df):
+                out = io.BytesIO()
+                with pd.ExcelWriter(out, engine='openpyxl') as w:
+                    df.to_excel(w, index=False, sheet_name='SF3_PANGEA')
+                return out.getvalue()
+
+            with d1:
+                if not df_solo_manual.empty:
+                    st.download_button("📝 Reporte Manual", to_excel(df_solo_manual), f"SF3_MANUAL_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True)
+            with d2:
+                if not df_solo_archivo.empty:
+                    st.download_button("📂 Reporte Archivo", to_excel(df_solo_archivo), f"SF3_ARCHIVO_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True)
+            with d3:
+                st.download_button("🌟 REPORTE UNIFICADO", to_excel(df_unificado), f"SF3_TOTAL_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True, type="primary")
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
