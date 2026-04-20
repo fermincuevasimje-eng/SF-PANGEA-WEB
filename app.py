@@ -224,11 +224,7 @@ else:
         from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- 1. MEMORIA DE ARCHIVO (Para evitar reseteos al borrar) ---
-        if 'archivo_memoria_sf3' not in st.session_state:
-            st.session_state.archivo_memoria_sf3 = None
-
-        # --- 2. CAPTURA MANUAL (Cerrado por defecto) ---
+        # --- 1. CAPTURA MANUAL (Contraído por default) ---
         with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=False):
             c1, c2, c3 = st.columns(3)
             with c1: f_fecha = st.date_input("1. Fecha de Atención")
@@ -256,86 +252,89 @@ else:
                         "DELEGACIÓN": f_del_man, "UTB": f_utb_man, "FOLIO": f_folio.upper(),
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs.upper()
                     })
-                    st.toast("Guardado con éxito", icon="✅")
+                    st.toast(f"Registro en {f_utb_man} guardado", icon="✅")
 
-        # --- 3. GESTIÓN DE CAPTURAS (Borrado seguro) ---
+        # --- 2. GESTIÓN Y BORRADO DE REGISTROS MANUALES ---
         if "manual_db" in st.session_state and st.session_state.manual_db:
-            with st.expander("🗑️ EDITAR / ELIMINAR CAPTURAS", expanded=False):
+            with st.expander("🗑️ EDITAR / ELIMINAR CAPTURAS RECIENTES", expanded=False):
                 df_temp_edit = pd.DataFrame(st.session_state.manual_db)
                 df_temp_edit.insert(0, "ID", range(len(df_temp_edit)))
                 st.dataframe(df_temp_edit, use_container_width=True, hide_index=True)
                 
-                c_del1, c_del2 = st.columns([3, 1])
-                with c_del1:
-                    idx_del = st.multiselect("Seleccionar ID(s) para borrar:", df_temp_edit["ID"].tolist())
-                with c_del2:
+                col_del1, col_del2 = st.columns([3, 1])
+                with col_del1:
+                    idx_to_del = st.multiselect("Seleccione ID(s) para eliminar:", df_temp_edit["ID"].tolist())
+                with col_del2:
                     if st.button("🔥 ELIMINAR", use_container_width=True):
-                        if idx_del:
-                            st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if i not in idx_del]
-                            st.rerun()
+                        if idx_to_del:
+                            st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if i not in idx_to_del]
+                            st.success("Eliminado correctamente."); time.sleep(1); st.rerun()
 
-        # --- 4. CARGA MASIVA (Conexión a Memoria) ---
+        # --- 3. CARGA MASIVA Y FILTROS REACTIVOS ---
         st.markdown("---")
-        up_cap = st.file_uploader("📂 Cargar Archivo Masivo", type=["csv", "xlsx"])
+        up_cap = st.file_uploader("📂 Opcional: Cargar Archivo Masivo", type=["csv", "xlsx"])
         
-        # Si se sube algo nuevo, actualizamos la memoria
-        if up_cap:
-            st.session_state.archivo_memoria_sf3 = up_cap
+        if 'S1_MAS' not in st.session_state: st.session_state['S1_MAS'] = "TODAS"
+        if 'S2_MAS' not in st.session_state: st.session_state['S2_MAS'] = "TODAS"
 
         col_m1, col_m2 = st.columns(2)
         with col_m1:
-            sel_del_masiva = st.selectbox("📍 Filtrar por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="S1_MAS")
+            def sync_del_masiva():
+                if st.session_state.S2_MAS != "TODAS": st.session_state.S1_MAS = MAPA_UTB_DEL.get(st.session_state.S2_MAS, "TODAS")
+            sel_del_masiva = st.selectbox("📍 Filtrar Archivo por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="S1_MAS")
         with col_m2:
-            lista_utb_m = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del_masiva, [])) if sel_del_masiva != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
-            sel_utb_masiva = st.selectbox("🔍 Filtrar por UTB:", lista_utb_m, key="S2_MAS")
+            lista_utb_m = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del_masiva, [])) if sel_del_masiva != "TODAS" else ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+            sel_utb_masiva = st.selectbox("🔍 Filtrar Archivo por UTB:", lista_utb_m, key="S2_MAS", on_change=sync_del_masiva)
 
-        # --- 5. MOTOR DE PROCESAMIENTO (UNIFICADO) ---
+        # --- 4. PROCESAMIENTO UNIFICADO ---
         t_rehab, t_manto, t_sust, t_ampli = 0, 0, 0, 0
-        df_solo_manual = pd.DataFrame(st.session_state.get('manual_db', []))
+        df_solo_manual = pd.DataFrame()
         df_solo_archivo = pd.DataFrame()
 
-        # Usar el archivo de la memoria si existe
-        if st.session_state.archivo_memoria_sf3:
+        if "manual_db" in st.session_state and st.session_state.manual_db:
+            df_solo_manual = pd.DataFrame(st.session_state.manual_db)
+
+        if up_cap:
             try:
-                f_mem = st.session_state.archivo_memoria_sf3
-                ext_mem = 'xlsx' if f_mem.name.endswith('.xlsx') else 'csv'
-                df_c = load_massive_data(f_mem, ext_mem)
-                
+                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
+                df_c = load_massive_data(up_cap, ext)
                 if sel_del_masiva != "TODAS": df_c = df_c[df_c['del_norm'] == normalizar_texto(sel_del_masiva)]
                 if sel_utb_masiva != "TODAS": df_c = df_c[df_c['utb_norm'] == normalizar_texto(sel_utb_masiva)]
-                
                 df_solo_archivo = df_c.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
                 df_solo_archivo.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-            except:
-                st.info("Suba el archivo nuevamente para procesar los totales.")
+            except Exception as e: st.error(f"Error: {e}")
 
-        # Unificación y Limpieza de Datos
+        # Unificación y Limpieza de Ceros
         df_unificado = pd.concat([df_solo_manual, df_solo_archivo], ignore_index=True)
         if not df_unificado.empty:
             for col in ["REHAB", "MANTO", "SUST", "AMPLI"]:
                 df_unificado[col] = pd.to_numeric(df_unificado[col], errors='coerce').fillna(0).astype(int)
             
-            t_rehab = df_unificado["REHAB"].sum()
-            t_manto = df_unificado["MANTO"].sum()
-            t_sust = df_unificado["SUST"].sum()
-            t_ampli = df_unificado["AMPLI"].sum()
+            t_rehab, t_manto, t_sust, t_ampli = df_unificado["REHAB"].sum(), df_unificado["MANTO"].sum(), df_unificado["SUST"].sum(), df_unificado["AMPLI"].sum()
             df_unificado.insert(0, "No.", range(1, len(df_unificado) + 1))
 
-        # --- 6. PANEL DE RESULTADOS ---
+        # --- 5. DASHBOARD Y TRIPLE DESCARGA ---
         st.markdown("### 📊 Resumen de Sesión")
-        met1, met2, met3, met4 = st.columns(4)
-        met1.metric("🔧 Rehab", t_rehab); met2.metric("🧹 Manto", t_manto)
-        met3.metric("💡 Sust", t_sust); met4.metric("➕ Ampli", t_ampli)
+        r1, r2, r3, r4 = st.columns(4)
+        r1.metric("🔧 Rehab", int(t_rehab)); r2.metric("🧹 Manto", int(t_manto))
+        r3.metric("💡 Sust", int(t_sust)); r4.metric("➕ Ampli", int(t_ampli))
 
         if not df_unificado.empty:
             st.dataframe(df_unificado, use_container_width=True, hide_index=True)
-            
+            st.markdown("### 📥 Centro de Descargas")
+            d1, d2, d3 = st.columns(3)
             def to_excel(df):
-                buf = io.BytesIO()
-                with pd.ExcelWriter(buf, engine='openpyxl') as w: df.to_excel(w, index=False)
-                return buf.getvalue()
-            
-            st.download_button("🌟 DESCARGAR REPORTE UNIFICADO", to_excel(df_unificado), "SF3_FINAL.xlsx", type="primary", use_container_width=True)
+                if df.empty: return None
+                out = io.BytesIO()
+                with pd.ExcelWriter(out, engine='openpyxl') as w: df.to_excel(w, index=False, sheet_name='SF3_PANGEA')
+                return out.getvalue()
+
+            with d1:
+                if not df_solo_manual.empty: st.download_button("📝 Solo Manual", to_excel(df_solo_manual), f"SF3_MANUAL_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True)
+            with d2:
+                if not df_solo_archivo.empty: st.download_button("📂 Solo Archivo", to_excel(df_solo_archivo), f"SF3_ARCHIVO_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True)
+            with d3:
+                st.download_button("🌟 UNIFICADO", to_excel(df_unificado), f"SF3_TOTAL_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True, type="primary")
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
