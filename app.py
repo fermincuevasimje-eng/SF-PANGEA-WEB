@@ -220,7 +220,7 @@ else:
         st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-    elif st.session_state.menu == "SF3":
+elif st.session_state.menu == "SF3":
 from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
