@@ -221,10 +221,10 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        from datetime import datetime
+       from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- 1. CAPTURA MANUAL (Contraído por default) ---
+        # --- 1. CAPTURA MANUAL (Interfaz Limpia) ---
         with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=False):
             c1, c2, c3 = st.columns(3)
             with c1: f_fecha = st.date_input("1. Fecha de Atención")
@@ -254,7 +254,7 @@ else:
                     })
                     st.toast(f"Registro en {f_utb_man} guardado", icon="✅")
 
-        # --- 2. GESTIÓN Y BORRADO DE REGISTROS MANUALES ---
+        # --- 2. GESTIÓN Y BORRADO (Sincronizado con Métricas) ---
         if "manual_db" in st.session_state and st.session_state.manual_db:
             with st.expander("🗑️ EDITAR / ELIMINAR CAPTURAS RECIENTES", expanded=False):
                 df_temp_edit = pd.DataFrame(st.session_state.manual_db)
@@ -267,8 +267,9 @@ else:
                 with col_del2:
                     if st.button("🔥 ELIMINAR", use_container_width=True):
                         if idx_to_del:
+                            # Actualizamos la lista y el rerun forzará el recalculo total en el Paso 4
                             st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if i not in idx_to_del]
-                            st.success("Eliminado correctamente."); time.sleep(1); st.rerun()
+                            st.success("Registro eliminado. Actualizando métricas..."); time.sleep(0.5); st.rerun()
 
         # --- 3. CARGA MASIVA Y FILTROS REACTIVOS ---
         st.markdown("---")
@@ -286,14 +287,16 @@ else:
             lista_utb_m = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del_masiva, [])) if sel_del_masiva != "TODAS" else ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
             sel_utb_masiva = st.selectbox("🔍 Filtrar Archivo por UTB:", lista_utb_m, key="S2_MAS", on_change=sync_del_masiva)
 
-        # --- 4. PROCESAMIENTO UNIFICADO ---
+        # --- 4. PROCESAMIENTO UNIFICADO (El Corazón de las Métricas) ---
         t_rehab, t_manto, t_sust, t_ampli = 0, 0, 0, 0
         df_solo_manual = pd.DataFrame()
         df_solo_archivo = pd.DataFrame()
 
+        # Procesar datos manuales actuales
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_solo_manual = pd.DataFrame(st.session_state.manual_db)
 
+        # Procesar datos del archivo cargado
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
@@ -302,18 +305,19 @@ else:
                 if sel_utb_masiva != "TODAS": df_c = df_c[df_c['utb_norm'] == normalizar_texto(sel_utb_masiva)]
                 df_solo_archivo = df_c.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
                 df_solo_archivo.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-            except Exception as e: st.error(f"Error: {e}")
+            except Exception as e: st.error(f"Error procesando archivo: {e}")
 
-        # Unificación y Limpieza de Ceros
+        # Unificación final y limpieza de ceros (Garantiza que las métricas nunca fallen)
         df_unificado = pd.concat([df_solo_manual, df_solo_archivo], ignore_index=True)
         if not df_unificado.empty:
             for col in ["REHAB", "MANTO", "SUST", "AMPLI"]:
                 df_unificado[col] = pd.to_numeric(df_unificado[col], errors='coerce').fillna(0).astype(int)
             
+            # Recálculo instantáneo de totales
             t_rehab, t_manto, t_sust, t_ampli = df_unificado["REHAB"].sum(), df_unificado["MANTO"].sum(), df_unificado["SUST"].sum(), df_unificado["AMPLI"].sum()
             df_unificado.insert(0, "No.", range(1, len(df_unificado) + 1))
 
-        # --- 5. DASHBOARD Y TRIPLE DESCARGA ---
+        # --- 5. RESULTADOS Y TRIPLE DESCARGA ---
         st.markdown("### 📊 Resumen de Sesión")
         r1, r2, r3, r4 = st.columns(4)
         r1.metric("🔧 Rehab", int(t_rehab)); r2.metric("🧹 Manto", int(t_manto))
@@ -325,6 +329,9 @@ else:
             d1, d2, d3 = st.columns(3)
             def to_excel(df):
                 if df.empty: return None
+                # Limpieza de ceros específica para el archivo Excel
+                for c in ["REHAB", "MANTO", "SUST", "AMPLI"]: 
+                    if c in df.columns: df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0).astype(int)
                 out = io.BytesIO()
                 with pd.ExcelWriter(out, engine='openpyxl') as w: df.to_excel(w, index=False, sheet_name='SF3_PANGEA')
                 return out.getvalue()
