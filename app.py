@@ -224,103 +224,101 @@ else:
         from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- 1. CARGA MASIVA (SELECTORES M1 Y M2) ---
+        # --- 1. CARGA MASIVA (Sincronización Bidireccional S1-S2) ---
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo Masivo", type=["csv", "xlsx"])
         
+        if 'S1_MAS' not in st.session_state: st.session_state['S1_MAS'] = "TODAS"
+        if 'S2_MAS' not in st.session_state: st.session_state['S2_MAS'] = "TODAS"
+
         col_m1, col_m2 = st.columns(2)
+        
         with col_m1:
-            sel_del_masiva = st.selectbox("📍 Filtrar Archivo por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="S1_DEL_MAS")
+            def sync_del_masiva():
+                utb_sel = st.session_state.S2_MAS
+                if utb_sel != "TODAS":
+                    st.session_state.S1_MAS = MAPA_UTB_DEL.get(utb_sel, "TODAS")
+
+            sel_del_masiva = st.selectbox("📍 Filtrar por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="S1_MAS")
+
         with col_m2:
-            opciones_utb_m = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del_masiva, list(MAPA_UTB_DEL.keys()))) if sel_del_masiva != "TODAS" else ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-            sel_utb_masiva = st.selectbox("🔍 Filtrar Archivo por UTB:", opciones_utb_m, key="S2_UTB_MAS")
+            if sel_del_masiva != "TODAS":
+                lista_utb_m = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del_masiva, []))
+            else:
+                lista_utb_m = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+            
+            sel_utb_masiva = st.selectbox("🔍 Filtrar por UTB:", lista_utb_m, key="S2_MAS", on_change=sync_del_masiva)
 
-        # --- 2. FORMULARIO MANUAL (SELECTORES M3 Y M4) ---
-        with st.expander("📝 CAPTURA MANUAL (GENERADOR DE REPORTE)", expanded=True):
-            with st.form("captura_sf3", clear_on_submit=True):
-                c1, c2, c3 = st.columns(3)
-                with c1: f_fecha = st.date_input("1. Fecha de Atención")
-                with c2: f_ot = st.text_input("2. O.T. (Folio)")
-                with c3: f_calle = st.text_input("3. Calle")
+        # --- 2. FORMULARIO MANUAL (Reactividad Total S3-S4) ---
+        with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=True):
+            c1, c2, c3 = st.columns(3)
+            with c1: f_fecha = st.date_input("1. Fecha de Atención")
+            with c2: f_ot = st.text_input("2. O.T. (Folio)")
+            with c3: f_calle = st.text_input("3. Calle")
 
-                c4, c5, c6 = st.columns(3)
-                with c4: f_del_man = st.selectbox("4. Delegación (Manual)", sorted(list(CATALOGO_MAESTRO.keys())), key="S3_DEL_MAN")
-                with c5: f_utb_man = st.selectbox("5. UTB (Manual)", sorted(CATALOGO_MAESTRO.get(f_del_man, [])), key="S4_UTB_MAN")
-                with c6: f_folio = st.text_input("6. Ticket / IMEI")
+            c4, c5, c6 = st.columns(3)
+            with c4: 
+                f_del_man = st.selectbox("4. Delegación Manual", sorted(list(CATALOGO_MAESTRO.keys())), key="S3_DEL_MAN")
+            with c5: 
+                opciones_utb_man = sorted(CATALOGO_MAESTRO.get(f_del_man, []))
+                f_utb_man = st.selectbox("5. UTB Manual", opciones_utb_man, key="S4_UTB_MAN")
+            with c6: 
+                f_folio = st.text_input("6. Ticket / IMEI")
 
+            with st.form("captura_sf3_met"):
                 st.markdown("---")
                 m1, m2, m3, m4 = st.columns(4)
                 with m1: f_rehab = st.number_input("7. Rehab", min_value=0, step=1)
                 with m2: f_manto = st.number_input("8. Manto", min_value=0, step=1)
                 with m3: f_sust = st.number_input("9. Sust", min_value=0, step=1)
                 with m4: f_ampli = st.number_input("10. Ampli", min_value=0, step=1)
-                
                 f_obs = st.text_area("11. Observaciones")
 
-                if st.form_submit_button("🚀 AGREGAR A LISTA DE SESIÓN", use_container_width=True):
+                if st.form_submit_button("🚀 AGREGAR A REPORTE", use_container_width=True):
                     if "manual_db" not in st.session_state: st.session_state.manual_db = []
                     st.session_state.manual_db.append({
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
                         "DELEGACIÓN": f_del_man, "UTB": f_utb_man, "FOLIO": f_folio.upper(),
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs.upper()
                     })
-                    st.toast("Registro guardado en memoria", icon="✅")
+                    st.toast(f"Atención en {f_utb_man} guardada", icon="✅")
 
-        # --- 3. PROCESAMIENTO Y CONSOLIDACIÓN ---
+        # --- 3. CONSOLIDACIÓN DE DATOS ---
         t_rehab, t_manto, t_sust, t_ampli = 0, 0, 0, 0
-        df_consolidado = pd.DataFrame()
+        df_final = pd.DataFrame()
 
-        # Primero procesamos lo Manual
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_m = pd.DataFrame(st.session_state.manual_db)
-            t_rehab += df_m["REHAB"].sum()
-            t_manto += df_m["MANTO"].sum()
-            t_sust += df_m["SUST"].sum()
-            t_ampli += df_m["AMPLI"].sum()
-            df_consolidado = df_m.copy()
+            t_rehab += df_m["REHAB"].sum(); t_manto += df_m["MANTO"].sum()
+            t_sust += df_m["SUST"].sum(); t_ampli += df_m["AMPLI"].sum()
+            df_final = df_m.copy()
 
-        # Luego procesamos el Archivo Masivo (si existe)
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
-                if sel_del_masiva != "TODAS":
-                    df_c = df_c[df_c['del_norm'] == normalizar_texto(sel_del_masiva)]
-                if sel_utb_masiva != "TODAS":
-                    df_c = df_c[df_c['utb_norm'] == normalizar_texto(sel_utb_masiva)]
-                
+                if sel_del_masiva != "TODAS": df_c = df_c[df_c['del_norm'] == normalizar_texto(sel_del_masiva)]
+                if sel_utb_masiva != "TODAS": df_c = df_c[df_c['utb_norm'] == normalizar_texto(sel_utb_masiva)]
                 t_rehab += pd.to_numeric(df_c.iloc[:, 29], errors='coerce').fillna(0).sum()
                 t_manto += pd.to_numeric(df_c.iloc[:, 30], errors='coerce').fillna(0).sum()
                 t_sust += pd.to_numeric(df_c.iloc[:, 31], errors='coerce').fillna(0).sum()
                 t_ampli += pd.to_numeric(df_c.iloc[:, 39], errors='coerce').fillna(0).sum()
-                
-                # Extraemos vista simplificada para unir
-                df_c_v = df_c.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_c_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                df_consolidado = pd.concat([df_consolidado, df_c_v], ignore_index=True)
-            except Exception as e:
-                st.error(f"Error procesando archivo masivo: {e}")
+                df_v = df_c.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
+                df_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+                df_final = pd.concat([df_final, df_v], ignore_index=True)
+            except: st.info("Sincronizando con el archivo masivo...")
 
-        # --- 4. DASHBOARD DE RESULTADOS ---
-        st.markdown("### 📊 Totales Combinados")
-        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-        m_col1.metric("🔧 Rehab", int(t_rehab))
-        m_col2.metric("🧹 Manto", int(t_manto))
-        m_col3.metric("💡 Sust", int(t_sust))
-        m_col4.metric("➕ Ampli", int(t_ampli))
+        # --- 4. RESULTADOS Y DESCARGA ---
+        st.markdown("### 📊 Resumen General")
+        r1, r2, r3, r4 = st.columns(4)
+        r1.metric("🔧 Rehab", int(t_rehab)); r2.metric("🧹 Manto", int(t_manto))
+        r3.metric("💡 Sust", int(t_sust)); r4.metric("➕ Ampli", int(t_ampli))
 
-        if not df_consolidado.empty:
-            st.dataframe(df_consolidado, use_container_width=True, hide_index=True)
-            # Creamos el Excel en memoria
-            output_buffer = io.BytesIO()
-            with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
-                df_consolidado.to_excel(writer, index=False, sheet_name='SF3_PANGEA')
-            st.download_button(
-                label="📥 DESCARGAR EXCEL DE ESTA SESIÓN",
-                data=output_buffer.getvalue(),
-                file_name=f"REPORTE_SF3_{datetime.now().strftime('%d_%m_%Y')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+        if not df_final.empty:
+            st.dataframe(df_final, use_container_width=True, hide_index=True)
+            out = io.BytesIO()
+            with pd.ExcelWriter(out, engine='openpyxl') as w:
+                df_final.to_excel(w, index=False, sheet_name='SF3_REPORTE')
+            st.download_button("📥 DESCARGAR EXCEL GENERADO", out.getvalue(), f"SF3_PANGEA_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True)
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
