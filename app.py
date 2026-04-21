@@ -195,13 +195,14 @@ if not st.session_state.autenticado:
 else:
     # --- 4. SIDEBAR ---
 # --- 4. SIDEBAR (Navegación Profesional v11.6) ---
+# --- 2. NAVEGACIÓN (MENÚ LATERAL v11.6) ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
         
-        # --- Lógica de permisos para GuaDAP ---
-        if st.session_state.perfil == "CONSULTA": # Perfil de GuaDAP
+        # Lógica de permisos para GuaDAP
+        if st.session_state.perfil == "CONSULTA":
             opciones_menu = {"📖 Bitácora SF": "SF2"}
         else:
             opciones_menu = {
@@ -223,30 +224,122 @@ else:
             st.rerun()
         st.info("SF PANGEA V1")
 
-    # --- 5. CUERPO LÓGICO DE MÓDULOS ---
+    # --- 3. LÓGICA DE MÓDULOS ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
         st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-    # --- AQUÍ SIGUE TU MÓDULO SF3 QUE YA FUNCIONA ---
     elif st.session_state.menu == "SF3":
         from datetime import datetime
-        # ... (Copia aquí el contenido de SF3 de tu v11.5) ...
+        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-    # --- NUEVO MÓDULO SF4 ---
+        if 'archivo_sf3_mem' not in st.session_state: st.session_state.archivo_sf3_mem = None
+        if 'manual_db' not in st.session_state: st.session_state.manual_db = []
+
+        with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=True):
+            def sync_m():
+                if st.session_state.M_UTB != "SELECCIONAR":
+                    st.session_state.M_DEL = MAPA_UTB_DEL.get(st.session_state.M_UTB, st.session_state.M_DEL)
+            c1, c2, c3 = st.columns(3)
+            with c1: f_fecha = st.date_input("1. Fecha de Atención")
+            with c2: f_ot = st.text_input("2. O.T.", key="ot_clean")
+            with c3: f_calle = st.text_input("3. Calle", key="calle_clean")
+            c4, c5, c6 = st.columns(3)
+            with c4: f_del_m = st.selectbox("4. Delegación Manual", sorted(list(CATALOGO_MAESTRO.keys())), key="M_DEL")
+            with c5:
+                opts_m = sorted(CATALOGO_MAESTRO.get(f_del_m, []))
+                f_utb_m = st.selectbox("5. UTB Manual", opts_m, key="M_UTB", on_change=sync_m)
+            with c6: f_folio = st.text_input("6. Folio/Ticket/Imei", key="folio_clean")
+
+            with st.form("f_sf3", clear_on_submit=True):
+                st.markdown("---")
+                m1, m2, m3, m4 = st.columns(4)
+                with m1: f_rehab = st.number_input("7. Rehab", 0, step=1, key="r_m")
+                with m2: f_manto = st.number_input("8. Manto", 0, step=1, key="m_m")
+                with m3: f_sust = st.number_input("9. Sust", 0, step=1, key="s_m")
+                with m4: f_ampli = st.number_input("10. Ampli", 0, step=1, key="a_m")
+                f_obs = st.text_area("11. Observaciones", key="ob_m")
+                if st.form_submit_button("🚀 AGREGAR A REPORTE", use_container_width=True):
+                    st.session_state.manual_db.append({
+                        "FECHA": f_fecha.strftime("%d/%m/%Y"), "O.T.": st.session_state.ot_clean.upper(), 
+                        "FOLIO DE SOLICITUD": st.session_state.folio_clean.upper(), "CALLE": st.session_state.calle_clean.upper(), 
+                        "DELEGACIÓN": f_del_m, "UTB": f_utb_m, "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs.upper()
+                    })
+                    for k in ["ot_clean", "calle_clean", "folio_clean"]:
+                        if k in st.session_state: del st.session_state[k]
+                    st.toast("Captura guardada", icon="✅")
+                    time.sleep(0.5); st.rerun()
+
+        if st.session_state.manual_db:
+            with st.expander("🗑️ GESTIÓN DE CAPTURAS MANUALES", expanded=False):
+                df_p = pd.DataFrame(st.session_state.manual_db)
+                df_p.insert(0, "No.", range(1, len(df_p) + 1))
+                st.dataframe(df_p, use_container_width=True, hide_index=True)
+                ids_d = st.multiselect("No. de Registro(s):", df_p["No."].tolist(), key="del_multi")
+                if st.button("🔥 ELIMINAR SELECCIONADOS", use_container_width=True):
+                    if ids_d:
+                        st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if (i+1) not in ids_d]
+                        st.rerun()
+
+        st.markdown("---")
+        up_sf3 = st.file_uploader("📂 Cargar Archivo Masivo", type=["csv", "xlsx"])
+        if up_sf3: st.session_state.archivo_sf3_mem = up_sf3
+        col_f1, col_f2 = st.columns(2)
+        with col_f1: s_del = st.selectbox("📍 Filtrar Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="S1_MAS")
+        with col_f2:
+            def sync_f():
+                if st.session_state.S2_MAS != "TODAS": st.session_state.S1_MAS = MAPA_UTB_DEL.get(st.session_state.S2_MAS, "TODAS")
+            opts_f = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(s_del, [])) if s_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+            s_utb = st.selectbox("🔍 Filtrar UTB:", opts_f, key="S2_MAS", on_change=sync_f)
+
+        df_man_f = pd.DataFrame(st.session_state.manual_db)
+        df_arc_f = pd.DataFrame()
+        if st.session_state.archivo_sf3_mem:
+            try:
+                f_r = st.session_state.archivo_sf3_mem
+                df_c = load_massive_data(f_r, 'xlsx' if f_r.name.endswith('.xlsx') else 'csv')
+                if not df_c.empty and "FECHA" in str(df_c.iloc[0, 4]).upper(): df_c = df_c.iloc[1:].reset_index(drop=True)
+                if s_del != "TODAS": df_c = df_c[df_c['del_norm'] == normalizar_texto(s_del)]
+                if s_utb != "TODAS": df_c = df_c[df_c['utb_norm'] == normalizar_texto(s_utb)]
+                df_arc_f = df_c.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
+                df_arc_f.columns = ["FECHA", "O.T.", "FOLIO DE SOLICITUD", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+            except: st.error("Error en archivo masivo.")
+
+        df_total = pd.concat([df_man_f, df_arc_f], ignore_index=True)
+        if not df_total.empty:
+            for c in ["REHAB", "MANTO", "SUST", "AMPLI"]: df_total[c] = pd.to_numeric(df_total[c], errors='coerce').fillna(0).astype(int)
+            df_total.insert(0, "No.", range(1, len(df_total) + 1))
+            t_r, t_m, t_s, t_a = df_total[["REHAB", "MANTO", "SUST", "AMPLI"]].sum()
+            st.markdown("### 📊 Totales Combinados")
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("🔧 Rehab", t_r); r2.metric("🧹 Manto", t_m); r3.metric("💡 Sust", t_s); r4.metric("➕ Ampli", t_a)
+            st.dataframe(df_total, use_container_width=True, hide_index=True)
+            def to_x(df):
+                out = io.BytesIO()
+                with pd.ExcelWriter(out, engine='openpyxl') as w: df.to_excel(w, index=False)
+                return out.getvalue()
+            d1, d2, d3 = st.columns(3)
+            with d1: 
+                if not df_man_f.empty: st.download_button("📝 Solo Manual", to_x(df_man_f), "SF3_MAN.xlsx", use_container_width=True)
+            with d2:
+                if not df_arc_f.empty: st.download_button("📂 Solo Archivo", to_x(df_arc_f), "SF3_ARC.xlsx", use_container_width=True)
+            with d3: st.download_button("🌟 UNIFICADO", to_x(df_total), "SF3_TOTAL.xlsx", type="primary", use_container_width=True)
+
     elif st.session_state.menu == "SF4":
         st.title("📐 Módulo SF4 - Diseño de Procesos")
         st.info("Espacio preparado para Temas de Diseño, Normatividad y Métodos Organizativos.")
 
-    # --- MÓDULO SF2 (Bitácora) ---
     elif st.session_state.menu == "SF2":
-        # ... (Copia aquí el contenido de SF2 de tu v11.5) ...
+        st.title("📁 SF2 - Módulo de Baja de Folios")
+        # Aquí va el código de SF2 de tu versión 11.5
+        pass
 
-    # --- MÓDULO GdR (Ahora llamado SF1) ---
     elif st.session_state.menu == "GdR":
-        # ... (Copia aquí el contenido de GdR de tu v11.5) ...
+        st.title("🚀 SF1 - Generador de Rutas")
+        # Aquí va el código de GdR de tu versión 11.5
+        pass
 
     elif st.session_state.menu == "SF3":
         from datetime import datetime
