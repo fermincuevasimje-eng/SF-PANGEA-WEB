@@ -194,31 +194,59 @@ if not st.session_state.autenticado:
             st.error("Acceso denegado")
 else:
     # --- 4. SIDEBAR ---
+# --- 4. SIDEBAR (Navegación Profesional v11.6) ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
-        if st.button("🏠 Inicio", use_container_width=True): st.session_state.menu = "Inicio"
-        if st.button("🚀 GdR (Generador de Rutas)", use_container_width=True): st.session_state.menu = "GdR"
-        if st.button("📁 SF2 (Baja de Folios)", use_container_width=True): st.session_state.menu = "SF2"
-        if st.button("📊 SF3", use_container_width=True): st.session_state.menu = "SF3"
+        
+        # --- Lógica de permisos para GuaDAP ---
+        if st.session_state.perfil == "CONSULTA": # Perfil de GuaDAP
+            opciones_menu = {"📖 Bitácora SF": "SF2"}
+        else:
+            opciones_menu = {
+                "🏠 Inicio": "Inicio",
+                "🚀 SF1 (Generador de Rutas)": "GdR",
+                "📖 Bitácora SF": "SF2",
+                "📝 SF3 (Captura - Carta)": "SF3",
+                "📐 SF4 (Diseño de Procesos)": "SF4"
+            }
+        
+        for label, target in opciones_menu.items():
+            if st.button(label, use_container_width=True, type="primary" if st.session_state.menu == target else "secondary"):
+                st.session_state.menu = target
+                st.rerun()
+
         st.write("---")
-        if st.session_state.menu == "GdR":
-            st.subheader("📊 Ajustes GdR")
-            t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
-            v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
-            st.write("---")
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
         st.info("SF PANGEA V1")
 
-  # --- 5. CUERPO LÓGICO ---
+    # --- 5. CUERPO LÓGICO DE MÓDULOS ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
         st.write("Seleccione un módulo en el menú lateral para comenzar.")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
+
+    # --- AQUÍ SIGUE TU MÓDULO SF3 QUE YA FUNCIONA ---
+    elif st.session_state.menu == "SF3":
+        from datetime import datetime
+        # ... (Copia aquí el contenido de SF3 de tu v11.5) ...
+
+    # --- NUEVO MÓDULO SF4 ---
+    elif st.session_state.menu == "SF4":
+        st.title("📐 Módulo SF4 - Diseño de Procesos")
+        st.info("Espacio preparado para Temas de Diseño, Normatividad y Métodos Organizativos.")
+
+    # --- MÓDULO SF2 (Bitácora) ---
+    elif st.session_state.menu == "SF2":
+        # ... (Copia aquí el contenido de SF2 de tu v11.5) ...
+
+    # --- MÓDULO GdR (Ahora llamado SF1) ---
+    elif st.session_state.menu == "GdR":
+        # ... (Copia aquí el contenido de GdR de tu v11.5) ...
 
     elif st.session_state.menu == "SF3":
         from datetime import datetime
