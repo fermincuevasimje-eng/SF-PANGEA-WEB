@@ -221,82 +221,81 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        from datetime import datetime
+from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- 1. GESTIÓN DE MEMORIA (Caja Fuerte) ---
+        # --- 1. CONFIGURACIÓN DE MEMORIA Y RESET ---
         if 'archivo_sf3_mem' not in st.session_state: st.session_state.archivo_sf3_mem = None
         if 'manual_db' not in st.session_state: st.session_state.manual_db = []
+        if 'reset_form' not in st.session_state: st.session_state.reset_form = False
 
-        # --- 2. CAPTURA MANUAL CON SELECTORES INTELIGENTES ---
+        # --- 2. CAPTURA MANUAL (CAMPOS AJUSTADOS) ---
         with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=False):
-            # Lógica de sincronización manual
-            def sync_manual_utb_to_del():
+            def sync_man_utb():
                 if st.session_state.M_UTB != "SELECCIONAR":
                     st.session_state.M_DEL = MAPA_UTB_DEL.get(st.session_state.M_UTB, st.session_state.M_DEL)
 
             c1, c2, c3 = st.columns(3)
             with c1: f_fecha = st.date_input("1. Fecha de Atención")
-            with c2: f_ot = st.text_input("2. O.T. (Folio)")
-            with c3: f_calle = st.text_input("3. Calle")
+            # El campo se limpia si reset_form es True
+            val_ot = "" if st.session_state.reset_form else None
+            with c2: f_ot = st.text_input("2. O.T.", value=val_ot, key="f_ot_man")
+            with c3: f_calle = st.text_input("3. Calle", value=val_ot, key="f_calle_man")
 
             c4, c5, c6 = st.columns(3)
-            with c4:
-                f_del_m = st.selectbox("4. Delegación Manual", sorted(list(CATALOGO_MAESTRO.keys())), key="M_DEL")
+            with c4: f_del_m = st.selectbox("4. Delegación Manual", sorted(list(CATALOGO_MAESTRO.keys())), key="M_DEL")
             with c5:
-                # Si se elige una UTB, la delegación cambia sola arriba
                 opts_utb_m = sorted(CATALOGO_MAESTRO.get(f_del_m, []))
-                f_utb_m = st.selectbox("5. UTB Manual", opts_utb_m, key="M_UTB", on_change=sync_manual_utb_to_del)
-            with c6: f_folio = st.text_input("6. Ticket / IMEI")
+                f_utb_m = st.selectbox("5. UTB Manual", opts_utb_m, key="M_UTB", on_change=sync_man_utb)
+            with c6: f_folio = st.text_input("6. Folio/Ticket/Imei", value=val_ot, key="f_folio_man")
 
-            with st.form("form_sf3_man"):
+            with st.form("form_sf3_man", clear_on_submit=True):
                 st.markdown("---")
                 m1, m2, m3, m4 = st.columns(4)
-                with m1: f_rehab = st.number_input("7. Rehab", min_value=0, step=1)
-                with m2: f_manto = st.number_input("8. Manto", min_value=0, step=1)
-                with m3: f_sust = st.number_input("9. Sust", min_value=0, step=1)
-                with m4: f_ampli = st.number_input("10. Ampli", min_value=0, step=1)
-                f_obs = st.text_area("11. Observaciones")
+                with m1: f_rehab = st.number_input("7. Rehab", min_value=0, step=1, key="n1")
+                with m2: f_manto = st.number_input("8. Manto", min_value=0, step=1, key="n2")
+                with m3: f_sust = st.number_input("9. Sust", min_value=0, step=1, key="n3")
+                with m4: f_ampli = st.number_input("10. Ampli", min_value=0, step=1, key="n4")
+                f_obs = st.text_area("11. Observaciones", key="n5")
 
                 if st.form_submit_button("🚀 AGREGAR A REPORTE", use_container_width=True):
                     st.session_state.manual_db.append({
-                        "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
-                        "DELEGACIÓN": f_del_m, "UTB": f_utb_m, "FOLIO": f_folio.upper(),
+                        "FECHA": f_fecha.strftime("%d/%m/%Y"), "O.T.": f_ot.upper(), "FOLIO DE SOLICITUD": f_folio.upper(),
+                        "CALLE": f_calle.upper(), "DELEGACIÓN": f_del_m, "UTB": f_utb_m,
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs.upper()
                     })
-                    st.toast(f"Registro en {f_utb_m} guardado", icon="✅")
+                    st.session_state.reset_form = True
+                    st.toast("Registro guardado y formulario limpio", icon="✅")
+                    time.sleep(0.5)
+                    st.rerun()
+            st.session_state.reset_form = False
 
-        # --- 3. TABLA DE GESTIÓN (BORRADO SEGURO) ---
+        # --- 3. BANDEJA DE BASURA (ÍNDICE DESDE 1) ---
         if st.session_state.manual_db:
             with st.expander("🗑️ EDITAR / ELIMINAR CAPTURAS", expanded=False):
-                df_ed = pd.DataFrame(st.session_state.manual_db)
-                df_ed.insert(0, "ID", range(len(df_ed)))
-                st.dataframe(df_ed, use_container_width=True, hide_index=True)
-                col_b1, col_b2 = st.columns([3, 1])
-                with col_b1: ids_del = st.multiselect("IDs para eliminar:", df_ed["ID"].tolist())
-                with col_b2:
-                    if st.button("🔥 ELIMINAR", use_container_width=True):
-                        st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if i not in ids_del]
-                        st.rerun()
+                df_trash = pd.DataFrame(st.session_state.manual_db)
+                df_trash.insert(0, "No.", range(1, len(df_trash) + 1))
+                st.dataframe(df_trash, use_container_width=True, hide_index=True)
+                ids_del = st.multiselect("Seleccione No. para eliminar:", df_trash["No."].tolist())
+                if st.button("🔥 ELIMINAR SELECCIONADOS"):
+                    st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if (i+1) not in ids_del]
+                    st.rerun()
 
-        # --- 4. CARGA MASIVA (Memoria Persistente) ---
+        # --- 4. CARGA MASIVA Y FILTROS ---
         st.markdown("---")
         up_sf3 = st.file_uploader("📂 Opcional: Cargar Archivo Masivo", type=["csv", "xlsx"])
         if up_sf3: st.session_state.archivo_sf3_mem = up_sf3
-
-        def sync_file_utb_to_del():
-            if st.session_state.S2_MAS != "TODAS":
-                st.session_state.S1_MAS = MAPA_UTB_DEL.get(st.session_state.S2_MAS, "TODAS")
 
         col_f1, col_f2 = st.columns(2)
         with col_f1:
             sel_del_f = st.selectbox("📍 Filtrar por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="S1_MAS")
         with col_f2:
-            opts_utb_f = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del_f, [])) if sel_del_f != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
-            sel_utb_f = st.selectbox("🔍 Filtrar por UTB:", opts_utb_f, key="S2_MAS", on_change=sync_file_utb_to_del)
+            def sync_f():
+                if st.session_state.S2_MAS != "TODAS": st.session_state.S1_MAS = MAPA_UTB_DEL.get(st.session_state.S2_MAS, "TODAS")
+            opts_f = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del_f, [])) if sel_del_f != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+            sel_utb_f = st.selectbox("🔍 Filtrar por UTB:", opts_f, key="S2_MAS", on_change=sync_f)
 
-        # --- 5. PROCESAMIENTO UNIFICADO ---
-        t_rehab, t_manto, t_sust, t_ampli = 0, 0, 0, 0
+        # --- 5. PROCESAMIENTO Y EXTRACCIÓN (OT Y FOLIO COLUMNAS G Y P) ---
         df_man_final = pd.DataFrame(st.session_state.manual_db)
         df_arc_final = pd.DataFrame()
 
@@ -306,37 +305,44 @@ else:
                 df_c = load_massive_data(f_ref, 'xlsx' if f_ref.name.endswith('.xlsx') else 'csv')
                 if sel_del_f != "TODAS": df_c = df_c[df_c['del_norm'] == normalizar_texto(sel_del_f)]
                 if sel_utb_f != "TODAS": df_c = df_c[df_c['utb_norm'] == normalizar_texto(sel_utb_f)]
-                df_arc_final = df_c.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_arc_final.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-            except: st.warning("Error al procesar el archivo. Reintente subirlo.")
+                
+                # Extracción: FECHA(4), O.T.(6), FOLIO SOL.(15), CALLE(19), DEL(22), UTB(23), REHAB(29), MANTO(30), SUST(31), AMPLI(39)
+                df_arc_final = df_c.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
+                df_arc_final.columns = ["FECHA", "O.T.", "FOLIO DE SOLICITUD", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+            except: st.error("Error al extraer columnas G y P. Verifique el formato.")
 
+        # UNIFICACIÓN CON MOLDE ESTÁNDAR
         df_total = pd.concat([df_man_final, df_arc_final], ignore_index=True)
         if not df_total.empty:
-            for c in ["REHAB", "MANTO", "SUST", "AMPLI"]:
-                df_total[c] = pd.to_numeric(df_total[c], errors='coerce').fillna(0).astype(int)
-            t_rehab, t_manto, t_sust, t_ampli = df_total["REHAB"].sum(), df_total["MANTO"].sum(), df_total["SUST"].sum(), df_total["AMPLI"].sum()
+            # Forzar ceros en métricas
+            cols_n = ["REHAB", "MANTO", "SUST", "AMPLI"]
+            for c in cols_n: df_total[c] = pd.to_numeric(df_total[c], errors='coerce').fillna(0).astype(int)
             df_total.insert(0, "No.", range(1, len(df_total) + 1))
+            
+            # Totales
+            t_rehab, t_manto, t_sust, t_ampli = df_total["REHAB"].sum(), df_total["MANTO"].sum(), df_total["SUST"].sum(), df_total["AMPLI"].sum()
+        else: t_rehab = t_manto = t_sust = t_ampli = 0
 
         # --- 6. MÉTRICAS Y DESCARGAS ---
-        st.markdown("### 📊 Totales de Sesión")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("🔧 Rehab", t_rehab); m2.metric("🧹 Manto", t_manto)
-        m3.metric("💡 Sust", t_sust); m4.metric("➕ Ampli", t_ampli)
+        st.markdown("### 📊 Totales Combinados")
+        met1, met2, met3, met4 = st.columns(4)
+        met1.metric("🔧 Rehab", t_rehab); met2.metric("🧹 Manto", t_manto)
+        met3.metric("💡 Sust", t_sust); met4.metric("➕ Ampli", t_ampli)
 
         if not df_total.empty:
             st.dataframe(df_total, use_container_width=True, hide_index=True)
             st.markdown("### 📥 Centro de Descargas")
             d1, d2, d3 = st.columns(3)
-            def to_xlsx(df):
-                out = io.BytesIO()
-                with pd.ExcelWriter(out, engine='openpyxl') as w: df.to_excel(w, index=False)
-                return out.getvalue()
+            def save_xlsx(df):
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer: df.to_excel(writer, index=False)
+                return output.getvalue()
             with d1:
-                if not df_man_final.empty: st.download_button("📝 Solo Manual", to_xlsx(df_man_final), f"SF3_MAN_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True)
+                if not df_man_final.empty: st.download_button("📝 Solo Manual", save_xlsx(df_man_final), "SF3_MANUAL.xlsx", use_container_width=True)
             with d2:
-                if not df_arc_final.empty: st.download_button("📂 Solo Archivo", to_xlsx(df_arc_final), f"SF3_ARC_{datetime.now().strftime('%d%m%Y')}.xlsx", use_container_width=True)
+                if not df_arc_final.empty: st.download_button("📂 Solo Archivo", save_xlsx(df_arc_final), "SF3_ARCHIVO.xlsx", use_container_width=True)
             with d3:
-                st.download_button("🌟 UNIFICADO", to_xlsx(df_total), f"SF3_TOTAL_{datetime.now().strftime('%d%m%Y')}.xlsx", type="primary", use_container_width=True)
+                st.download_button("🌟 REPORTE UNIFICADO", save_xlsx(df_total), "SF3_TOTAL.xlsx", type="primary", use_container_width=True)
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
