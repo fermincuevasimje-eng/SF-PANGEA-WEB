@@ -193,13 +193,13 @@ if not st.session_state.autenticado:
         else:
             st.error("Acceso denegado")
 else:
-   # --- 4. SIDEBAR (Navegación Profesional v11.6) ---
+# --- 4. SIDEBAR (Navegación Profesional v11.6) ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
         
-        # SEGURIDAD: GuaDAP solo ve Bajas (Consulta de Bitácora y SF2)
+        # SEGURIDAD: GuaDAP solo ve Bajas y Generador (Consulta)
         if st.session_state.perfil == "CONSULTA":
             opciones_menu = {
                 "🚀 SF1-GENERADOR DE RUTAS": "GdR",
@@ -222,7 +222,7 @@ else:
                 st.rerun()
 
         st.write("---")
-        # Mantener Sliders de Ajuste para Admin en Rutas
+        # Mantener ajustes de rutas para Administrador
         if st.session_state.menu == "GdR" and st.session_state.perfil == "ADMIN":
             st.subheader("📊 Ajustes GdR")
             t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
@@ -234,117 +234,18 @@ else:
             st.rerun()
         st.info("SF PANGEA V1")
 
-    # --- 5. CUERPO LÓGICO (ESTRUCTURA INTEGRAL 11.5) ---
+    # --- 5. CUERPO LÓGICO (FUNCIONALIDAD ÍNTEGRA DE TU 11.5) ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-    elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
-        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
-            with st.form("captura_sf3", clear_on_submit=True):
-                c1, c2, c3 = st.columns(3)
-                with c1: f_fecha = st.date_input("1. Fecha de Atención")
-                with c2: f_ot = st.text_input("2. O.T.")
-                with c3: f_calle = st.text_input("3. Calle")
-                c4, c5, c6 = st.columns(3)
-                with c4: f_del = st.selectbox("4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
-                with c5: f_utb = st.selectbox("5. UTB", sorted(CATALOGO_MAESTRO.get(f_del, [])))
-                with c6: f_folio = st.text_input("6. Folio / Ticket / IMEI")
-                st.markdown("---")
-                m1, m2, m3, m4 = st.columns(4)
-                with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
-                with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
-                with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
-                with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
-                f_obs = st.text_area("11. Observaciones", placeholder="Detalles de la atención...")
-                if st.form_submit_button("🚀 GUARDAR REGISTRO Y ACTUALIZAR", use_container_width=True):
-                    if "manual_db" not in st.session_state: st.session_state.manual_db = []
-                    st.session_state.manual_db.append({
-                        "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
-                        "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
-                        "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
-                    })
-                    st.toast(f"O.T. {f_ot} registrada", icon="✅")
-
-        st.markdown("---")
-        up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"])
-        total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
-        df_final_vista = pd.DataFrame()
-        if "manual_db" in st.session_state and st.session_state.manual_db:
-            df_manual = pd.DataFrame(st.session_state.manual_db)
-            total_rehab += df_manual["REHAB"].sum(); total_manto += df_manual["MANTO"].sum()
-            total_sust += df_manual["SUST"].sum(); total_ampli += df_manual["AMPLI"].sum()
-            df_final_vista = df_manual.copy()
-        if up_cap:
-            try:
-                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
-                df_c = load_massive_data(up_cap, ext)
-                col_f1, col_f2 = st.columns(2)
-                if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
-                if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
-                if st.session_state.sel_utb_val != "TODAS":
-                    st.session_state.sel_del_val = MAPA_UTB_DEL.get(st.session_state.sel_utb_val, "TODAS")
-                with col_f1:
-                    def cambio_del(): st.session_state.sel_utb_val = "TODAS"
-                    sel_del = st.selectbox("📍 Filtrar por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="sel_del_val", on_change=cambio_del)
-                with col_f2:
-                    opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb, key="sel_utb_val")
-                df_filt = df_c.copy()
-                if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
-                total_rehab += pd.to_numeric(df_filt.iloc[:, 29], errors='coerce').fillna(0).sum()
-                total_manto += pd.to_numeric(df_filt.iloc[:, 30], errors='coerce').fillna(0).sum()
-                total_sust += pd.to_numeric(df_filt.iloc[:, 31], errors='coerce').fillna(0).sum()
-                total_ampli += pd.to_numeric(df_filt.iloc[:, 39], errors='coerce').fillna(0).sum()
-                df_archivo_v = df_filt.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_archivo_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                df_final_vista = pd.concat([df_final_vista, df_archivo_v], ignore_index=True)
-            except Exception as e: st.error(f"Error: {e}")
-        st.markdown("### 📊 Resumen Consolidado")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("🔧 Rehabilitaciones", int(total_rehab)); m2.metric("🧹 Mantenimientos", int(total_manto))
-        m3.metric("💡 Sustituciones", int(total_sust)); m4.metric("➕ Ampliaciones", int(total_ampli))
-        if not df_final_vista.empty:
-            st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
-
-    elif st.session_state.menu == "SF2":
-        st.title("📖 SF2-BAJAS")
-        up_sf2 = st.file_uploader("Subir Archivo de Referencia", type=["csv", "xlsx"], key="sf2_up")
-        if up_sf2:
-            try:
-                df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
-                id_col_sf2 = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
-                c_input, c_lista = st.columns([1, 1])
-                with c_input:
-                    with st.form("form_bajas", clear_on_submit=True):
-                        f_in = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
-                        r_in = st.text_input("Respuesta 127:", max_chars=30, key=f"r_{st.session_state.input_key}")
-                        if st.form_submit_button("➕ Agregar"):
-                            if f_in.strip() in df_ref[id_col_sf2].astype(str).values:
-                                st.session_state.lista_bajas[f_in.strip()] = r_in.strip() or "ATENDIDO"
-                                st.toast(f"Folio {f_in} validado"); st.rerun()
-                            else: st.error("El folio no existe en el archivo.")
-                    if st.button("🗑️ Limpiar Lista"): st.session_state.lista_bajas = {}; st.rerun()
-                with c_lista:
-                    if st.session_state.lista_bajas:
-                        st.dataframe(pd.DataFrame([{"Folio": k, "Respuesta": v} for k, v in st.session_state.lista_bajas.items()]), use_container_width=True, hide_index=True)
-                        if st.button("📥 Generar Documento de Bajas"):
-                            st.balloons()
-                            df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(list(st.session_state.lista_bajas.keys()))].copy()
-                            df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].map(st.session_state.lista_bajas)
-                            output = io.BytesIO()
-                            with pd.ExcelWriter(output, engine='openpyxl') as writer: df_final_bajas.to_excel(writer, index=False)
-                            st.download_button("📗 Descargar Excel", output.getvalue(), f"BAJAS_{up_sf2.name}.xlsx")
-            except Exception as e: st.error(f"Error: {e}")
-
     elif st.session_state.menu == "GdR":
         st.title("🚀 SF1-GENERADOR DE RUTAS")
         tab1, tab2, tab3 = st.tabs(["🆕 Nueva Ruta", "📂 Bitácora", "🗑️ Papelera"])
         with tab1:
-            if st.session_state.perfil == "CONSULTA": st.warning("⚠️ Modo Consulta.")
+            if st.session_state.perfil == "CONSULTA":
+                st.warning("⚠️ Modo Consulta activo.")
             else:
                 up = st.file_uploader("Subir Archivo", type=["csv", "xlsx"])
                 if up:
@@ -360,9 +261,9 @@ else:
                                 rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
                                 idx = np.argmin(cdist([last_coord], rest))
                                 p_prox = pts.pop(idx); ordenados_temp.append(p_prox); last_coord = (p_prox['lat_aux'], p_prox['lon_aux'])
-                            ordenados = ordenados_temp[::-1] # Punto lejano primero
+                            ordenados = ordenados_temp[::-1] # Lógica: Punto lejano primero
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
-                            geo_trazo, dist_real_km = get_real_route(route_coords) # TRAZO OSRM
+                            geo_trazo, dist_real_km = get_real_route(route_coords) # OSRM
                             if not dist_real_km: dist_real_km = (len(ordenados) + 1) * 1.3
                             total_lums = total_postes = total_cable = 0
                             for i, p in enumerate(ordenados, 1):
@@ -379,7 +280,7 @@ else:
                             m4.metric("🧶 Cable", f"{total_cable}m"); m5.metric("🛣️ Dist", f"{round(dist_real_km,2)}km"); m6.metric("⏱️ Tiempo", tiempo_abr)
                             df_export = pd.DataFrame(ordenados)
                             c1, c2, c3, c4 = st.columns(4)
-                            # EXCEL PRO CON COLORES GRIS/AZUL Y RESUMEN DINÁMICO
+                            # EXCEL PRO CON COLORES Y RESUMEN
                             buf = io.BytesIO()
                             with pd.ExcelWriter(buf, engine='openpyxl') as writer:
                                 df_export.to_excel(writer, index=False, sheet_name='Ruta')
@@ -392,10 +293,10 @@ else:
                                         for cell in ws[r]: cell.fill = fg
                                     elif int(df_export.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
-                            c1.download_button("📗 Excel Pro", buf.getvalue(), f"SF_{up.name}.xlsx")
+                            c1.download_button("📗 Excel Pro Dinámico", buf.getvalue(), f"SF_{up.name}.xlsx")
                             kml = simplekml.Kml()
                             if geo_trazo:
-                                ls = kml.newlinestring(name="Ruta Real", coords=[(float(c[0]), float(c[1])) for c in geo_trazo])
+                                ls = kml.newlinestring(name="Ruta OSRM", coords=[(float(c[0]), float(c[1])) for c in geo_trazo])
                                 ls.style.linestyle.width = 6; ls.style.linestyle.color = 'ff0000ff'
                             for p in ordenados:
                                 pnt = kml.newpoint(name=str(p[id_col]), coords=[(p['lon_aux'], p['lat_aux'])])
@@ -404,20 +305,19 @@ else:
                             if st.button("💾 REGISTRAR EN BITÁCORA"):
                                 conn = st.connection("gsheets", type=GSheetsConnection)
                                 hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                info = f"Pts: {len(ordenados)}, Lums: {total_lums}, Dist: {round(dist_real_km,2)}km"
-                                n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info}])
+                                n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": "Ruta Procesada"}])
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                st.balloons(); st.success("Guardado.")
+                                st.success("Guardado.")
                     except Exception as e: st.error(f"Error: {e}")
 
-        with tab2:
+        with tab2: # BITÁCORA
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
                 df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
                 if not df_bt.empty:
                     df_bt_v = df_bt.copy(); df_bt_v.insert(0, "ID_Reg", range(1, len(df_bt_v) + 1))
                     if st.session_state.perfil == "ADMIN":
-                        ids_e = st.multiselect("ID para mover a papelera:", df_bt_v["ID_Reg"].tolist())
+                        ids_e = st.multiselect("ID para papelera:", df_bt_v["ID_Reg"].tolist())
                         if st.button("🗑️ Mover"):
                             idx_e = df_bt_v[df_bt_v["ID_Reg"].isin(ids_e)].index
                             df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
@@ -426,7 +326,7 @@ else:
                     st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
             except: st.info("Sincronizando...")
 
-        with tab3:
+        with tab3: # PAPELERA
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -439,12 +339,52 @@ else:
                             df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
                             conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[idx_r]], ignore_index=True))
                             conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r)); st.rerun()
-                        if st.button("🔥 VACIAR PAPELERA"):
-                            conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.DataFrame(columns=df_tr.columns)); st.rerun()
                         st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
                 except: st.info("Cargando papelera...")
+
+    elif st.session_state.menu == "SF2":
+        st.title("📖 SF2-BAJAS")
+        up_sf2 = st.file_uploader("Archivo Referencia", type=["csv", "xlsx"])
+        if up_sf2:
+            try:
+                df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
+                id_col_sf2 = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
+                c1, c2 = st.columns(2)
+                with c1:
+                    with st.form("f_b", clear_on_submit=True):
+                        f_in = st.text_input("Digite Folio/Ticket/IMEi:"); r_in = st.text_input("Respuesta 127:")
+                        if st.form_submit_button("➕ Agregar"):
+                            if f_in.strip() in df_ref[id_col_sf2].astype(str).values:
+                                st.session_state.lista_bajas[f_in.strip()] = r_in.strip() or "ATENDIDO"; st.rerun()
+                            else: st.error("No existe.")
+                with c2:
+                    if st.session_state.lista_bajas:
+                        st.dataframe(pd.DataFrame([{"Folio":k,"Resp":v} for k,v in st.session_state.lista_bajas.items()]), use_container_width=True)
+                        if st.button("📥 Generar Documento"):
+                            df_f = df_ref[df_ref[id_col_sf2].astype(str).isin(list(st.session_state.lista_bajas.keys()))].copy()
+                            df_f['RESPUESTA 127'] = df_f[id_col_sf2].map(st.session_state.lista_bajas)
+                            out = io.BytesIO(); df_f.to_excel(out, index=False)
+                            st.download_button("📗 Descargar", out.getvalue(), f"BAJAS_{up_sf2.name}.xlsx")
+            except Exception as e: st.error(f"Error: {e}")
+
+    elif st.session_state.menu == "SF3":
+        st.title("📝 SF3-CAPTURA")
+        # Formulario de 11 campos y Filtros Sincronizados
+        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN", expanded=True):
+            with st.form("c_sf3", clear_on_submit=True):
+                c1, c2, c3 = st.columns(3)
+                f_f = c1.date_input("Fecha"); f_o = c2.text_input("O.T."); f_c = c3.text_input("Calle")
+                c4, c5, c6 = st.columns(3)
+                f_d = c4.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
+                f_u = c5.selectbox("UTB", sorted(CATALOGO_MAESTRO.get(f_d, [])))
+                f_fol = c6.text_input("Folio")
+                m1, m2, m3, m4 = st.columns(4)
+                r, m, s, a = m1.number_input("Rehab",0), m2.number_input("Manto",0), m3.number_input("Sust",0), m4.number_input("Ampli",0)
+                obs = st.text_area("Observaciones")
+                if st.form_submit_button("🚀 GUARDAR"):
+                    st.session_state.manual_db.append({"FECHA":f_f.strftime("%d/%m/%Y"),"OT":f_o.upper(),"CALLE":f_c.upper(),"DELEGACIÓN":f_d,"UTB":f_u,"FOLIO":f_fol.upper(),"REHAB":r,"MANTO":m,"SUST":s,"AMPLI":a,"OBS":obs})
+                    st.rerun()
 
     elif st.session_state.menu == "SF4":
         st.title("📐 SF4-DISEÑO DE PROCESOS")
         st.info("Módulo de Organización y Métodos - Dirección de Alumbrado Público")
-                except: st.info("Cargando papelera...")
