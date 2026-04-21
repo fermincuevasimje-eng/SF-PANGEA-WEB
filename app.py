@@ -224,12 +224,11 @@ else:
         from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- 1. CONFIGURACIÓN DE MEMORIA ---
+        # --- 1. CONFIGURACIÓN DE MEMORIA Y RESET ---
         if 'archivo_sf3_mem' not in st.session_state: st.session_state.archivo_sf3_mem = None
         if 'manual_db' not in st.session_state: st.session_state.manual_db = []
-        if 'reset_f' not in st.session_state: st.session_state.reset_f = False
 
-        # --- 2. CAPTURA MANUAL ---
+        # --- 2. CAPTURA MANUAL (CORRECCIÓN DE LIMPIEZA) ---
         with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=False):
             def sync_m():
                 if st.session_state.M_UTB != "SELECCIONAR":
@@ -237,16 +236,16 @@ else:
             
             c1, c2, c3 = st.columns(3)
             with c1: f_fecha = st.date_input("1. Fecha de Atención")
-            v_r = "" if st.session_state.reset_f else None
-            with c2: f_ot = st.text_input("2. O.T.", value=v_r, key="ot_m")
-            with c3: f_calle = st.text_input("3. Calle", value=v_r, key="cl_m")
+            # Usamos keys fijas para forzar el reset desde el formulario
+            with c2: f_ot = st.text_input("2. O.T.", key="ot_input")
+            with c3: f_calle = st.text_input("3. Calle", key="calle_input")
 
             c4, c5, c6 = st.columns(3)
             with c4: f_del_m = st.selectbox("4. Delegación Manual", sorted(list(CATALOGO_MAESTRO.keys())), key="M_DEL")
             with c5:
                 opts_m = sorted(CATALOGO_MAESTRO.get(f_del_m, []))
                 f_utb_m = st.selectbox("5. UTB Manual", opts_m, key="M_UTB", on_change=sync_m)
-            with c6: f_folio = st.text_input("6. Folio/Ticket/Imei", value=v_r, key="fo_m")
+            with c6: f_folio = st.text_input("6. Folio/Ticket/Imei", key="folio_input")
 
             with st.form("f_sf3", clear_on_submit=True):
                 st.markdown("---")
@@ -258,34 +257,37 @@ else:
                 f_obs = st.text_area("11. Observaciones", key="ob_m")
 
                 if st.form_submit_button("🚀 AGREGAR A REPORTE", use_container_width=True):
+                    # Guardamos los datos de los inputs externos al form usando sus keys de session_state
                     st.session_state.manual_db.append({
-                        "FECHA": f_fecha.strftime("%d/%m/%Y"), "O.T.": f_ot.upper(), 
-                        "FOLIO DE SOLICITUD": f_folio.upper(), "CALLE": f_calle.upper(), 
+                        "FECHA": f_fecha.strftime("%d/%m/%Y"), 
+                        "O.T.": st.session_state.ot_input.upper(), 
+                        "FOLIO DE SOLICITUD": st.session_state.folio_input.upper(), 
+                        "CALLE": st.session_state.calle_input.upper(), 
                         "DELEGACIÓN": f_del_m, "UTB": f_utb_m, "REHAB": f_rehab, 
                         "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs.upper()
                     })
-                    st.session_state.reset_f = True
+                    # Limpiamos manualmente los widgets que están fuera del form
+                    st.session_state.ot_input = ""
+                    st.session_state.calle_input = ""
+                    st.session_state.folio_input = ""
+                    
                     st.toast("Guardado correctamente", icon="✅")
                     time.sleep(0.5); st.rerun()
-            st.session_state.reset_f = False
 
-        # --- 3. PAPELERA (Diseño Anti-Saturación v10.1) ---
+        # --- 3. PAPELERA ---
         if st.session_state.manual_db:
             with st.expander("🗑️ GESTIÓN DE CAPTURAS MANUALES", expanded=False):
                 df_p = pd.DataFrame(st.session_state.manual_db)
                 df_p.insert(0, "No.", range(1, len(df_p) + 1))
                 st.dataframe(df_p, use_container_width=True, hide_index=True)
-                
                 st.markdown("##### Seleccione los registros que desea remover:")
                 ids_d = st.multiselect("No. de Registro(s):", df_p["No."].tolist(), key="del_multi")
-                
                 st.write("") 
                 if st.button("🔥 ELIMINAR SELECCIONADOS", use_container_width=True, type="secondary"):
                     if ids_d:
                         st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if (i+1) not in ids_d]
                         st.success(f"Se eliminaron {len(ids_d)} registros.")
-                        time.sleep(0.5)
-                        st.rerun()
+                        time.sleep(0.5); st.rerun()
 
         # --- 4. CARGA MASIVA ---
         st.markdown("---")
