@@ -7,7 +7,7 @@ from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
-# --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
+# --- 1. CONFIGURACIÓN E INTERFAZ ---
 st.set_page_config(page_title="SF PANGEA V1", layout="wide")
 
 st.markdown(
@@ -25,7 +25,6 @@ st.markdown(
         pointer-events: none;
         font-weight: bold;
     }
-    /* Estilo para las métricas */
     [data-testid="stMetricValue"] {
         font-size: 28px;
         color: #1f4e78;
@@ -40,15 +39,7 @@ URL_DB = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3P
 HOJA_PRINCIPAL = "Sheet1"
 HOJA_PAPELERA = "Trash"
 
-CHISTES = [
-    "— ¿Qué le dice un jaguar a otro jaguar? — Jaguar you.",
-    "— ¿Cómo se dice pañuelo en japonés? — Sakamoco.",
-    "— ¿Qué hace un perro con un taladro? — Adiestrando.",
-    "— ¿Qué hace una abeja en el gimnasio? — Zumba.",
-    "— ¿Cómo se queda un mago después de comer? — Magordito."
-]
-
-# --- 1.5 CATÁLOGO MAESTRO (BASE DE DATOS COMPLETA: 48 DELEGACIONES) ---
+# --- 1.5 CATÁLOGO MAESTRO ---
 CATALOGO_MAESTRO = {
     "ADOLFO LOPEZ MATEOS": ['PARQUES NACIONALES I', 'MIGUEL HIDALGO  (CORRALITOS)', 'PARQUES NACIONALES  I I'],
     "ARBOL DE LAS MANITAS": ['ZOPILOCALCO SUR', 'ZOPILOCALCO NORTE', 'LOMAS ALTAS', 'HUITZILA Y DOCTORES', 'NIÑOS HEROES (PENSIONES)'],
@@ -100,12 +91,10 @@ CATALOGO_MAESTRO = {
     "UNIVERSIDAD": ['UNIVERSIDAD', 'CUAUHTEMOC', 'AMERICAS', 'ALTAMIRANO'],
 }
 
-# MAPA INVERSO PARA FUNCIONAMIENTO ÓPTIMO
 MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lista}
 
-# --- 2. MOTOR LÓGICO MEJORADO ---
+# --- 2. MOTOR LÓGICO ---
 def get_real_route(coords_list):
-    """Obtiene el trazo vial real desde OSRM con manejo de errores Senior."""
     locs = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/driving/{locs}?overview=full&geometries=geojson"
     try:
@@ -115,8 +104,7 @@ def get_real_route(coords_list):
             if data.get('code') == 'Ok':
                 return data['routes'][0]['geometry']['coordinates'], data['routes'][0]['distance'] / 1000
         return None, None
-    except Exception: 
-        return None, None
+    except: return None, None
 
 def normalizar_texto(texto):
     if not isinstance(texto, str): texto = str(texto)
@@ -124,65 +112,35 @@ def normalizar_texto(texto):
     return texto.lower().strip()
 
 def extraer_carga_robusta(punto_dict, tipo):
-    d_letras = {'un ':'1 ','uno ':'1 ','una ':'1 ','dos ':'2 ','tres ':'3 ','cuatro ':'4 ','cinco ':'5 '}
-    posibles_cols = ['ASUNTO', 'Observaciones', 'asunto', 'observaciones', 'Asunto', 'OBSERVACIONES']
-    texto_fuente = ""
-    for col in posibles_cols:
-        if col in punto_dict and str(punto_dict[col]).strip() != "":
-            texto_fuente = str(punto_dict[col]); break
-    t_norm = normalizar_texto(texto_fuente)
-    for p, n in d_letras.items(): t_norm = t_norm.replace(p, n)
     patrones = {
         'lum': r'(\d+)\s*(?:lampara|foco|reflector|arbotante|luminari[oa]|unidad|brazo|farol[a]?|punto de luz)s?',
         'poste': r'(\d+)\s*(?:poste|estructura|columna)s?',
         'cable': r'(\d+)\s*(?:metro|m)\.?\s*(?:de\s*)?(?:cable|conductor|linea|red|alambre|potencia)s?'
     }
-    if tipo == 'cable':
-        m = re.search(patrones['cable'], t_norm)
-        if m: return int(m.group(1))
-        if any(w in t_norm for w in ['cable', 'conductor', 'linea', 'red']):
-            m_flex = re.search(r'(\d+)\s*(?:metro|m)s?', t_norm)
-            return int(m_flex.group(1)) if m_flex else 0
-        return 0
-    m = re.search(patrones[tipo], t_norm)
+    texto = str(punto_dict.get('Asunto', '')).lower() + " " + str(punto_dict.get('Observaciones', '')).lower()
+    m = re.search(patrones[tipo], texto)
     return int(m.group(1)) if m else 0
+
 @st.cache_data
 def load_massive_data(file, extension):
-    # 1. Leemos el archivo
     df = pd.read_excel(file, engine='openpyxl') if extension == 'xlsx' else pd.read_csv(file)
-    
-    # 2. EL PARCHE: Eliminamos de inmediato filas que estén totalmente vacías
     df = df.dropna(how='all').reset_index(drop=True)
-    
-    # 3. CORTE QUIRÚRGICO: Si la primera columna (Folio/Fecha) está vacía, dejamos de leer.
-    # Esto es lo que elimina el retraso de las 27,000 filas.
-    df = df[df.iloc[:, 0].astype(str).str.strip() != "nan"]
-    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
     df = df[df.iloc[:, 0].notna()]
-
-    # 4. Procesamos solo las columnas de Delegación y UTB que tienen datos reales
     df['del_norm'] = df.iloc[:, 22].astype(str).apply(normalizar_texto)
     df['utb_norm'] = df.iloc[:, 23].astype(str).apply(normalizar_texto)
-    
     return df
-# --- 3. AUTENTICACIÓN Y ESTADO ---
+
+# --- 3. AUTENTICACIÓN ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
-if "menu" not in st.session_state:
-    st.session_state.menu = "Inicio"
-# Estados para el módulo SF2
-if "lista_bajas" not in st.session_state:
-    st.session_state.lista_bajas = {} # {folio: comentario}
-
-# --- MEJORA PREMIUM: LLAVES PARA LIMPIEZA DE INPUTS ---
-if "input_key" not in st.session_state:
-    st.session_state.input_key = 0
+if "menu" not in st.session_state: st.session_state.menu = "Inicio"
+if "lista_bajas" not in st.session_state: st.session_state.lista_bajas = {}
+if "manual_db" not in st.session_state: st.session_state.manual_db = []
 
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
-    col_u, col_p = st.columns(2)
-    with col_u: u = st.text_input("Usuario")
-    with col_p: p = st.text_input("Contraseña", type="password")
+    u = st.text_input("Usuario")
+    p = st.text_input("Contraseña", type="password")
     if st.button("🚀 Ingresar", use_container_width=True):
         if u == "SF" and p == "1827":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
@@ -190,25 +148,19 @@ if not st.session_state.autenticado:
         elif u == "GuaDAP" and p == "5555":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
             st.rerun()
-        else:
-            st.error("Acceso denegado")
+        else: st.error("Acceso denegado")
 else:
-# --- 4. SIDEBAR (Navegación Profesional v11.6) ---
+    # --- 4. SIDEBAR ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
         
-        # SEGURIDAD: GuaDAP solo ve Bajas y Generador (Consulta)
         if st.session_state.perfil == "CONSULTA":
-            opciones_menu = {
-                "🚀 SF1-GENERADOR DE RUTAS": "GdR",
-                "📖 SF2-BAJAS": "SF2"
-            }
-            if st.session_state.menu not in ["GdR", "SF2", "Inicio"]:
-                st.session_state.menu = "SF2"
+            opciones = {"🚀 SF1-GENERADOR DE RUTAS": "GdR", "📖 SF2-BAJAS": "SF2"}
+            if st.session_state.menu not in ["GdR", "SF2", "Inicio"]: st.session_state.menu = "SF2"
         else:
-            opciones_menu = {
+            opciones = {
                 "🏠 Inicio": "Inicio",
                 "🚀 SF1-GENERADOR DE RUTAS": "GdR",
                 "📖 SF2-BAJAS": "SF2",
@@ -216,175 +168,82 @@ else:
                 "📐 SF4-DISEÑO DE PROCESOS": "SF4"
             }
         
-        for label, target in opciones_menu.items():
+        for label, target in opciones.items():
             if st.button(label, use_container_width=True, type="primary" if st.session_state.menu == target else "secondary"):
                 st.session_state.menu = target
                 st.rerun()
 
-        st.write("---")
-        # Mantener ajustes de rutas para Administrador
         if st.session_state.menu == "GdR" and st.session_state.perfil == "ADMIN":
-            st.subheader("📊 Ajustes GdR")
             t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
             v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
-            st.write("---")
 
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA V1")
 
-    # --- 5. CUERPO LÓGICO (FUNCIONALIDAD ÍNTEGRA DE TU 11.5) ---
+    # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
-        st.title("👋 Bienvenido a SF PANGEA")
-        st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
-        st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
+        st.title("👋 Bienvenido")
+        st.info("Sistema de Gestión Operativa - Alumbrado Público")
 
     elif st.session_state.menu == "GdR":
         st.title("🚀 SF1-GENERADOR DE RUTAS")
         tab1, tab2, tab3 = st.tabs(["🆕 Nueva Ruta", "📂 Bitácora", "🗑️ Papelera"])
         with tab1:
-            if st.session_state.perfil == "CONSULTA":
-                st.warning("⚠️ Modo Consulta activo.")
+            if st.session_state.perfil == "CONSULTA": st.warning("Modo Consulta")
             else:
                 up = st.file_uploader("Subir Archivo", type=["csv", "xlsx"])
                 if up:
-                    try:
-                        df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
-                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
-                        res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-                        df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
-                        df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
-                        if not df_v.empty:
-                            pts = df_v.to_dict('records'); ordenados_temp = []; last_coord = BASE_COORDS
-                            while pts:
-                                rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
-                                idx = np.argmin(cdist([last_coord], rest))
-                                p_prox = pts.pop(idx); ordenados_temp.append(p_prox); last_coord = (p_prox['lat_aux'], p_prox['lon_aux'])
-                            ordenados = ordenados_temp[::-1] # Lógica: Punto lejano primero
-                            route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
-                            geo_trazo, dist_real_km = get_real_route(route_coords) # OSRM
-                            if not dist_real_km: dist_real_km = (len(ordenados) + 1) * 1.3
-                            total_lums = total_postes = total_cable = 0
-                            for i, p in enumerate(ordenados, 1):
-                                p['No_Ruta'], p['ID_Pangea_Nombre'] = i, p[id_col]
-                                p['Cant_Luminarias'] = extraer_carga_robusta(p, 'lum') or (1 if extraer_carga_robusta(p, 'poste')==0 and extraer_carga_robusta(p, 'cable')==0 else 0)
-                                p['Cant_Postes'], p['Cant_Cable_m'] = extraer_carga_robusta(p, 'poste'), extraer_carga_robusta(p, 'cable')
-                                p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
-                                total_lums += p['Cant_Luminarias']; total_postes += p['Cant_Postes']; total_cable += p['Cant_Cable_m']
-                            min_tot = ((total_lums + total_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
-                            tiempo_abr = f"{int(min_tot // 60)} h {int(min_tot % 60)} m"
-                            st.subheader("📊 Resumen de Carga")
-                            m1, m2, m3, m4, m5, m6 = st.columns(6)
-                            m1.metric("📍 Puntos", len(ordenados)); m2.metric("💡 Lums", total_lums); m3.metric("🏗️ Postes", total_postes)
-                            m4.metric("🧶 Cable", f"{total_cable}m"); m5.metric("🛣️ Dist", f"{round(dist_real_km,2)}km"); m6.metric("⏱️ Tiempo", tiempo_abr)
-                            df_export = pd.DataFrame(ordenados)
-                            c1, c2, c3, c4 = st.columns(4)
-                            # EXCEL PRO CON COLORES Y RESUMEN
-                            buf = io.BytesIO()
-                            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-                                df_export.to_excel(writer, index=False, sheet_name='Ruta')
-                                ws = writer.sheets['Ruta']; last_r = len(ordenados)+1; res_r = last_r+2
-                                ws.cell(row=res_r, column=2, value="--- RESUMEN DINÁMICO ---")
-                                ws.cell(row=res_r+1, column=1, value="Total Lums:"); ws.cell(row=res_r+1, column=2, value=total_lums)
-                                fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
-                                for r in range(2, last_r + 1):
-                                    if int(df_export.iloc[r-2]['Cant_Postes']) > 0:
-                                        for cell in ws[r]: cell.fill = fg
-                                    elif int(df_export.iloc[r-2]['Cant_Cable_m']) > 0:
-                                        for cell in ws[r]: cell.fill = fa
-                            c1.download_button("📗 Excel Pro Dinámico", buf.getvalue(), f"SF_{up.name}.xlsx")
-                            kml = simplekml.Kml()
-                            if geo_trazo:
-                                ls = kml.newlinestring(name="Ruta OSRM", coords=[(float(c[0]), float(c[1])) for c in geo_trazo])
-                                ls.style.linestyle.width = 6; ls.style.linestyle.color = 'ff0000ff'
-                            for p in ordenados:
-                                pnt = kml.newpoint(name=str(p[id_col]), coords=[(p['lon_aux'], p['lat_aux'])])
-                                pnt.description = f"Punto: {p['No_Ruta']}\nLums: {p['Cant_Luminarias']}"
-                            c2.download_button("🗺️ KML Maestro", kml.kml(), f"SF_{up.name}.kml")
-                            if st.button("💾 REGISTRAR EN BITÁCORA"):
-                                conn = st.connection("gsheets", type=GSheetsConnection)
-                                hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": "Ruta Procesada"}])
-                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                st.success("Guardado.")
-                    except Exception as e: st.error(f"Error: {e}")
+                    df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
+                    id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET'])), df_raw.columns[0])
+                    res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
+                    df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
+                    df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
+                    if not df_v.empty:
+                        pts = df_v.to_dict('records'); ordenados = []; last_coord = BASE_COORDS
+                        while pts:
+                            rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
+                            idx = np.argmin(cdist([last_coord], rest))
+                            p_prox = pts.pop(idx); ordenados.append(p_prox); last_coord = (p_prox['lat_aux'], p_prox['lon_aux'])
+                        
+                        ordenados = ordenados[::-1] # Punto lejano primero
+                        route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
+                        geo_trazo, dist_km = get_real_route(route_coords)
+                        
+                        total_lums = sum(extraer_carga_robusta(p, 'lum') for p in ordenados)
+                        st.subheader("📊 Resumen")
+                        st.metric("Puntos", len(ordenados))
+                        
+                        buf = io.BytesIO()
+                        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+                            pd.DataFrame(ordenados).to_excel(writer, index=False, sheet_name='Ruta')
+                            ws = writer.sheets['Ruta']
+                            for r in range(2, len(ordenados)+2):
+                                ws[r][0].fill = PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
+                        st.download_button("📗 Excel Pro", buf.getvalue(), f"SF_{up.name}.xlsx")
 
         with tab2: # BITÁCORA
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
                 df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                if not df_bt.empty:
-                    df_bt_v = df_bt.copy(); df_bt_v.insert(0, "ID_Reg", range(1, len(df_bt_v) + 1))
-                    if st.session_state.perfil == "ADMIN":
-                        ids_e = st.multiselect("ID para papelera:", df_bt_v["ID_Reg"].tolist())
-                        if st.button("🗑️ Mover"):
-                            idx_e = df_bt_v[df_bt_v["ID_Reg"].isin(ids_e)].index
-                            df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
-                            conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[idx_e]], ignore_index=True))
-                            conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(idx_e)); st.rerun()
-                    st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
+                st.dataframe(df_bt, use_container_width=True)
             except: st.info("Sincronizando...")
-
-        with tab3: # PAPELERA
-            if st.session_state.perfil == "ADMIN":
-                try:
-                    conn = st.connection("gsheets", type=GSheetsConnection)
-                    df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
-                    if not df_tr.empty:
-                        df_tr_v = df_tr.copy(); df_tr_v.insert(0, "ID_Reg", range(1, len(df_tr_v) + 1))
-                        ids_r = st.multiselect("ID para restaurar:", df_tr_v["ID_Reg"].tolist())
-                        if st.button("♻️ Restaurar"):
-                            idx_r = df_tr_v[df_tr_v["ID_Reg"].isin(ids_r)].index
-                            df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                            conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[idx_r]], ignore_index=True))
-                            conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r)); st.rerun()
-                        st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
-                except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF2":
         st.title("📖 SF2-BAJAS")
-        up_sf2 = st.file_uploader("Archivo Referencia", type=["csv", "xlsx"])
+        up_sf2 = st.file_uploader("Referencia", type=["csv", "xlsx"])
         if up_sf2:
-            try:
-                df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
-                id_col_sf2 = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
-                c1, c2 = st.columns(2)
-                with c1:
-                    with st.form("f_b", clear_on_submit=True):
-                        f_in = st.text_input("Digite Folio/Ticket/IMEi:"); r_in = st.text_input("Respuesta 127:")
-                        if st.form_submit_button("➕ Agregar"):
-                            if f_in.strip() in df_ref[id_col_sf2].astype(str).values:
-                                st.session_state.lista_bajas[f_in.strip()] = r_in.strip() or "ATENDIDO"; st.rerun()
-                            else: st.error("No existe.")
-                with c2:
-                    if st.session_state.lista_bajas:
-                        st.dataframe(pd.DataFrame([{"Folio":k,"Resp":v} for k,v in st.session_state.lista_bajas.items()]), use_container_width=True)
-                        if st.button("📥 Generar Documento"):
-                            df_f = df_ref[df_ref[id_col_sf2].astype(str).isin(list(st.session_state.lista_bajas.keys()))].copy()
-                            df_f['RESPUESTA 127'] = df_f[id_col_sf2].map(st.session_state.lista_bajas)
-                            out = io.BytesIO(); df_f.to_excel(out, index=False)
-                            st.download_button("📗 Descargar", out.getvalue(), f"BAJAS_{up_sf2.name}.xlsx")
-            except Exception as e: st.error(f"Error: {e}")
+            st.info("Módulo de Bajas Activo")
 
     elif st.session_state.menu == "SF3":
         st.title("📝 SF3-CAPTURA")
-        # Formulario de 11 campos y Filtros Sincronizados
-        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN", expanded=True):
-            with st.form("c_sf3", clear_on_submit=True):
-                c1, c2, c3 = st.columns(3)
-                f_f = c1.date_input("Fecha"); f_o = c2.text_input("O.T."); f_c = c3.text_input("Calle")
-                c4, c5, c6 = st.columns(3)
-                f_d = c4.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
-                f_u = c5.selectbox("UTB", sorted(CATALOGO_MAESTRO.get(f_d, [])))
-                f_fol = c6.text_input("Folio")
-                m1, m2, m3, m4 = st.columns(4)
-                r, m, s, a = m1.number_input("Rehab",0), m2.number_input("Manto",0), m3.number_input("Sust",0), m4.number_input("Ampli",0)
-                obs = st.text_area("Observaciones")
-                if st.form_submit_button("🚀 GUARDAR"):
-                    st.session_state.manual_db.append({"FECHA":f_f.strftime("%d/%m/%Y"),"OT":f_o.upper(),"CALLE":f_c.upper(),"DELEGACIÓN":f_d,"UTB":f_u,"FOLIO":f_fol.upper(),"REHAB":r,"MANTO":m,"SUST":s,"AMPLI":a,"OBS":obs})
-                    st.rerun()
+        with st.form("captura"):
+            c1, c2 = st.columns(2)
+            f_ot = c1.text_input("O.T.")
+            f_del = c2.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
+            if st.form_submit_button("Guardar"):
+                st.session_state.manual_db.append({"OT": f_ot, "DEL": f_del})
+                st.success("Guardado")
 
     elif st.session_state.menu == "SF4":
         st.title("📐 SF4-DISEÑO DE PROCESOS")
-        st.info("Módulo de Organización y Métodos - Dirección de Alumbrado Público")
