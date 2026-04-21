@@ -221,7 +221,7 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        from datetime import datetime
+from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
         # --- 1. CONFIGURACIÓN DE MEMORIA ---
@@ -258,7 +258,6 @@ else:
                 f_obs = st.text_area("11. Observaciones", key="ob_m")
 
                 if st.form_submit_button("🚀 AGREGAR A REPORTE", use_container_width=True):
-                    # Orden idéntico al masivo para evitar duplicación de encabezados
                     st.session_state.manual_db.append({
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), "O.T.": f_ot.upper(), 
                         "FOLIO DE SOLICITUD": f_folio.upper(), "CALLE": f_calle.upper(), 
@@ -270,18 +269,25 @@ else:
                     time.sleep(0.5); st.rerun()
             st.session_state.reset_f = False
 
-        # --- 3. PAPELERA (No. DESDE 1) ---
+        # --- 3. PAPELERA (Diseño Anti-Saturación v10.1) ---
         if st.session_state.manual_db:
             with st.expander("🗑️ GESTIÓN DE CAPTURAS MANUALES", expanded=False):
                 df_p = pd.DataFrame(st.session_state.manual_db)
                 df_p.insert(0, "No.", range(1, len(df_p) + 1))
                 st.dataframe(df_p, use_container_width=True, hide_index=True)
-                ids_d = st.multiselect("Eliminar No.:", df_p["No."].tolist())
-                if st.button("🔥 ELIMINAR"):
-                    st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if (i+1) not in ids_d]
-                    st.rerun()
+                
+                st.markdown("##### Seleccione los registros que desea remover:")
+                ids_d = st.multiselect("No. de Registro(s):", df_p["No."].tolist(), key="del_multi")
+                
+                st.write("") 
+                if st.button("🔥 ELIMINAR SELECCIONADOS", use_container_width=True, type="secondary"):
+                    if ids_d:
+                        st.session_state.manual_db = [v for i, v in enumerate(st.session_state.manual_db) if (i+1) not in ids_d]
+                        st.success(f"Se eliminaron {len(ids_d)} registros.")
+                        time.sleep(0.5)
+                        st.rerun()
 
-        # --- 4. CARGA MASIVA (LIMPIEZA DE ENCABEZADOS) ---
+        # --- 4. CARGA MASIVA ---
         st.markdown("---")
         up_sf3 = st.file_uploader("📂 Cargar Archivo Masivo", type=["csv", "xlsx"])
         if up_sf3: st.session_state.archivo_sf3_mem = up_sf3
@@ -294,7 +300,7 @@ else:
             opts_f = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(s_del, [])) if s_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
             s_utb = st.selectbox("🔍 Filtrar UTB:", opts_f, key="S2_MAS", on_change=sync_f)
 
-        # --- 5. UNIFICACIÓN Y EXTRACCIÓN G Y P ---
+        # --- 5. UNIFICACIÓN Y LIMPIEZA ---
         df_man_f = pd.DataFrame(st.session_state.manual_db)
         df_arc_f = pd.DataFrame()
 
@@ -302,17 +308,13 @@ else:
             try:
                 f_r = st.session_state.archivo_sf3_mem
                 df_c = load_massive_data(f_r, 'xlsx' if f_r.name.endswith('.xlsx') else 'csv')
-                # Eliminar fila 0 si es igual a los encabezados (Limpieza Captura 2)
                 if not df_c.empty and "FECHA" in str(df_c.iloc[0, 4]).upper(): df_c = df_c.iloc[1:].reset_index(drop=True)
-                
                 if s_del != "TODAS": df_c = df_c[df_c['del_norm'] == normalizar_texto(s_del)]
                 if s_utb != "TODAS": df_c = df_c[df_c['utb_norm'] == normalizar_texto(s_utb)]
-                
                 df_arc_f = df_c.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
                 df_arc_f.columns = ["FECHA", "O.T.", "FOLIO DE SOLICITUD", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
             except: st.error("Error en formato de archivo.")
 
-        # Unión y Limpieza de Ceros
         df_total = pd.concat([df_man_f, df_arc_f], ignore_index=True)
         cols_num = ["REHAB", "MANTO", "SUST", "AMPLI"]
         if not df_total.empty:
@@ -321,7 +323,7 @@ else:
             t_r, t_m, t_s, t_a = df_total[cols_num].sum()
         else: t_r = t_m = t_s = t_a = 0
 
-        # --- 6. MÉTRICAS Y DESCARGAS ---
+        # --- 6. DASHBOARD Y DESCARGAS ---
         st.markdown("### 📊 Totales Combinados")
         r1, r2, r3, r4 = st.columns(4)
         r1.metric("🔧 Rehab", t_r); r2.metric("🧹 Manto", t_m)
@@ -330,7 +332,6 @@ else:
         if not df_total.empty:
             st.dataframe(df_total, use_container_width=True, hide_index=True)
             def to_x(df):
-                # Limpieza final de ceros antes de descargar (Captura 1)
                 for c in ["REHAB", "MANTO", "SUST", "AMPLI"]: 
                     if c in df.columns: df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0).astype(int)
                 out = io.BytesIO()
