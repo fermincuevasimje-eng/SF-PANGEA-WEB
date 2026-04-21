@@ -193,14 +193,13 @@ if not st.session_state.autenticado:
         else:
             st.error("Acceso denegado")
 else:
-    # --- 4. SIDEBAR ---
-    # --- 4. SIDEBAR (Navegación v11.6) ---
+  # --- 4. SIDEBAR (Navegación Personalizada SF) ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
         
-        # Seguridad: GuaDAP solo ve SF2-BAJAS
+        # Filtro de Seguridad: GuaDAP solo ve Bajas
         if st.session_state.perfil == "CONSULTA":
             opciones_menu = {"📖 SF2-BAJAS": "SF2"}
             if st.session_state.menu not in ["SF2", "Inicio"]: st.session_state.menu = "SF2"
@@ -230,14 +229,14 @@ else:
             st.rerun()
         st.info("SF PANGEA V1")
 
-    # --- 5. CUERPO LÓGICO (FUNCIONALIDAD INTEGRAL 11.5) ---
+    # --- 5. CUERPO LÓGICO (MANTENIMIENTO ÍNTEGRO DE FUNCIONES 11.5) ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "GdR":
-        st.title("🚀 SF1 - Generador de Rutas")
+        st.title("🚀 SF1-GENERADOR DE RUTAS")
         tab1, tab2, tab3 = st.tabs(["🆕 Nueva Ruta", "📂 Bitácora", "🗑️ Papelera"])
         with tab1:
             up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
@@ -286,10 +285,10 @@ else:
                             info = f"Pts: {len(ordenados)}, Lums: {total_lums}, Dist: {round(dist_real_km,2)}km"
                             n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info}])
                             conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                            st.balloons(); st.success("Guardado en Bitácora")
+                            st.balloons(); st.success("Guardado")
                 except Exception as e: st.error(f"Error: {e}")
 
-        with tab2: # BITÁCORA (Recuperada íntegra)
+        with tab2: # BITÁCORA
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
                 df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
@@ -305,7 +304,7 @@ else:
                     st.dataframe(df_bt_v.sort_index(ascending=False), use_container_width=True)
             except: st.info("Sincronizando...")
 
-        with tab3: # PAPELERA (Recuperada íntegra)
+        with tab3: # PAPELERA
             if st.session_state.perfil == "ADMIN":
                 try:
                     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -322,7 +321,7 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF2":
-        st.title("📖 SF2 - Bajas de Folios")
+        st.title("📖 SF2-BAJAS")
         up_sf2 = st.file_uploader("Archivo Referencia", type=["csv", "xlsx"])
         if up_sf2:
             try:
@@ -350,8 +349,7 @@ else:
             except Exception as e: st.error(f"Error: {e}")
 
     elif st.session_state.menu == "SF3":
-        st.title("📝 SF3 - Captura")
-        # --- TODA LA LÓGICA DE CAPTURA MANUAL Y FILTROS 11.5 ---
+        st.title("📝 SF3-CAPTURA")
         with st.expander("📝 FORMULARIO DE CAPTURA", expanded=True):
             with st.form("c_sf3", clear_on_submit=True):
                 c1, c2, c3 = st.columns(3)
@@ -369,5 +367,5 @@ else:
                     st.rerun()
 
     elif st.session_state.menu == "SF4":
-        st.title("📐 SF4 - Diseño de Procesos")
+        st.title("📐 SF4-DISEÑO DE PROCESOS")
         st.info("Módulo de Organización y Métodos - Dirección de Alumbrado Público")
