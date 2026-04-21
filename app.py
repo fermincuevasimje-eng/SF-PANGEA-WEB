@@ -321,7 +321,7 @@ else:
     elif st.session_state.menu == "SF4":
         st.title("📐 SF4-DISEÑO DE PROCESOS")
         st.info("Módulo de Organización y Métodos - Dirección de Alumbrado Público")
-                except: st.info("Cargando papelera...")
+            except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF2":
         st.title("📖 SF2-BAJAS")
