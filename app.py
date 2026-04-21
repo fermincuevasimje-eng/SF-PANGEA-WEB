@@ -221,14 +221,14 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
-        from datetime import datetime
+   from datetime import datetime
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
         # --- 1. CONFIGURACIÓN DE MEMORIA ---
         if 'archivo_sf3_mem' not in st.session_state: st.session_state.archivo_sf3_mem = None
         if 'manual_db' not in st.session_state: st.session_state.manual_db = []
 
-        # --- 2. CAPTURA MANUAL (CORRECCIÓN DE RESET) ---
+        # --- 2. CAPTURA MANUAL (Sincronización y Limpieza) ---
         with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=False):
             def sync_m():
                 if st.session_state.M_UTB != "SELECCIONAR":
@@ -236,7 +236,7 @@ else:
             
             c1, c2, c3 = st.columns(3)
             with c1: f_fecha = st.date_input("1. Fecha de Atención")
-            # Forzamos llaves fijas para poder limpiarlas manualmente
+            # Usamos llaves específicas para control de limpieza
             with c2: f_ot = st.text_input("2. O.T.", key="ot_clean")
             with c3: f_calle = st.text_input("3. Calle", key="calle_clean")
 
@@ -257,7 +257,7 @@ else:
                 f_obs = st.text_area("11. Observaciones", key="ob_m")
 
                 if st.form_submit_button("🚀 AGREGAR A REPORTE", use_container_width=True):
-                    # Guardamos la información capturada
+                    # Captura de datos desde session_state para los campos externos al form
                     st.session_state.manual_db.append({
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), 
                         "O.T.": st.session_state.ot_clean.upper(), 
@@ -266,15 +266,15 @@ else:
                         "DELEGACIÓN": f_del_m, "UTB": f_utb_m, "REHAB": f_rehab, 
                         "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs.upper()
                     })
-                    # VACIADO MANUAL DE CAMPOS EXTERNOS AL FORMULARIO
+                    # VACIADO FORZADO de campos externos
                     st.session_state.ot_clean = ""
                     st.session_state.calle_clean = ""
                     st.session_state.folio_clean = ""
                     
-                    st.toast("Guardado correctamente", icon="✅")
+                    st.toast("Guardado y formulario limpio", icon="✅")
                     time.sleep(0.5); st.rerun()
 
-        # --- 3. PAPELERA (Diseño optimizado) ---
+        # --- 3. PAPELERA (Diseño Anti-Saturación) ---
         if st.session_state.manual_db:
             with st.expander("🗑️ GESTIÓN DE CAPTURAS MANUALES", expanded=False):
                 df_p = pd.DataFrame(st.session_state.manual_db)
@@ -301,7 +301,7 @@ else:
             opts_f = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(s_del, [])) if s_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
             s_utb = st.selectbox("🔍 Filtrar UTB:", opts_f, key="S2_MAS", on_change=sync_f)
 
-        # --- 5. UNIFICACIÓN Y MÓDULO DE DATOS ---
+        # --- 5. UNIFICACIÓN Y PROCESAMIENTO ---
         df_man_f = pd.DataFrame(st.session_state.manual_db)
         df_arc_f = pd.DataFrame()
 
