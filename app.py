@@ -228,7 +228,7 @@ else:
         if 'archivo_sf3_mem' not in st.session_state: st.session_state.archivo_sf3_mem = None
         if 'manual_db' not in st.session_state: st.session_state.manual_db = []
 
-        # --- 2. CAPTURA MANUAL (Limpieza y Sincronización) ---
+        # --- 2. CAPTURA MANUAL (Sincronización y Limpieza Segura) ---
         with st.expander("📝 CAPTURA MANUAL (NUEVA ATENCIÓN)", expanded=True):
             def sync_m():
                 if st.session_state.M_UTB != "SELECCIONAR":
@@ -236,7 +236,8 @@ else:
             
             c1, c2, c3 = st.columns(3)
             with c1: f_fecha = st.date_input("1. Fecha de Atención")
-            # Forzamos las llaves para limpieza manual inmediata
+            
+            # Los widgets se limpian automáticamente al hacer rerun porque NO tienen un 'value' estático
             with c2: f_ot = st.text_input("2. O.T.", key="ot_clean")
             with c3: f_calle = st.text_input("3. Calle", key="calle_clean")
 
@@ -257,7 +258,7 @@ else:
                 f_obs = st.text_area("11. Observaciones", key="ob_m")
 
                 if st.form_submit_button("🚀 AGREGAR A REPORTE", use_container_width=True):
-                    # Guardado de datos combinando inputs de sesión y formulario
+                    # Guardamos los datos antes de limpiar
                     st.session_state.manual_db.append({
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), 
                         "O.T.": st.session_state.ot_clean.upper(), 
@@ -266,15 +267,16 @@ else:
                         "DELEGACIÓN": f_del_m, "UTB": f_utb_m, "REHAB": f_rehab, 
                         "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs.upper()
                     })
-                    # VACIADO FULMINANTE de los campos de texto
-                    st.session_state.ot_clean = ""
-                    st.session_state.calle_clean = ""
-                    st.session_state.folio_clean = ""
                     
-                    st.toast("Captura guardada con éxito", icon="✅")
-                    time.sleep(0.5); st.rerun()
+                    # Truco de limpieza: Eliminamos las llaves del estado para que vuelvan a su valor vacío por defecto
+                    for k in ["ot_clean", "calle_clean", "folio_clean"]:
+                        if k in st.session_state: del st.session_state[k]
+                    
+                    st.toast("Captura guardada y campos listos", icon="✅")
+                    time.sleep(0.5)
+                    st.rerun()
 
-        # --- 3. PAPELERA (Diseño Profesional) ---
+        # --- 3. PAPELERA (Diseño Pro) ---
         if st.session_state.manual_db:
             with st.expander("🗑️ GESTIÓN DE CAPTURAS MANUALES", expanded=False):
                 df_p = pd.DataFrame(st.session_state.manual_db)
@@ -301,7 +303,7 @@ else:
             opts_f = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(s_del, [])) if s_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
             s_utb = st.selectbox("🔍 Filtrar por UTB:", opts_f, key="S2_MAS", on_change=sync_f)
 
-        # --- 5. UNIFICACIÓN Y LIMPIEZA DE DATOS ---
+        # --- 5. UNIFICACIÓN ---
         df_man_f = pd.DataFrame(st.session_state.manual_db)
         df_arc_f = pd.DataFrame()
 
@@ -309,14 +311,12 @@ else:
             try:
                 f_r = st.session_state.archivo_sf3_mem
                 df_c = load_massive_data(f_r, 'xlsx' if f_r.name.endswith('.xlsx') else 'csv')
-                # Eliminación de fila de encabezados duplicada
                 if not df_c.empty and "FECHA" in str(df_c.iloc[0, 4]).upper(): df_c = df_c.iloc[1:].reset_index(drop=True)
                 if s_del != "TODAS": df_c = df_c[df_c['del_norm'] == normalizar_texto(s_del)]
                 if s_utb != "TODAS": df_c = df_c[df_c['utb_norm'] == normalizar_texto(s_utb)]
-                # Extracción OT (G) y Folio (P)
                 df_arc_f = df_c.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
                 df_arc_f.columns = ["FECHA", "O.T.", "FOLIO DE SOLICITUD", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-            except: st.error("Error al procesar columnas del archivo masivo.")
+            except: st.error("Error al procesar archivo masivo.")
 
         df_total = pd.concat([df_man_f, df_arc_f], ignore_index=True)
         cols_num = ["REHAB", "MANTO", "SUST", "AMPLI"]
@@ -326,7 +326,7 @@ else:
             t_r, t_m, t_s, t_a = df_total[cols_num].sum()
         else: t_r = t_m = t_s = t_a = 0
 
-        # --- 6. MÉTRICAS Y DESCARGAS ---
+        # --- 6. DASHBOARD Y DESCARGAS ---
         st.markdown("### 📊 Totales de Sesión")
         r1, r2, r3, r4 = st.columns(4)
         r1.metric("🔧 Rehab", t_r); r2.metric("🧹 Manto", t_m)
@@ -340,7 +340,6 @@ else:
                 out = io.BytesIO()
                 with pd.ExcelWriter(out, engine='openpyxl') as w: df.to_excel(w, index=False)
                 return out.getvalue()
-            
             d1, d2, d3 = st.columns(3)
             with d1: 
                 if not df_man_f.empty: st.download_button("📝 Solo Manual", to_x(df_man_f), "SF3_MANUAL.xlsx", use_container_width=True)
