@@ -258,11 +258,11 @@ else:
                 # FILA 3: Ubicación Geográfica (Selectores en la misma fila)
                 c_sel1, c_sel2 = st.columns(2)
                 with c_sel1:
-                    f_del = st.selectbox("📍 5. Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
+                    f_del = st.selectbox("📍 5. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"del_manual_{rk}")
                 with c_sel2:
                     opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                    f_utb = st.selectbox("🔍 6. UTB", opciones_utb_f)
-
+                    f_utb = st.selectbox("🔍 6. UTB", opciones_utb_f, key=f"utb_manual_{rk}")
+                    
                 st.markdown("---")
                 st.write("📊 **Cantidades de Trabajo Realizado:**")
                 
