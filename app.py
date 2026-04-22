@@ -668,11 +668,10 @@ else:
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
                                 st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
                         st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
-                        st.dataframe(df_tr)
+                       elif st.session_state.menu == "SF4":
+        st.title("🏗️ SF4 - Diseño de Procesos")
+        st.write("---")
+        st.info("Bienvenido al Módulo de Diseño de Procesos.")
 
-                elif st.session_state.menu == "SF4":
-                    st.title("🏗️ SF4 - Diseño de Procesos")
-                    st.write("---")
-                    st.info("Bienvenido al Módulo de Diseño de Procesos.")
-                    else: st.info("Papelera vacía.")
-                except: st.info("Cargando papelera...")
+    else:
+        st.error("Acceso denegado. Por favor, inicia sesión.")
