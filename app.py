@@ -257,7 +257,7 @@ else:
                 # Fila 4: Observaciones
                 f_obs = st.text_area("11. Observaciones", placeholder="Escriba aquí los detalles adicionales de la atención...")
 
-              if st.form_submit_button("🚀 GUARDAR REGISTRO", use_container_width=True):
+                if st.form_submit_button("🚀 GUARDAR REGISTRO", use_container_width=True):
                     if "manual_db" not in st.session_state: st.session_state.manual_db = []
                     
                     st.session_state.manual_db.append({
