@@ -229,42 +229,44 @@ else:
         st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
     elif st.session_state.menu == "SF3":
+        st.write("---")
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
-            # 1. Selectores dinámicos fuera del form para que la UTB cambie al instante
+            # --- SECCIÓN A: IDENTIFICACIÓN Y UBICACIÓN (FUERA DEL FORM PARA DINAMISMO) ---
+            # Fila 1: Fecha y OT
+            c_f1, c_f2 = st.columns(2)
+            with c_f1: f_fecha = st.date_input("1. Fecha de Atención", key="f_1")
+            with c_f2: f_ot = st.text_input("2. O.T.", key="f_2")
+
+            # Fila 2: Calle
+            f_calle = st.text_input("3. Calle", key="f_3")
+
+            # Fila 3: Territorio (Los que ya sirven)
             c_sel1, c_sel2 = st.columns(2)
             with c_sel1:
-                f_del = st.selectbox("📍 4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="m_del_man")
+                f_del = st.selectbox("📍 4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="f_4")
             with c_sel2:
                 opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                f_utb = st.selectbox("🔍 5. UTB", opciones_utb_f, key="m_utb_man")
+                f_utb = st.selectbox("🔍 5. UTB", opciones_utb_f, key="f_5")
 
-            with st.form("form_registro_sf3", clear_on_submit=True):
-                # FILA 1: Identificación Básica
-                c1, c2 = st.columns(2)
-                with c1: f_fecha = st.date_input("1. Fecha de Atención")
-                with c2: f_ot = st.text_input("2. O.T.")
-
-                # FILA 2: Dirección y Folio
-                c3, c4 = st.columns([2, 1]) # Calle más ancha que el Folio
-                with c3: f_calle = st.text_input("3. Calle")
-                with c4: f_folio = st.text_input("6. Folio / Ticket / IMEI")
+            # --- SECCIÓN B: MÉTRICAS Y GUARDADO (DENTRO DEL FORMULARIO) ---
+            with st.form("form_registro_sf3_final", clear_on_submit=True):
+                # Fila 4: Folio
+                f_folio = st.text_input("6. Folio / Ticket / IMEI")
 
                 st.markdown("---")
                 st.write("📊 **Cantidades de Trabajo Realizado:**")
                 
-                # FILA 3: Métricas (Las 4 cantidades juntas)
+                # Fila 5: Métricas
                 m1, m2, m3, m4 = st.columns(4)
                 with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
                 with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
                 with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
                 with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
 
-                # FILA 4: Observaciones finales
                 f_obs = st.text_area("11. Observaciones")
                 
-                # Botón de Guardado
                 btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA", use_container_width=True)
 
                 if btn_guardar:
