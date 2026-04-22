@@ -644,16 +644,17 @@ else:
                 else: st.info("Bitácora vacía.")
             except: st.info("Sincronizando...")
 
-        with tab3: # PAPELERA MEJORADA
-            if st.session_state.perfil == "ADMIN":
-                try:
-                    conn = st.connection("gsheets", type=GSheetsConnection)
+with tab3: # PAPELERA MEJORADA
+                    st.subheader("🗑️ Papelera de Reciclaje")
                     df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
-                    if not df_tr.empty:
+                    if df_tr.empty:
+                        st.info("La papelera está vacía.")
+                    else:
                         df_tr_v = df_tr.copy()
                         df_tr_v.insert(0, "ID_Reg", range(1, len(df_tr_v) + 1))
                         col_r1, col_r2, col_r3 = st.columns([2, 1, 1])
-                        with col_r1: ids_r = st.multiselect("ID para restaurar:", df_tr_v["ID_Reg"].tolist())
+                        with col_r1: 
+                            ids_r = st.multiselect("ID para restaurar:", df_tr_v["ID_Reg"].tolist())
                         with col_r2: 
                             if st.button("♻️ Restaurar"):
                                 if ids_r:
@@ -667,6 +668,12 @@ else:
                                 df_vacio = pd.DataFrame(columns=df_tr.columns)
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
                                 st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
-                        st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
-                    else: st.info("Papelera vacía.")
-                except: st.info("Cargando papelera...")
+                        st.dataframe(df_tr)
+
+    elif st.session_state.menu == "SF4":
+        st.title("🏗️ SF4 - Diseño de Procesos")
+        st.write("---")
+        st.info("Bienvenido al Módulo de Diseño de Procesos. Este espacio será utilizado para sistematizar las actividades de la Dirección.")
+
+else:
+    st.error("Acceso denegado. Por favor, inicia sesión con tus credenciales en la barra lateral.")
