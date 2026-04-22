@@ -256,12 +256,14 @@ else:
                 with c4: f_calle = st.text_input("4. Calle")
 
                 # FILA 3: Ubicación Geográfica (Selectores en la misma fila)
+                # FILA 3: Ubicación Geográfica (Selectores en la misma fila)
                 c_sel1, c_sel2 = st.columns(2)
                 with c_sel1:
-                    f_del = st.selectbox("📍 5. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"del_manual_{rk}")
+                    f_del = st.selectbox("📍 5. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"manual_del_fix_{rk}")
                 with c_sel2:
+                    # Esta línea es la que hace que la UTB cambie según la Delegación elegida arriba
                     opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                    f_utb = st.selectbox("🔍 6. UTB", opciones_utb_f, key=f"utb_manual_{rk}")
+                    f_utb = st.selectbox("🔍 6. UTB", opciones_utb_f, key=f"manual_utb_fix_{rk}")
                     
                 st.markdown("---")
                 st.write("📊 **Cantidades de Trabajo Realizado:**")
@@ -328,18 +330,21 @@ else:
         # B. SUMAMOS LO MASIVO (Si hay algo en la caja fuerte)
         if st.session_state.masivo_persistente is not None:
             df_c = st.session_state.masivo_persistente
+            
             col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+                sel_del = st.selectbox("📍 Filtrar Archivo por Delegación:", lista_delegaciones, key="filtro_del_masivo")
             
-            # Filtros para el archivo masivo
-            lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-            sel_del = st.selectbox("📍 Filtrar Archivo por Delegación:", lista_delegaciones, key="sel_del_masivo")
-            
-            opciones_utb = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
-            sel_utb = st.selectbox("🔍 Filtrar Archivo por UTB:", opciones_utb, key="sel_utb_masivo")
+            with col_f2:
+                opciones_utb_mas = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+                sel_utb = st.selectbox("🔍 Filtrar Archivo por UTB:", opciones_utb_mas, key="filtro_utb_masivo")
 
             df_filt = df_c.copy()
-            if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
-            if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
+            if sel_del != "TODAS": 
+                df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
+            if sel_utb != "TODAS": 
+                df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
 
             # Sumamos los totales del archivo a los que ya teníamos de lo manual
             total_rehab += pd.to_numeric(df_filt.iloc[:, 29], errors='coerce').fillna(0).sum()
