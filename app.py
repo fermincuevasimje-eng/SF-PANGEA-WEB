@@ -670,7 +670,7 @@ with tab3: # PAPELERA MEJORADA
                                 st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
                         st.dataframe(df_tr)
 
-elif st.session_state.menu == "SF4":
+    elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Diseño de Procesos")
         st.write("---")
         st.info("Bienvenido al Módulo de Diseño de Procesos. Este espacio será utilizado para sistematizar las actividades de la Dirección.")
