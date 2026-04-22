@@ -640,7 +640,8 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-        st.title("🏗️ SF4 - Diseño de Procesos")
-        st.write("---")
+        st.write("---")                       # La raya ahora separa el menú del título
+        st.title("🏗️ SF4 - Diseño de Procesos") 
+        st.info("Bienvenido a la sección de diseño...")
         st.info("Bienvenido al Módulo de Diseño de Procesos.")
         st.write("Seleccione una herramienta para sistematizar actividades diarias.")
