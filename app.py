@@ -232,61 +232,52 @@ else:
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
         # --- PANEL DE CAPTURA MANUAL (11 CAMPOS ORDENADOS) ---
+        elif st.session_state.menu == "SF3":
+        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
+
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
-            # --- SELECTORES DINÁMICOS (FUERA DEL FORM PARA QUE SIRVAN) ---
-            col_m1, col_m2 = st.columns(2)
-            with col_m1:
-                f_del = st.selectbox("📍 4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="f_del_m")
-            with col_m2:
-                # Aquí se hace la magia: las opciones de UTB se filtran por la delegación elegida arriba
-                opciones_utb_m = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                f_utb = st.selectbox("🔍 5. UTB", opciones_utb_m, key="f_utb_m")
+            # --- 1. SELECTORES DINÁMICOS (FUERA DEL FORMULARIO PARA QUE SIRVAN) ---
+            c_sel1, c_sel2 = st.columns(2)
+            with c_sel1:
+                f_del = st.selectbox("📍 4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="m_del")
+            with c_sel2:
+                # Aquí se genera la lista correcta según la delegación elegida
+                opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
+                f_utb = st.selectbox("🔍 5. UTB", opciones_utb_f, key="m_utb")
 
-            with st.form("captura_sf3", clear_on_submit=True):
-                # Fila 1: Datos de Identificación
-                c1, c2, c3 = st.columns(3)
-                with c1: f_fecha = st.date_input("1. Fecha de Atención")
-                with c2: f_ot = st.text_input("2. O.T.")
-                with c3: f_calle = st.text_input("3. Calle")
-                # Fila 1: Datos de Identificación
-                c1, c2, c3 = st.columns(3)
-                with c1: f_fecha = st.date_input("1. Fecha de Atención")
-                with c2: f_ot = st.text_input("2. O.T.")
-                with c3: f_calle = st.text_input("3. Calle")
+            # --- 2. EL FORMULARIO PARA CAPTURA DE DATOS ---
+            with st.form("form_registro_sf3", clear_on_submit=True):
+                # Fila 1
+                col1, col2, col3 = st.columns(3)
+                with col1: f_fecha = st.date_input("1. Fecha de Atención")
+                with col2: f_ot = st.text_input("2. O.T.")
+                with col3: f_calle = st.text_input("3. Calle")
 
-                # Fila 2: Territorio
-                c4, c5, c6 = st.columns(3)
-                with c4: 
-                    # Selector de Delegación para el formulario
-                    f_del = st.selectbox("4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="f_del_manual")
-                with c5: 
-                    # Selector de UTB filtrado por la delegación elegida arriba
-                    opciones_utb_manual = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                    f_utb = st.selectbox("5. UTB", opciones_utb_manual, key="f_utb_manual")
-                with c6: f_folio = st.text_input("6. Folio / Ticket / IMEI")
+                f_folio = st.text_input("6. Folio / Ticket / IMEI")
 
-                # Fila 3: Cantidades (Métricas)
                 st.markdown("---")
+                # Fila 3: Cantidades
                 m1, m2, m3, m4 = st.columns(4)
                 with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
                 with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
                 with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
                 with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
 
-                # Fila 4: Observaciones
-                f_obs = st.text_area("11. Observaciones", placeholder="Escriba aquí los detalles adicionales de la atención...")
+                f_obs = st.text_area("11. Observaciones")
 
-                if st.form_submit_button("🚀 GUARDAR REGISTRO", use_container_width=True):
+                # El botón de envío (Submit Button)
+                btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA", use_container_width=True)
+
+                if btn_guardar:
                     if "manual_db" not in st.session_state: st.session_state.manual_db = []
-                    
                     st.session_state.manual_db.append({
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
                         "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
                     })
-                    st.toast(f"O.T. {f_ot} registrada", icon="✅")
+                    st.toast(f"O.T. {f_ot} registrada con éxito", icon="✅")
 
-        # --- BOTÓN PARA BORRAR REGISTROS MANUALES (FUERA DEL FORMULARIO) ---
+        # --- BOTÓN PARA BORRAR REGISTROS MANUALES ---
         if "manual_db" in st.session_state and st.session_state.manual_db:
             if st.button("🗑️ Borrar Último Registro Manual", use_container_width=True):
                 st.session_state.manual_db.pop()
@@ -294,14 +285,12 @@ else:
 
         st.markdown("---")
         
-        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS COMBINADAS ---
-        up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"])
+        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS COMBINADAS (Esto ya te funcionaba bien) ---
+        up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         
-        # Inicializamos acumuladores
         total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
         df_final_vista = pd.DataFrame()
 
-        # 1. Sumamos lo manual si existe
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_manual = pd.DataFrame(st.session_state.manual_db)
             total_rehab += df_manual["REHAB"].sum()
@@ -310,117 +299,70 @@ else:
             total_ampli += df_manual["AMPLI"].sum()
             df_final_vista = df_manual.copy()
 
-        # 2. Sumamos lo del archivo si existe
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
                 
-               # --- FILTROS INTELIGENTES CON CRUCE AUTOMÁTICO ---
-               # --- FILTROS CON JERARQUÍA INTELIGENTE ---
-             # --- FILTROS CON SINCRONIZACIÓN BIDIRECCIONAL ---
-              # --- FILTROS CON JERARQUÍA Y SINCRONIZACIÓN TOTAL ---
-                # --- FILTROS CON SINCRONIZACIÓN TOTAL BIDIRECCIONAL ---
-                # --- FUNCIÓN DE SINCRONIZACIÓN MAESTRA ---
-                def actualizar_delegacion():
-                    utb_sel = st.session_state.selector_utb_global
-                    if utb_sel != "TODAS":
-                        del_auto = MAPA_UTB_DEL.get(utb_sel, "TODAS")
-                        st.session_state.sel_del_f = del_auto
-
-                # --- FILTROS CON SINCRONIZACIÓN TOTAL ---
-       # --- FILTROS DE ALTA PRECISIÓN (SINCRONIZACIÓN TOTAL) ---
                 col_f1, col_f2 = st.columns(2)
-                
-                # Inicializar estados si no existen
                 if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
                 if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
 
-                # 1. LÓGICA DE CRUCE ANTES DE RENDERIZAR
                 lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                
-                # Si el usuario eligió una UTB, forzamos la delegación a cambiar
                 if st.session_state.sel_utb_val != "TODAS":
-                    delegacion_correcta = MAPA_UTB_DEL.get(st.session_state.sel_utb_val, "TODAS")
-                    st.session_state.sel_del_val = delegacion_correcta
+                    st.session_state.sel_del_val = MAPA_UTB_DEL.get(st.session_state.sel_utb_val, "TODAS")
 
-                # 2. SELECTOR DE DELEGACIÓN
                 with col_f1:
-                    def cambio_del():
-                        # Si cambia la delegación, reseteamos la UTB para evitar mostrar una de otra zona
-                        st.session_state.sel_utb_val = "TODAS"
-                    
+                    def cambio_del(): st.session_state.sel_utb_val = "TODAS"
                     idx_del = lista_delegaciones.index(st.session_state.sel_del_val)
-                    sel_del = st.selectbox("📍 Filtrar por Delegación:", lista_delegaciones, index=idx_del, key="sel_del_val", on_change=cambio_del)
+                    sel_del = st.selectbox("📍 Filtrar Archivo por Delegación:", lista_delegaciones, index=idx_del, key="sel_del_val", on_change=cambio_del)
 
-                # 3. SELECTOR DE UTB
                 with col_f2:
-                    if sel_del != "TODAS":
-                        # ENCASILLADO: Solo las UTB de esta delegación
-                        opciones_utb = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
-                    else:
-                        # ABIERTO: Las 280 para búsqueda global
-                        opciones_utb = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-                    
-                    try:
-                        idx_utb = opciones_utb.index(st.session_state.sel_utb_val)
-                    except:
-                        idx_utb = 0
-                        
-                    sel_utb = st.selectbox("🔍 Seleccione UTB (Colonia):", opciones_utb, index=idx_utb, key="sel_utb_val")
+                    opciones_utb = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+                    idx_utb = opciones_utb.index(st.session_state.sel_utb_val) if st.session_state.sel_utb_val in opciones_utb else 0
+                    sel_utb = st.selectbox("🔍 Filtrar Archivo por UTB:", opciones_utb, index=idx_utb, key="sel_utb_val")
 
-                # --- FILTRADO FINAL DEL ARCHIVO ---
                 df_filt = df_c.copy()
-                if sel_del != "TODAS":
-                    df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS":
-                    df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
+                if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
 
                 total_rehab += pd.to_numeric(df_filt.iloc[:, 29], errors='coerce').fillna(0).sum()
                 total_manto += pd.to_numeric(df_filt.iloc[:, 30], errors='coerce').fillna(0).sum()
                 total_sust += pd.to_numeric(df_filt.iloc[:, 31], errors='coerce').fillna(0).sum()
                 total_ampli += pd.to_numeric(df_filt.iloc[:, 39], errors='coerce').fillna(0).sum()
                 
-                # Unimos las vistas asegurando que las columnas sean IDÉNTICAS
                 df_archivo_v = df_filt.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
                 df_archivo_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
                 
-                if "manual_db" in st.session_state and st.session_state.manual_db:
-                    df_manual = pd.DataFrame(st.session_state.manual_db)
-                    df_manual = df_manual[["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]]
-                    df_final_vista = pd.concat([df_manual, df_archivo_v], ignore_index=True)
+                if not df_final_vista.empty:
+                    df_final_vista = pd.concat([df_final_vista[["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]], df_archivo_v], ignore_index=True)
                 else:
                     df_final_vista = df_archivo_v
 
             except Exception as e: st.error(f"Error procesando archivo: {e}")
 
-        # 3. Despliegue de Resultados
-        st.markdown("### 📊 Resumen Consolidado (Manual + Archivo)")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("🔧 Rehabilitaciones", int(total_rehab))
-        m2.metric("🧹 Mantenimientos", int(total_manto))
-        m3.metric("💡 Sustituciones", int(total_sust))
-        m4.metric("➕ Ampliaciones", int(total_ampli))
+        # 3. Despliegue de Resultados y Descarga
+        st.markdown("### 📊 Resumen Consolidado")
+        m_r1, m_r2, m_r3, m_r4 = st.columns(4)
+        m_r1.metric("🔧 Rehabilitaciones", int(total_rehab))
+        m_r2.metric("🧹 Mantenimientos", int(total_manto))
+        m_r3.metric("💡 Sustituciones", int(total_sust))
+        m_r4.metric("➕ Ampliaciones", int(total_ampli))
 
         if not df_final_vista.empty:
-            st.markdown("---")
             st.write("🔍 **Detalle de Actividades:**")
             st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
-            st.markdown("---")
-            st.subheader("📥 Exportar Reporte Consolidado")
+            
+            st.subheader("📥 Descargar Reporte")
             d_col1, d_col2 = st.columns(2)
+            output_xlsx = io.BytesIO()
+            with pd.ExcelWriter(output_xlsx, engine='openpyxl') as writer:
+                df_final_vista.to_excel(writer, index=False, sheet_name='Reporte')
             
-            output_sf3 = io.BytesIO()
-            with pd.ExcelWriter(output_sf3, engine='openpyxl') as writer:
-                df_final_vista.to_excel(writer, index=False, sheet_name='METRICAS_SF')
-            
-            with d_col1:
-                st.download_button(label="📗 Excel", data=output_sf3.getvalue(), file_name="REPORTE_SF.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-            with d_col2:
-                csv_sf3 = df_final_vista.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(label="📊 CSV", data=csv_sf3, file_name="REPORTE_SF.csv", mime="text/csv", use_container_width=True)
+            d_col1.download_button("📗 Excel", data=output_xlsx.getvalue(), file_name="REPORTE_SF.xlsx", use_container_width=True)
+            d_col2.download_button("📊 CSV", data=df_final_vista.to_csv(index=False).encode('utf-8-sig'), file_name="REPORTE_SF.csv", use_container_width=True)
         else:
-            st.info("Esperando captura manual o carga de archivo para mostrar datos.")
+            st.info("Sin datos para mostrar.")
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
