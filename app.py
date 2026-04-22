@@ -257,7 +257,7 @@ else:
                 # Fila 4: Observaciones
                 f_obs = st.text_area("11. Observaciones", placeholder="Escriba aquí los detalles adicionales de la atención...")
 
-                if st.form_submit_button("🚀 GUARDAR REGISTRO Y ACTUALIZAR", use_container_width=True):
+              if st.form_submit_button("🚀 GUARDAR REGISTRO", use_container_width=True):
                     if "manual_db" not in st.session_state: st.session_state.manual_db = []
                     
                     st.session_state.manual_db.append({
@@ -265,7 +265,13 @@ else:
                         "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
                     })
-                    st.toast(f"O.T. {f_ot} registrada con éxito", icon="✅")
+                    st.toast(f"O.T. {f_ot} registrada", icon="✅")
+
+        # --- BOTÓN PARA BORRAR REGISTROS MANUALES (FUERA DEL FORMULARIO) ---
+        if "manual_db" in st.session_state and st.session_state.manual_db:
+            if st.button("🗑️ Borrar Último Registro Manual", use_container_width=True):
+                st.session_state.manual_db.pop()
+                st.rerun()
 
         st.markdown("---")
         
