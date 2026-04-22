@@ -298,12 +298,25 @@ else:
 
         st.markdown("---")
         
-        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS COMBINADAS ---
+        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS COMBINADAS (VERSIÓN BLINDADA) ---
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         
+        # Si suben un archivo nuevo, se guarda en la "caja fuerte" del session_state
+        if up_cap:
+            ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
+            st.session_state.masivo_persistente = load_massive_data(up_cap, ext)
+            st.success(f"Archivo '{up_cap.name}' anclado a la memoria.")
+
+        # Botón para liberar la memoria si quieres cambiar de archivo
+        if st.session_state.masivo_persistente is not None:
+            if st.button("❌ Quitar Archivo de la Memoria (Limpiar)"):
+                st.session_state.masivo_persistente = None
+                st.rerun()
+
         total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
         df_final_vista = pd.DataFrame()
 
+        # A. SUMAMOS LO MANUAL (Si existe)
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_manual = pd.DataFrame(st.session_state.manual_db)
             total_rehab += df_manual["REHAB"].sum()
@@ -312,47 +325,36 @@ else:
             total_ampli += df_manual["AMPLI"].sum()
             df_final_vista = df_manual.copy()
 
-        if up_cap:
-            try:
-                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
-                df_c = load_massive_data(up_cap, ext)
-                col_f1, col_f2 = st.columns(2)
-                
-                if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
-                if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
+        # B. SUMAMOS LO MASIVO (Si hay algo en la caja fuerte)
+        if st.session_state.masivo_persistente is not None:
+            df_c = st.session_state.masivo_persistente
+            col_f1, col_f2 = st.columns(2)
+            
+            # Filtros para el archivo masivo
+            lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+            sel_del = st.selectbox("📍 Filtrar Archivo por Delegación:", lista_delegaciones, key="sel_del_masivo")
+            
+            opciones_utb = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+            sel_utb = st.selectbox("🔍 Filtrar Archivo por UTB:", opciones_utb, key="sel_utb_masivo")
 
-                lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                if st.session_state.sel_utb_val != "TODAS":
-                    st.session_state.sel_del_val = MAPA_UTB_DEL.get(st.session_state.sel_utb_val, "TODAS")
+            df_filt = df_c.copy()
+            if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
+            if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
 
-                with col_f1:
-                    def cambio_del(): st.session_state.sel_utb_val = "TODAS"
-                    idx_del = lista_delegaciones.index(st.session_state.sel_del_val)
-                    sel_del = st.selectbox("📍 Filtrar Archivo por Delegación:", lista_delegaciones, index=idx_del, key="sel_del_val", on_change=cambio_del)
-
-                with col_f2:
-                    opciones_utb = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
-                    idx_utb = opciones_utb.index(st.session_state.sel_utb_val) if st.session_state.sel_utb_val in opciones_utb else 0
-                    sel_utb = st.selectbox("🔍 Filtrar Archivo por UTB:", opciones_utb, index=idx_utb, key="sel_utb_val")
-
-                df_filt = df_c.copy()
-                if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
-
-                total_rehab += pd.to_numeric(df_filt.iloc[:, 29], errors='coerce').fillna(0).sum()
-                total_manto += pd.to_numeric(df_filt.iloc[:, 30], errors='coerce').fillna(0).sum()
-                total_sust += pd.to_numeric(df_filt.iloc[:, 31], errors='coerce').fillna(0).sum()
-                total_ampli += pd.to_numeric(df_filt.iloc[:, 39], errors='coerce').fillna(0).sum()
-                
-                df_archivo_v = df_filt.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_archivo_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                
-                if not df_final_vista.empty:
-                    df_final_vista = pd.concat([df_final_vista[["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]], df_archivo_v], ignore_index=True)
-                else:
-                    df_final_vista = df_archivo_v
-            except Exception as e: st.error(f"Error: {e}")
-
+            # Sumamos los totales del archivo a los que ya teníamos de lo manual
+            total_rehab += pd.to_numeric(df_filt.iloc[:, 29], errors='coerce').fillna(0).sum()
+            total_manto += pd.to_numeric(df_filt.iloc[:, 30], errors='coerce').fillna(0).sum()
+            total_sust += pd.to_numeric(df_filt.iloc[:, 31], errors='coerce').fillna(0).sum()
+            total_ampli += pd.to_numeric(df_filt.iloc[:, 39], errors='coerce').fillna(0).sum()
+            
+            # Unimos las vistas para la tabla final
+            df_archivo_v = df_filt.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
+            df_archivo_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+            
+            if not df_final_vista.empty:
+                df_final_vista = pd.concat([df_final_vista[["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]], df_archivo_v], ignore_index=True)
+            else:
+                df_final_vista = df_archivo_v
         st.markdown("### 📊 Resumen Consolidado")
         m_r1, m_r2, m_r3, m_r4 = st.columns(4)
         m_r1.metric("🔧 Rehabilitaciones", int(total_rehab))
