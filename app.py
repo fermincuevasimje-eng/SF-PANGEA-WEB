@@ -231,44 +231,45 @@ else:
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # Inicialización de la llave de limpieza
+        # Inicialización de la llave de limpieza (Reset Key)
         if "reset_key" not in st.session_state:
             st.session_state.reset_key = 0
         
         rk = st.session_state.reset_key
 
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
-            # Todo el formulario se envuelve en el reset_key para limpieza total
-            with st.form(key=f"form_sf3_v13_{rk}", clear_on_submit=True):
-                # FILA 1: Delegación y UTB (Campos 4 y 5)
-                c_sel1, c_sel2 = st.columns(2)
-                with c_sel1:
-                    f_del = st.selectbox("📍 4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
-                with c_sel2:
-                    opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                    f_utb = st.selectbox("🔍 5. UTB", opciones_utb_f)
-
-                # FILA 2: Identificación (Campos 1 y 2)
+            # El formulario cambia de ID con cada rk para forzar limpieza total
+            with st.form(key=f"form_sf3_v14_final_{rk}", clear_on_submit=True):
+                
+                # FILA 1: Identificación Temporal
                 c1, c2 = st.columns(2)
                 with c1: f_fecha = st.date_input("1. Fecha de Atención")
                 with c2: f_ot = st.text_input("2. O.T.")
 
-                # FILA 3: Dirección y Folio (Campos 3 y 6)
-                c3, c4 = st.columns([2, 1])
-                with c3: f_calle = st.text_input("3. Calle")
-                with c4: f_folio = st.text_input("6. Folio / Ticket / IMEI")
+                # FILA 2: Identificación de Reporte (Invertido según tu instrucción)
+                c3, c4 = st.columns(2)
+                with c3: f_folio = st.text_input("3. Folio / Ticket / IMEI")
+                with c4: f_calle = st.text_input("4. Calle")
+
+                # FILA 3: Ubicación Geográfica (Selectores en la misma fila)
+                c_sel1, c_sel2 = st.columns(2)
+                with c_sel1:
+                    f_del = st.selectbox("📍 5. Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
+                with c_sel2:
+                    opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
+                    f_utb = st.selectbox("🔍 6. UTB", opciones_utb_f)
 
                 st.markdown("---")
                 st.write("📊 **Cantidades de Trabajo Realizado:**")
                 
-                # FILA 4: Métricas (Campos 7 al 10)
+                # FILA 4: Métricas
                 m1, m2, m3, m4 = st.columns(4)
                 with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
                 with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
                 with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
                 with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
 
-                # FILA 5: Observaciones (Campo 11)
+                # FILA 5: Notas finales
                 f_obs = st.text_area("11. Observaciones")
                 
                 btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA", use_container_width=True)
@@ -280,7 +281,7 @@ else:
                         "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
                     })
-                    # Incremento de la llave para forzar el vaciado de los campos
+                    # Disparador del Reset y guardado exitoso
                     st.session_state.reset_key += 1
                     st.toast(f"O.T. {f_ot} registrada correctamente", icon="✅")
                     time.sleep(0.5)
