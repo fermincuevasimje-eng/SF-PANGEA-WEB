@@ -242,8 +242,13 @@ else:
 
                 # Fila 2: Territorio
                 c4, c5, c6 = st.columns(3)
-                with c4: f_del = st.selectbox("4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
-                with c5: f_utb = st.selectbox("5. UTB", sorted(CATALOGO_MAESTRO.get(f_del, [])))
+                with c4: 
+                    # Selector de Delegación para el formulario
+                    f_del = st.selectbox("4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="f_del_manual")
+                with c5: 
+                    # Selector de UTB filtrado por la delegación elegida arriba
+                    opciones_utb_manual = sorted(CATALOGO_MAESTRO.get(f_del, []))
+                    f_utb = st.selectbox("5. UTB", opciones_utb_manual, key="f_utb_manual")
                 with c6: f_folio = st.text_input("6. Folio / Ticket / IMEI")
 
                 # Fila 3: Cantidades (Métricas)
