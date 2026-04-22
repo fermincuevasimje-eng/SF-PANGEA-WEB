@@ -362,10 +362,16 @@ else:
                 total_sust += pd.to_numeric(df_filt.iloc[:, 31], errors='coerce').fillna(0).sum()
                 total_ampli += pd.to_numeric(df_filt.iloc[:, 39], errors='coerce').fillna(0).sum()
                 
-                # Unimos vistas (simplificado)
+                # Unimos las vistas asegurando que las columnas sean IDÉNTICAS
                 df_archivo_v = df_filt.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
                 df_archivo_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                df_final_vista = pd.concat([df_final_vista, df_archivo_v], ignore_index=True)
+                
+                if "manual_db" in st.session_state and st.session_state.manual_db:
+                    df_manual = pd.DataFrame(st.session_state.manual_db)
+                    df_manual = df_manual[["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]]
+                    df_final_vista = pd.concat([df_manual, df_archivo_v], ignore_index=True)
+                else:
+                    df_final_vista = df_archivo_v
 
             except Exception as e: st.error(f"Error procesando archivo: {e}")
 
