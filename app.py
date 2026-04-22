@@ -221,7 +221,7 @@ else:
             st.rerun()
         st.info("SF PANGEA V1")
 
-  # --- 5. CUERPO LÓGICO ---
+# --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
         st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
@@ -231,12 +231,8 @@ else:
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- PANEL DE CAPTURA MANUAL (11 CAMPOS ORDENADOS) ---
-        elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
-
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
-            # --- 1. SELECTORES DINÁMICOS (FUERA DEL FORMULARIO) ---
+            # 1. Selectores dinámicos fuera del form para que la UTB cambie al instante
             c_sel1, c_sel2 = st.columns(2)
             with c_sel1:
                 f_del = st.selectbox("📍 4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="m_del_man")
@@ -244,7 +240,6 @@ else:
                 opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
                 f_utb = st.selectbox("🔍 5. UTB", opciones_utb_f, key="m_utb_man")
 
-            # --- 2. EL FORMULARIO ---
             with st.form("form_registro_sf3", clear_on_submit=True):
                 col1, col2, col3 = st.columns(3)
                 with col1: f_fecha = st.date_input("1. Fecha de Atención")
@@ -334,7 +329,6 @@ else:
                     df_final_vista = df_archivo_v
             except Exception as e: st.error(f"Error: {e}")
 
-        # 3. Métricas y Descargas
         st.markdown("### 📊 Resumen Consolidado")
         m_r1, m_r2, m_r3, m_r4 = st.columns(4)
         m_r1.metric("🔧 Rehabilitaciones", int(total_rehab))
