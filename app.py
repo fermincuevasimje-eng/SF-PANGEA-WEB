@@ -669,8 +669,8 @@ else:
                                 st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
                         st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
     elif st.session_state.menu == "SF4": # ESTO ES LO QUE PEGAS
-        st.title("🏗️ SF4 - Diseño de Procesos")
-        st.write("---")
-        st.info("Bienvenido al Módulo de Diseño de Procesos.")
+         st.title("🏗️ SF4 - Diseño de Procesos")
+         st.write("---")
+         st.info("Bienvenido al Módulo de Diseño de Procesos.")
                     else: st.info("Papelera vacía.")
                 except: st.info("Cargando papelera...")
