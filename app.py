@@ -460,7 +460,7 @@ else:
             except Exception as e:
                 st.error(f"Error en SF2: {e}")
     
-    elif st.session_state.menu == "GdR":
+    elif st.session_state.menu == "SF1":
         st.title("🚀 GdR - Generador de Rutas")
         tab1, tab2, tab3 = st.tabs(["🆕 Nueva Ruta", "📂 Bitácora", "🗑️ Papelera"])
 
