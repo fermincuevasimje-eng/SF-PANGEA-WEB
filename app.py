@@ -233,6 +233,16 @@ else:
 
         # --- PANEL DE CAPTURA MANUAL (11 CAMPOS ORDENADOS) ---
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
+            # --- SELECTORES FUERA DEL FORMULARIO PARA QUE SE ACTUALICEN AL MOMENTO ---
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            f_del = st.selectbox("📍 4. Delegación (Manual)", sorted(list(CATALOGO_MAESTRO.keys())), key="f_del_m")
+        with col_m2:
+            opciones_utb_m = sorted(CATALOGO_MAESTRO.get(f_del, []))
+            f_utb = st.selectbox("🔍 5. UTB (Manual)", opciones_utb_m, key="f_utb_m")
+
+        with st.form("captura_sf3", clear_on_submit=True):
+            # Aquí sigue el resto de tu formulario (Fecha, OT, Calle, etc.)
             with st.form("captura_sf3", clear_on_submit=True):
                 # Fila 1: Datos de Identificación
                 c1, c2, c3 = st.columns(3)
