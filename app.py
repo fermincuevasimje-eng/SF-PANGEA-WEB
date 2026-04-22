@@ -231,6 +231,10 @@ else:
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
+        # Caja fuerte para que el archivo no se borre al guardar manuales
+        if "masivo_persistente" not in st.session_state:
+            st.session_state.masivo_persistente = None
+
         # Inicialización de la llave de limpieza (Reset Key)
         if "reset_key" not in st.session_state:
             st.session_state.reset_key = 0
