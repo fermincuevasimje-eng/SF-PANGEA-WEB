@@ -237,7 +237,7 @@ else:
         
         rk = st.session_state.reset_key
 
-        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
+        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
             # El formulario cambia de ID con cada rk para forzar limpieza total
             with st.form(key=f"form_sf3_v14_final_{rk}", clear_on_submit=True):
                 
