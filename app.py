@@ -236,18 +236,16 @@ else:
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
-            # --- 1. SELECTORES DINÁMICOS (FUERA DEL FORMULARIO PARA QUE SIRVAN) ---
+            # --- 1. SELECTORES DINÁMICOS (FUERA DEL FORMULARIO) ---
             c_sel1, c_sel2 = st.columns(2)
             with c_sel1:
-                f_del = st.selectbox("📍 4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="m_del")
+                f_del = st.selectbox("📍 4. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key="m_del_man")
             with c_sel2:
-                # Aquí se genera la lista correcta según la delegación elegida
                 opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                f_utb = st.selectbox("🔍 5. UTB", opciones_utb_f, key="m_utb")
+                f_utb = st.selectbox("🔍 5. UTB", opciones_utb_f, key="m_utb_man")
 
-            # --- 2. EL FORMULARIO PARA CAPTURA DE DATOS ---
+            # --- 2. EL FORMULARIO ---
             with st.form("form_registro_sf3", clear_on_submit=True):
-                # Fila 1
                 col1, col2, col3 = st.columns(3)
                 with col1: f_fecha = st.date_input("1. Fecha de Atención")
                 with col2: f_ot = st.text_input("2. O.T.")
@@ -256,7 +254,6 @@ else:
                 f_folio = st.text_input("6. Folio / Ticket / IMEI")
 
                 st.markdown("---")
-                # Fila 3: Cantidades
                 m1, m2, m3, m4 = st.columns(4)
                 with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
                 with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
@@ -264,8 +261,6 @@ else:
                 with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
 
                 f_obs = st.text_area("11. Observaciones")
-
-                # El botón de envío (Submit Button)
                 btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA", use_container_width=True)
 
                 if btn_guardar:
@@ -275,9 +270,8 @@ else:
                         "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
                     })
-                    st.toast(f"O.T. {f_ot} registrada con éxito", icon="✅")
+                    st.toast(f"O.T. {f_ot} registrada", icon="✅")
 
-        # --- BOTÓN PARA BORRAR REGISTROS MANUALES ---
         if "manual_db" in st.session_state and st.session_state.manual_db:
             if st.button("🗑️ Borrar Último Registro Manual", use_container_width=True):
                 st.session_state.manual_db.pop()
@@ -285,7 +279,7 @@ else:
 
         st.markdown("---")
         
-        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS COMBINADAS (Esto ya te funcionaba bien) ---
+        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS COMBINADAS ---
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         
         total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
@@ -303,8 +297,8 @@ else:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
-                
                 col_f1, col_f2 = st.columns(2)
+                
                 if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
                 if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
 
@@ -338,10 +332,9 @@ else:
                     df_final_vista = pd.concat([df_final_vista[["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]], df_archivo_v], ignore_index=True)
                 else:
                     df_final_vista = df_archivo_v
+            except Exception as e: st.error(f"Error: {e}")
 
-            except Exception as e: st.error(f"Error procesando archivo: {e}")
-
-        # 3. Despliegue de Resultados y Descarga
+        # 3. Métricas y Descargas
         st.markdown("### 📊 Resumen Consolidado")
         m_r1, m_r2, m_r3, m_r4 = st.columns(4)
         m_r1.metric("🔧 Rehabilitaciones", int(total_rehab))
@@ -350,19 +343,14 @@ else:
         m_r4.metric("➕ Ampliaciones", int(total_ampli))
 
         if not df_final_vista.empty:
-            st.write("🔍 **Detalle de Actividades:**")
             st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
-            
             st.subheader("📥 Descargar Reporte")
             d_col1, d_col2 = st.columns(2)
-            output_xlsx = io.BytesIO()
-            with pd.ExcelWriter(output_xlsx, engine='openpyxl') as writer:
-                df_final_vista.to_excel(writer, index=False, sheet_name='Reporte')
-            
-            d_col1.download_button("📗 Excel", data=output_xlsx.getvalue(), file_name="REPORTE_SF.xlsx", use_container_width=True)
+            out_xlsx = io.BytesIO()
+            with pd.ExcelWriter(out_xlsx, engine='openpyxl') as writer:
+                df_final_vista.to_excel(writer, index=False, sheet_name='METRICAS')
+            d_col1.download_button("📗 Excel", data=out_xlsx.getvalue(), file_name="REPORTE_SF.xlsx", use_container_width=True)
             d_col2.download_button("📊 CSV", data=df_final_vista.to_csv(index=False).encode('utf-8-sig'), file_name="REPORTE_SF.csv", use_container_width=True)
-        else:
-            st.info("Sin datos para mostrar.")
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
