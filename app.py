@@ -241,21 +241,30 @@ else:
                 f_utb = st.selectbox("🔍 5. UTB", opciones_utb_f, key="m_utb_man")
 
             with st.form("form_registro_sf3", clear_on_submit=True):
-                col1, col2, col3 = st.columns(3)
-                with col1: f_fecha = st.date_input("1. Fecha de Atención")
-                with col2: f_ot = st.text_input("2. O.T.")
-                with col3: f_calle = st.text_input("3. Calle")
+                # FILA 1: Identificación Básica
+                c1, c2 = st.columns(2)
+                with c1: f_fecha = st.date_input("1. Fecha de Atención")
+                with c2: f_ot = st.text_input("2. O.T.")
 
-                f_folio = st.text_input("6. Folio / Ticket / IMEI")
+                # FILA 2: Dirección y Folio
+                c3, c4 = st.columns([2, 1]) # Calle más ancha que el Folio
+                with c3: f_calle = st.text_input("3. Calle")
+                with c4: f_folio = st.text_input("6. Folio / Ticket / IMEI")
 
                 st.markdown("---")
+                st.write("📊 **Cantidades de Trabajo Realizado:**")
+                
+                # FILA 3: Métricas (Las 4 cantidades juntas)
                 m1, m2, m3, m4 = st.columns(4)
                 with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
                 with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
                 with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
                 with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
 
+                # FILA 4: Observaciones finales
                 f_obs = st.text_area("11. Observaciones")
+                
+                # Botón de Guardado
                 btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA", use_container_width=True)
 
                 if btn_guardar:
@@ -265,7 +274,7 @@ else:
                         "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
                         "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
                     })
-                    st.toast(f"O.T. {f_ot} registrada", icon="✅")
+                    st.toast(f"O.T. {f_ot} registrada correctamente", icon="✅")
 
         if "manual_db" in st.session_state and st.session_state.manual_db:
             if st.button("🗑️ Borrar Último Registro Manual", use_container_width=True):
