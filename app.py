@@ -199,11 +199,19 @@ else:
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
         if st.button("🏠 Inicio", use_container_width=True): st.session_state.menu = "Inicio"
-        if st.button("🚀 GdR (Generador de Rutas)", use_container_width=True): st.session_state.menu = "GdR"
-        if st.button("📁 SF2 (Baja de Folios)", use_container_width=True): st.session_state.menu = "SF2"
-        if st.button("📊 SF3", use_container_width=True): st.session_state.menu = "SF3"
+        if st.button("🚀 SF1-Generador de Rutas", use_container_width=True): 
+                st.session_state.menu = "SF1"
+            
+            if st.button("📁 SF2-Bajas", use_container_width=True): 
+                st.session_state.menu = "SF2"
+            
+            if st.button("📊 SF3-Captura y Métricas", use_container_width=True): 
+                st.session_state.menu = "SF3"
+                
+            if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): 
+                st.session_state.menu = "SF4"
         st.write("---")
-        if st.session_state.menu == "GdR":
+        if st.session_state.menu == "SF1":
             st.subheader("📊 Ajustes GdR")
             t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
             v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
