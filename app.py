@@ -387,6 +387,19 @@ else:
             st.markdown("---")
             st.write("🔍 **Detalle de Actividades:**")
             st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
+            st.markdown("---")
+            st.subheader("📥 Exportar Reporte Consolidado")
+            d_col1, d_col2 = st.columns(2)
+            
+            output_sf3 = io.BytesIO()
+            with pd.ExcelWriter(output_sf3, engine='openpyxl') as writer:
+                df_final_vista.to_excel(writer, index=False, sheet_name='METRICAS_SF')
+            
+            with d_col1:
+                st.download_button(label="📗 Excel", data=output_sf3.getvalue(), file_name="REPORTE_SF.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            with d_col2:
+                csv_sf3 = df_final_vista.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(label="📊 CSV", data=csv_sf3, file_name="REPORTE_SF.csv", mime="text/csv", use_container_width=True)
         else:
             st.info("Esperando captura manual o carga de archivo para mostrar datos.")
     elif st.session_state.menu == "SF2":
