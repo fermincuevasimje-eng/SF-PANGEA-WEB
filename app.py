@@ -353,7 +353,6 @@ else:
             df_final_vista = df_final_vista.replace(["nan", "None", "NaN"], "")
         else:
             df_final_vista = pd.DataFrame()
-            except Exception as e: st.error(f"Error: {e}")
 
         st.markdown("### 📊 Resumen Consolidado")
         m_r1, m_r2, m_r3, m_r4 = st.columns(4)
