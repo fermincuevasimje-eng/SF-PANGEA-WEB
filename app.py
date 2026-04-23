@@ -744,95 +744,77 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-        st.write("---")
-        st.title("🏗️ SF4 - Creador de Procesos Profesional")
-        
-        # 1. Estados
-        if "pasos_proceso" not in st.session_state: st.session_state.pasos_proceso = []
-        
-        tab_crear, tab_ia = st.tabs(["🖋️ Diseño de Flujo", "🤖 Optimización y Exportación"])
+    st.title("🏗️ SF4 - Diseño de Procesos")
+    st.info("Generador de Flujogramas Operativos")
 
-        with tab_crear:
-            # --- AGREGAR PASO (Con auto-limpieza vía Form) ---
-            with st.form("form_pasos_v15", clear_on_submit=True):
-                col_in, col_btn = st.columns([3, 1])
-                with col_in:
-                    txt_paso = st.text_input("Describa el paso del proceso:", placeholder="Ej: Revisión de luminarias en campo")
-                with col_btn:
-                    add_btn = st.form_submit_button("➕ Agregar Paso", use_container_width=True)
-                
-                if add_btn and txt_paso:
-                    st.session_state.pasos_proceso.append(txt_paso.upper())
+    # Contenedor para la captura del proceso y botones de descarga
+    with st.container(border=True):
+        st.subheader("📝 Registro de Pasos del Proceso")
+        
+        # Inicializar lista de pasos si no existe
+        if "pasos_proceso" not in st.session_state:
+            st.session_state.pasos_proceso = []
+
+        # Formulario de entrada
+        with st.form("form_procesos", clear_on_submit=True):
+            col_paso, col_accion = st.columns([1, 3])
+            paso_n = col_paso.text_input("Paso No.", placeholder="Ej: 1")
+            descripcion = col_accion.text_input("Acción / Actividad", placeholder="Ej: Reporte de luminaria fundida")
+            
+            if st.form_submit_button("➕ Agregar al Proceso"):
+                if paso_n and descripcion:
+                    st.session_state.pasos_proceso.append({"id": paso_n, "act": descripcion})
                     st.rerun()
 
-            if st.session_state.pasos_proceso:
-                # --- GESTIÓN DE PASOS ---
-                c_ed1, c_ed2, c_ed3 = st.columns([2, 1, 1])
-                with c_ed1:
-                    idx_e = st.selectbox("🎯 Seleccionar paso:", range(len(st.session_state.pasos_proceso)), 
-                                         format_func=lambda x: f"{x+1}. {st.session_state.pasos_proceso[x]}")
-                with c_ed2:
-                    if st.button("❌ Eliminar Paso", use_container_width=True):
-                        st.session_state.pasos_proceso.pop(idx_e)
-                        st.rerun()
-                with c_ed3:
-                    if st.button("🔥 Limpiar Todo", type="primary", use_container_width=True):
-                        st.session_state.pasos_proceso = []
-                        st.rerun()
-                
-                # --- EDICIÓN ---
-                nuevo_txt = st.text_input("Editar texto del paso seleccionado y presionar Enter:")
-                if nuevo_txt:
-                    st.session_state.pasos_proceso[idx_e] = nuevo_txt.upper()
-                    st.rerun()
+        # --- AQUÍ ESTÁN LOS 3 BOTONES DE DESCARGA ---
+        if st.session_state.pasos_proceso:
+            st.write("---")
+            col_d1, col_d2, col_d3 = st.columns(3)
+            
+            # 1. Botón Excel
+            df_proc = pd.DataFrame(st.session_state.pasos_proceso)
+            excel_data = io.BytesIO()
+            with pd.ExcelWriter(excel_data, engine='openpyxl') as writer:
+                df_proc.to_excel(writer, index=False)
+            col_d1.download_button("📗 Excel", data=excel_data.getvalue(), file_name="proceso.xlsx", use_container_width=True)
 
-                st.markdown("---")
-                
-                # --- RENDERIZADO VISUAL (MÉTODO SEGURO) ---
-                st.subheader("📊 Flujograma del Proceso")
-                mermaid_syntax = "graph TD\n"
-                for i, p in enumerate(st.session_state.pasos_proceso):
-                    # Limpieza de caracteres especiales para evitar errores en el dibujo
-                    p_safe = p.replace('"', '').replace("'", "")
-                    mermaid_syntax += f'    P{i}["{i+1}. {p_safe}"]\n'
-                    if i > 0: mermaid_syntax += f"    P{i-1} --> P{i}\n"
-                
-                # Renderizado mediante Markdown (Este no da AttributeError)
-                st.markdown(f"```mermaid\n{mermaid_syntax}\n```")
+            # 2. Botón Word (Simulado/Texto)
+            col_d2.download_button("📘 Word", data=df_proc.to_csv(), file_name="proceso.doc", use_container_width=True)
 
-        with tab_ia:
-            st.subheader("🤖 Optimización y Generación de Documentos")
-            if st.session_state.pasos_proceso:
-                if st.button("🚀 Profesionalizar Proceso con IA"):
-                    resultado_ia = "### 📋 PROTOCOLO TÉCNICO DE OPERACIÓN\n"
-                    resultado_ia += "Este documento describe la secuencia lógica de actividades para la Dirección de Alumbrado Público.\n\n"
-                    for i, p in enumerate(st.session_state.pasos_proceso):
-                        resultado_ia += f"**FASE {i+1}:** {p}\n"
-                    st.session_state.ia_proceso_texto = resultado_ia
-                    st.markdown(resultado_ia)
+            # 3. Botón PDF (Representación del Flujo)
+            col_d3.download_button("📕 PDF", data=df_proc.to_csv(), file_name="proceso.pdf", use_container_width=True)
 
-                st.write("---")
-                st.write("### 📥 Descargas Oficiales")
-                d_col1, d_col2, d_col3 = st.columns(3)
-
-                # 1. EXCEL (Tabla de pasos)
-                df_proc = pd.DataFrame({"ORDEN": range(1, len(st.session_state.pasos_proceso)+1), "ACTIVIDAD": st.session_state.pasos_proceso})
-                buf_ex = io.BytesIO()
-                df_proc.to_excel(buf_ex, index=False)
-                d_col1.download_button("📗 Descargar Excel", buf_ex.getvalue(), "proceso_pangea.xlsx", use_container_width=True)
-
-                # 2. WORD (Con estructura de flujo)
-                # Para Word/PDF real con imágenes, el servidor necesita librerías externas. 
-                # Por ahora, generamos el documento con "Arte ASCII" que Word reconoce perfecto.
-                word_doc = "DIRECCIÓN DE ALUMBRADO PÚBLICO - TOLUCA\n" + "="*40 + "\n\n"
-                for i, p in enumerate(st.session_state.pasos_proceso):
-                    word_doc += f" [ {p} ] \n"
-                    if i < len(st.session_state.pasos_proceso)-1:
-                        word_doc += "       |       \n       v       \n"
-                
-                d_col2.download_button("📘 Descargar Word", word_doc.encode('utf-8-sig'), "flujograma_oficial.doc", use_container_width=True)
-
-                # 3. PDF
-                d_col3.download_button("📕 Descargar PDF", word_doc.encode('utf-8-sig'), "proceso_aprobado.pdf", use_container_width=True)
+    # --- RENDERIZADO DEL DIAGRAMA MERMAID ---
+    if st.session_state.pasos_proceso:
+        st.subheader("📊 Visualización del Proceso")
+        
+        # Construcción dinámica del código Mermaid
+        mermaid_code = "graph TD\n"
+        for i in range(len(st.session_state.pasos_proceso)):
+            p = st.session_state.pasos_proceso[i]
+            # Conecta con el siguiente paso si existe
+            if i < len(st.session_state.pasos_proceso) - 1:
+                p_sig = st.session_state.pasos_proceso[i+1]
+                mermaid_code += f'    {p["id"]}[{p["id"]}. {p["act"]}] --> {p_sig["id"]}[{p_sig["id"]}. {p_sig["act"]}]\n'
             else:
-                st.info("Agregue pasos en la pestaña anterior para habilitar la IA y las descargas.")
+                mermaid_code += f'    {p["id"]}[{p["id"]}. {p["act"]}]\n'
+
+        # Mostrar el diagrama usando Markdown
+        st.markdown(
+            f"""
+            <div style="background-color: white; padding: 20px; border-radius: 10px;">
+                <pre class="mermaid">
+                    {mermaid_code}
+                </pre>
+            </div>
+            <script type="module">
+                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                mermaid.initialize({{ startOnLoad: true }});
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
+        
+        if st.button("🗑️ Reiniciar Proceso"):
+            st.session_state.pasos_proceso = []
+            st.rerun()
