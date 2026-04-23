@@ -745,68 +745,104 @@ else:
 
     elif st.session_state.menu == "SF4":
         st.write("---")
-        st.title("🏗️ SF4 - Diseño y Creación de Procesos")
+        st.title("🏗️ SF4 - Diseño de Procesos (Versión Mermaid)")
         
-        # Inicialización de la memoria del proceso si no existe
-        if "pasos_proceso" not in st.session_state:
-            st.session_state.pasos_proceso = []
-
+        # 1. Inicialización de Estados
+        if "pasos_proceso" not in st.session_state: st.session_state.pasos_proceso = []
+        if "key_paso" not in st.session_state: st.session_state.key_paso = 0
+        
         tab_crear, tab_ia = st.tabs(["🖋️ Creador de Flujos", "🤖 Optimización IA"])
 
         with tab_crear:
-            st.subheader("Configuración del Flujograma")
+            st.subheader("Configuración del Proceso")
             
-            # Input para agregar pasos
-            col_in, col_btn = st.columns([3, 1])
-            with col_in:
-                nuevo_paso = st.text_input("Escribe el siguiente paso del proceso:", key="input_paso_sf4")
-            with col_btn:
-                if st.button("➕ Agregar Paso", use_container_width=True):
-                    if nuevo_paso:
-                        st.session_state.pasos_proceso.append(nuevo_paso.upper())
+            # --- AGREGAR PASO (Con auto-limpieza) ---
+            with st.container(border=True):
+                col_in, col_btn = st.columns([3, 1])
+                with col_in:
+                    # Usamos la llave dinámica para limpiar el campo tras click
+                    nuevo_p = st.text_input("Escribe el paso:", key=f"input_p_{st.session_state.key_paso}")
+                with col_btn:
+                    if st.button("➕ Agregar Paso", use_container_width=True):
+                        if nuevo_p:
+                            st.session_state.pasos_proceso.append(nuevo_p.upper())
+                            st.session_state.key_paso += 1 # Esto limpia el input
+                            st.rerun()
+
+            # --- EDITAR Y ELIMINAR ---
+            if st.session_state.pasos_proceso:
+                col_ed1, col_ed2 = st.columns(2)
+                
+                with col_ed1:
+                    idx_edit = st.selectbox("📝 Seleccionar para Editar:", range(len(st.session_state.pasos_proceso)), 
+                                            format_func=lambda x: f"{x+1}. {st.session_state.pasos_proceso[x]}")
+                    nuevo_texto = st.text_input("Nuevo texto para el paso seleccionado:")
+                    if st.button("💾 Guardar Edición", use_container_width=True):
+                        if nuevo_texto:
+                            st.session_state.pasos_proceso[idx_edit] = nuevo_texto.upper()
+                            st.rerun()
+
+                with col_ed2:
+                    idx_del = st.selectbox("🗑️ Seleccionar para Eliminar:", range(len(st.session_state.pasos_proceso)), 
+                                           format_func=lambda x: f"{x+1}. {st.session_state.pasos_proceso[x]}", key="del_sel")
+                    if st.button("❌ Eliminar Paso Seleccionado", use_container_width=True):
+                        st.session_state.pasos_proceso.pop(idx_del)
                         st.rerun()
 
-            if st.session_state.pasos_proceso:
-                st.write("### 📝 Estructura Actual:")
-                for i, paso in enumerate(st.session_state.pasos_proceso):
-                    st.write(f"**{i+1}.** {paso}")
-                
-                if st.button("🗑️ Limpiar Todo el Proceso", type="primary"):
+                if st.button("🔥 Limpiar Todo el Proceso", type="primary", use_container_width=True):
                     st.session_state.pasos_proceso = []
                     st.rerun()
 
                 st.markdown("---")
-                if st.button("📊 GENERAR FLUJOGRAMA", use_container_width=True):
-                    # Lógica de dibujo (Usamos representación textual profesional)
-                    st.success("Flujograma Generado")
-                    
-                    # Simulación de Diagrama (En la siguiente versión integraremos Graphviz visual)
-                    for i in range(len(st.session_state.pasos_proceso) - 1):
-                        st.code(f"[{st.session_state.pasos_proceso[i]}]  --->  [{st.session_state.pasos_proceso[i+1]}]")
-                    
-                    # Espacio para el futuro botón de Oficios
-                    st.info("💡 Próximamente: Este flujo podrá convertirse en un Oficio de Comisión Automático.")
+                
+                # --- GENERACIÓN DE MERMAID ---
+                st.subheader("📊 Flujograma Dinámico")
+                
+                # Construcción del código Mermaid
+                mermaid_code = "graph TD\n"
+                for i, paso in enumerate(st.session_state.pasos_proceso):
+                    # Limpiamos texto para evitar errores de sintaxis en Mermaid
+                    p_clean = "".join(e for e in paso if e.isalnum() or e == " ")
+                    mermaid_code += f'    P{i}["{i+1}. {p_clean}"]\n'
+                    if i > 0:
+                        mermaid_code += f"    P{i-1} --> P{i}\n"
+
+                # Mostrar el diagrama (Streamlit tiene soporte nativo para Mermaid)
+                st.markdown(f"""
+                ```mermaid
+                {mermaid_code}
+                ```
+                """)
+
+                # --- DESCARGAS ---
+                st.write("📥 **Descargar Estructura del Proceso:**")
+                d_col1, d_col2, d_col3 = st.columns(3)
+                
+                df_proc = pd.DataFrame({"Orden": range(1, len(st.session_state.pasos_proceso)+1), "Actividad": st.session_state.pasos_proceso})
+                
+                # Excel
+                buf_ex = io.BytesIO()
+                df_proc.to_excel(buf_ex, index=False)
+                d_col1.download_button("📗 Excel", buf_ex.getvalue(), "proceso.xlsx", use_container_width=True)
+                
+                # Word (Simulado vía TXT/Markdown compatible con Word)
+                word_text = "DISEÑO DE PROCESO - SF PANGEA\n\n" + "\n".join([f"{i+1}. {p}" for i, p in enumerate(st.session_state.pasos_proceso)])
+                d_col2.download_button("📘 Word (Doc)", word_text, "proceso.doc", use_container_width=True)
+                
+                # PDF (Usando la previsualización de impresión del navegador)
+                d_col3.info("Para PDF: Use Ctrl+P y Guardar como PDF")
 
         with tab_ia:
-            st.subheader("Mejora de Procesos por IA")
-            if not st.session_state.pasos_proceso:
-                st.info("Primero agrega pasos en la pestaña 'Creador de Flujos'")
+            st.subheader("🤖 Optimización Senior")
+            if st.session_state.pasos_proceso:
+                st.write("Tu proceso será analizado para cumplir con estándares de ingeniería.")
+                # Aquí la lógica de optimización se activará en la v16 con un prompt específico
+                if st.button("🚀 Profesionalizar con IA"):
+                    st.success("Analizando secuencia lógica...")
+                    # Simulación de respuesta IA profesional
+                    ia_ver = "PROTOCOLO DE OPERACIÓN TÉCNICA\n" + "="*30 + "\n"
+                    for p in st.session_state.pasos_proceso:
+                        ia_ver += f"✔ PROCEDIMIENTO: {p} (Validación de cumplimiento normativo)\n"
+                    st.text_area("Borrador Pro:", ia_ver, height=200)
             else:
-                st.write("Haz clic para que la IA profesionalice tu borrador:")
-                if st.button("🚀 Optimizar y Descargar Versión Pro"):
-                    # Aquí simulamos la optimización IA (En la v16 haremos el prompt real)
-                    proceso_mejorado = f"REPORTE TÉCNICO DE PROCESO\n" + "="*30 + "\n"
-                    for i, p in enumerate(st.session_state.pasos_proceso):
-                        proceso_mejorado += f"FASE {i+1}: Ejecución de {p} bajo normatividad vigente.\n"
-                    
-                    st.text_area("Previsualización de Versión Mejorada:", proceso_mejorado, height=200)
-                    
-                    st.download_button(
-                        label="📥 Descargar Proceso Optimizado (TXT)",
-                        data=proceso_mejorado,
-                        file_name="PROCESO_OPTIMIZADO_SF.txt",
-                        mime="text/plain",
-                        use_container_width=True
-                    )
-        st.info("Bienvenido al Módulo de Diseño de Procesos.")
-        st.write("Seleccione una herramienta para sistematizar actividades diarias.")
+                st.info("Agregue pasos para activar la IA.")
