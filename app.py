@@ -340,13 +340,24 @@ else:
                 total_sust += pd.to_numeric(df_filt.iloc[:, 31], errors='coerce').fillna(0).sum()
                 total_ampli += pd.to_numeric(df_filt.iloc[:, 39], errors='coerce').fillna(0).sum()
                 
-                df_archivo_v = df_filt.iloc[:, [4, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_archivo_v.columns = ["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+                # --- EXTRACCIÓN QUIRÚRGICA DE COLUMNAS (G, P y MÉTRICAS) ---
+                # 4=Fecha, 6=O.T, 15=Folio, 19=Calle, 22=Del, 23=UTB, 29=Rehab, 30=Manto, 31=Sust, 39=Ampli
+                indices_cols = [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]
+                df_archivo_v = df_filt.iloc[:, indices_cols].copy()
                 
+                # Renombramos para que coincida 100% con el diccionario del registro manual
+                columnas_finales = ["FECHA", "OT", "FOLIO", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+                df_archivo_v.columns = columnas_finales
+                
+                # Añadimos columna de Observaciones vacía para el masivo (para que cuadre con el manual)
+                df_archivo_v["OBS"] = ""
+                cols_con_obs = columnas_finales + ["OBS"]
+
                 if not df_final_vista.empty:
-                    df_final_vista = pd.concat([df_final_vista[["FECHA", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]], df_archivo_v], ignore_index=True)
+                    # Unificamos manual y masivo en una sola tabla sin costuras
+                    df_final_vista = pd.concat([df_final_vista[cols_con_obs], df_archivo_v[cols_con_obs]], ignore_index=True)
                 else:
-                    df_final_vista = df_archivo_v
+                    df_final_vista = df_archivo_v[cols_con_obs]
             except Exception as e: st.error(f"Error: {e}")
 
         st.markdown("### 📊 Resumen Consolidado")
