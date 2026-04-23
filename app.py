@@ -297,24 +297,24 @@ else:
         # --- SECCIÓN DE ARCHIVO Y MÉTRICAS PERSISTENTES ---
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         
-        # PERSISTENCIA: Si el usuario sube un archivo nuevo, lo procesamos y guardamos en session_state
+        # Persistencia: Si hay archivo nuevo, se guarda en session_state para que no se borre al guardar manuales
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_temp = load_massive_data(up_cap, ext)
-                # Limpieza de cabeceras basura del Excel
+                # Limpieza de cabeceras redundantes
                 df_temp = df_temp[~df_temp.iloc[:, 0].astype(str).str.contains("IDENTIFICACION|CIUDADANO|JEFE", case=False, na=False)]
-                st.session_state.masivo_persistente = df_temp
-            except Exception as e: 
+                st.session_state.masivo_pangea = df_temp
+            except Exception as e:
                 st.error(f"Error procesando archivo: {e}")
-        
-        # Si no hay archivo subido actualmente, inicializamos la variable de memoria si no existe
-        if 'masivo_persistente' not in st.session_state:
-            st.session_state.masivo_persistente = None
+
+        # Inicialización de la memoria si está vacía
+        if "masivo_pangea" not in st.session_state:
+            st.session_state.masivo_pangea = None
 
         total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
         
-        # --- CONTROL MAESTRO DE FILTRADO (INTELIGENCIA CRUZADA) ---
+        # --- CONTROL MAESTRO DE FILTRADO (TUS SELECTORES ORIGINALES) ---
         col_f1, col_f2 = st.columns(2)
         if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
         if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
@@ -330,21 +330,21 @@ else:
         lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
         sel_del = col_f1.selectbox("📍 Filtrar TODO por Delegación:", lista_delegaciones, key="sel_del_val", on_change=cambio_delegacion)
         
-        opciones_utb_mostrar = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
-        sel_utb = col_f2.selectbox("🔍 Filtrar TODO por UTB:", opciones_utb_mostrar, key="sel_utb_val", on_change=sincronizar_filtros)
+        lista_utbs_mostrar = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+        sel_utb = col_f2.selectbox("🔍 Filtrar TODO por UTB:", lista_utbs_mostrar, key="sel_utb_val", on_change=sincronizar_filtros)
 
         piezas_reporte = []
 
-        # 1. INTEGRAR DATOS MANUALES (Desde session_state)
+        # 1. PROCESAR MANUAL (Si existe)
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_m = pd.DataFrame(st.session_state.manual_db)
             if sel_del != "TODAS": df_m = df_m[df_m['DELEGACIÓN'] == sel_del]
             if sel_utb != "TODAS": df_m = df_m[df_m['UTB'] == sel_utb]
             if not df_m.empty: piezas_reporte.append(df_m)
 
-        # 2. INTEGRAR DATOS MASIVOS (Desde la memoria persistente)
-        if st.session_state.masivo_persistente is not None:
-            df_filt = st.session_state.masivo_persistente.copy()
+        # 2. PROCESAR MASIVO (Desde la memoria persistente)
+        if st.session_state.masivo_pangea is not None:
+            df_filt = st.session_state.masivo_pangea.copy()
             if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
             if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
             
@@ -354,7 +354,7 @@ else:
                 df_archivo_v["OBS"] = ""
                 piezas_reporte.append(df_archivo_v)
 
-        # 3. CONSOLIDACIÓN FINAL
+        # 3. CONSOLIDACIÓN FINAL Y MÉTRICAS
         if piezas_reporte:
             df_final_vista = pd.concat(piezas_reporte, ignore_index=True)
             cols_num = ["REHAB", "MANTO", "SUST", "AMPLI"]
@@ -365,8 +365,7 @@ else:
             total_manto = df_final_vista["MANTO"].sum()
             total_sust = df_final_vista["SUST"].sum()
             total_ampli = df_final_vista["AMPLI"].sum()
-            
-            df_final_vista = df_final_vista.astype(str).replace(["nan", "None", "0.0"], "0")
+            df_final_vista = df_final_vista.astype(str).replace(["nan", "None"], "")
         else:
             df_final_vista = pd.DataFrame()
 
