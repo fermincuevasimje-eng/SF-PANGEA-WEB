@@ -238,27 +238,26 @@ else:
         rk = st.session_state.reset_key
 
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
-            # El formulario cambia de ID con cada rk para forzar limpieza total
-            with st.form(key=f"form_sf3_v14_final_{rk}", clear_on_submit=True):
+            # --- SELECCIÓN REACTIVA (FUERA DEL FORMULARIO) ---
+            st.write("📍 **Paso 1: Ubicación**")
+            col_geo1, col_geo2 = st.columns(2)
+            with col_geo1:
+                f_del = st.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"del_manual_{rk}")
+            with col_geo2:
+                opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
+                f_utb = st.selectbox("UTB", opciones_utb_f, key=f"utb_manual_{rk}")
+
+            # --- FORMULARIO DE DATOS (DENTRO DEL FORMULARIO) ---
+            with st.form(key=f"form_sf3_core_{rk}", clear_on_submit=True):
+                st.write("📝 **Paso 2: Detalles de la Atención**")
                 
-                # FILA 1: Identificación Temporal
-                c1, c2 = st.columns(2)
-                with c1: f_fecha = st.date_input("1. Fecha de Atención")
-                with c2: f_ot = st.text_input("2. O.T.")
-
-                # FILA 2: Identificación de Reporte (Invertido según tu instrucción)
-                c3, c4 = st.columns(2)
-                with c3: f_folio = st.text_input("3. Folio / Ticket / IMEI")
-                with c4: f_calle = st.text_input("4. Calle")
-
-                # FILA 3: Ubicación Geográfica (Selectores en la misma fila)
-                c_sel1, c_sel2 = st.columns(2)
-                c_sel1, c_sel2 = st.columns(2)
-                with c_sel1:
-                    f_del = st.selectbox("📍 5. Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"manual_del_{rk}")
-                with c_sel2:
-                    opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                    f_utb = st.selectbox("🔍 6. UTB", opciones_utb_f, key=f"manual_utb_{rk}")
+                # FILA 1: Identificación
+                c1, c2, c3 = st.columns([1, 1, 2])
+                with c1: f_fecha = st.date_input("Fecha")
+                with c2: f_ot = st.text_input("O.T.")
+                with c3: f_folio = st.text_input("Folio / Ticket / IMEI")
+                
+                f_calle = st.text_input("Calle")
 
                 st.markdown("---")
                 st.write("📊 **Cantidades de Trabajo Realizado:**")
