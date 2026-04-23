@@ -358,6 +358,11 @@ else:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
+                
+                # --- LIMPIEZA DE FILA ROJA (Cabeceras del Excel) ---
+                # Filtramos cualquier fila donde la columna de Fecha o Folio diga "IDENTIFICACION" o "No. DE VALE"
+                df_c = df_c[~df_c.iloc[:, 0].astype(str).str.contains("IDENTIFICACION|CIUDADANO|JEFE", case=False, na=False)]
+                
                 df_filt = df_c.copy()
                 
                 # Aplicar filtro de selectores al masivo
@@ -371,20 +376,25 @@ else:
                     piezas_reporte.append(df_archivo_v)
             except Exception as e: st.error(f"Error en archivo: {e}")
 
-        # 3. CONSOLIDACIÓN FINAL Y MÉTRICAS
+        # 3. CONSOLIDACIÓN FINAL Y FORMATO DE CEROS
         if piezas_reporte:
             df_final_vista = pd.concat(piezas_reporte, ignore_index=True)
-            # Asegurar que las columnas de números sean tratadas como tal para la suma
-            cols_num = ["REHAB", "MANTO", "SUST", "AMPLI"]
-            for c in cols_num: df_final_vista[c] = pd.to_numeric(df_final_vista[c], errors='coerce').fillna(0)
             
+            # Unificamos columnas numéricas y rellenamos vacíos con 0
+            cols_num = ["REHAB", "MANTO", "SUST", "AMPLI"]
+            for c in cols_num:
+                df_final_vista[c] = pd.to_numeric(df_final_vista[c], errors='coerce').fillna(0).astype(int)
+            
+            # Totales para las métricas
             total_rehab = df_final_vista["REHAB"].sum()
             total_manto = df_final_vista["MANTO"].sum()
             total_sust = df_final_vista["SUST"].sum()
             total_ampli = df_final_vista["AMPLI"].sum()
             
-            # Convertir a texto para visualización limpia (sin .0)
-            df_final_vista = df_final_vista.astype(str).replace(["nan", "None", "0.0"], "")
+            # Limpieza visual final para la tabla
+            df_final_vista = df_final_vista.fillna("")
+            # Convertimos todo a string pero asegurando que los ceros se mantengan
+            df_final_vista = df_final_vista.astype(str).replace(["nan", "None", "<NA>"], "")
         else:
             df_final_vista = pd.DataFrame()
             total_rehab = total_manto = total_sust = total_ampli = 0
@@ -397,8 +407,8 @@ else:
         m_r4.metric("➕ Ampliaciones", int(total_ampli))
 
         if not df_final_vista.empty:
+            # Mostramos la tabla unificada sin distinguir origen
             st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
-            st.subheader("📥 Descargar Reporte")
             d_col1, d_col2 = st.columns(2)
             out_xlsx = io.BytesIO()
             with pd.ExcelWriter(out_xlsx, engine='openpyxl') as writer:
