@@ -298,18 +298,50 @@ else:
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         
         total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
-       # --- CONTROL MAESTRO DE FILTRADO ---
+       # --- CONTROL MAESTRO DE FILTRADO (INTELIGENCIA CRUZADA) ---
         col_f1, col_f2 = st.columns(2)
+        
+        # Inicializamos valores en session_state si no existen
         if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
         if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
 
+        # Lógica de Sincronización Inversa
+        def sincronizar_filtros():
+            # Si el usuario elige una UTB específica, forzamos a la Delegación a ser la correcta
+            u_actual = st.session_state.sel_utb_val
+            if u_actual != "TODAS":
+                delegacion_perteneciente = MAPA_UTB_DEL.get(u_actual)
+                if delegacion_perteneciente:
+                    st.session_state.sel_del_val = delegacion_perteneciente
+
+        def cambio_delegacion():
+            # Si cambia la delegación, reseteamos la UTB para evitar conflictos
+            st.session_state.sel_utb_val = "TODAS"
+
+        # Listas de opciones
         lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-        with col_f1:
-            def cambio_del(): st.session_state.sel_utb_val = "TODAS"
-            sel_del = st.selectbox("📍 Filtrar TODO por Delegación:", lista_delegaciones, key="sel_del_val", on_change=cambio_del)
-        with col_f2:
-            opciones_utb = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
-            sel_utb = st.selectbox("🔍 Filtrar TODO por UTB:", opciones_utb, key="sel_utb_val")
+        
+        # Selector 1: Delegación
+        sel_del = col_f1.selectbox(
+            "📍 Filtrar TODO por Delegación:", 
+            lista_delegaciones, 
+            key="sel_del_val", 
+            on_change=cambio_delegacion
+        )
+
+        # Filtramos las UTBs que se muestran según la delegación elegida
+        if sel_del == "TODAS":
+            lista_utbs_mostrar = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
+        else:
+            lista_utbs_mostrar = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
+
+        # Selector 2: UTB
+        sel_utb = col_f2.selectbox(
+            "🔍 Filtrar TODO por UTB:", 
+            lista_utbs_mostrar, 
+            key="sel_utb_val", 
+            on_change=sincronizar_filtros
+        )
 
         piezas_reporte = []
 
