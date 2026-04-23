@@ -298,61 +298,64 @@ else:
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         
         total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
+       # --- CONTROL MAESTRO DE FILTRADO ---
+        col_f1, col_f2 = st.columns(2)
+        if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
+        if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
+
+        lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+        with col_f1:
+            def cambio_del(): st.session_state.sel_utb_val = "TODAS"
+            sel_del = st.selectbox("📍 Filtrar TODO por Delegación:", lista_delegaciones, key="sel_del_val", on_change=cambio_del)
+        with col_f2:
+            opciones_utb = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+            sel_utb = st.selectbox("🔍 Filtrar TODO por UTB:", opciones_utb, key="sel_utb_val")
+
         piezas_reporte = []
 
-        # 1. Agregamos los datos manuales si existen
+        # 1. PROCESAR MANUAL (Si existe)
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_m = pd.DataFrame(st.session_state.manual_db)
-            total_rehab += df_m["REHAB"].sum()
-            total_manto += df_m["MANTO"].sum()
-            total_sust += df_m["SUST"].sum()
-            total_ampli += df_m["AMPLI"].sum()
-            piezas_reporte.append(df_m)
+            # Aplicar filtro de selectores al manual
+            if sel_del != "TODAS": df_m = df_m[df_m['DELEGACIÓN'] == sel_del]
+            if sel_utb != "TODAS": df_m = df_m[df_m['UTB'] == sel_utb]
+            if not df_m.empty: piezas_reporte.append(df_m)
 
-        # 2. Procesamos el archivo masivo con persistencia
+        # 2. PROCESAR MASIVO (Si existe)
         if up_cap:
             try:
                 ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
                 df_c = load_massive_data(up_cap, ext)
-                
-                # Selectores de filtrado
-                col_f1, col_f2 = st.columns(2)
-                if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
-                if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
-
-                lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
-                with col_f1:
-                    def cambio_del(): st.session_state.sel_utb_val = "TODAS"
-                    sel_del = st.selectbox("📍 Filtrar Archivo por Delegación:", lista_delegaciones, key="sel_del_val", on_change=cambio_del)
-                with col_f2:
-                    opciones_utb = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
-                    sel_utb = st.selectbox("🔍 Filtrar Archivo por UTB:", opciones_utb, key="sel_utb_val")
-
                 df_filt = df_c.copy()
+                
+                # Aplicar filtro de selectores al masivo
                 if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
                 if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
-
-                # Sumatoria de métricas del archivo
-                total_rehab += pd.to_numeric(df_filt.iloc[:, 29], errors='coerce').fillna(0).sum()
-                total_manto += pd.to_numeric(df_filt.iloc[:, 30], errors='coerce').fillna(0).sum()
-                total_sust += pd.to_numeric(df_filt.iloc[:, 31], errors='coerce').fillna(0).sum()
-                total_ampli += pd.to_numeric(df_filt.iloc[:, 39], errors='coerce').fillna(0).sum()
                 
-                # Unificación de columnas (G=6, P=15)
-                df_archivo_v = df_filt.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_archivo_v.columns = ["FECHA", "OT", "FOLIO", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                df_archivo_v["OBS"] = ""
-                piezas_reporte.append(df_archivo_v)
+                if not df_filt.empty:
+                    df_archivo_v = df_filt.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
+                    df_archivo_v.columns = ["FECHA", "OT", "FOLIO", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+                    df_archivo_v["OBS"] = ""
+                    piezas_reporte.append(df_archivo_v)
+            except Exception as e: st.error(f"Error en archivo: {e}")
 
-            except Exception as e: st.error(f"Error procesando archivo: {e}")
-
-        # 3. Concatenación final (El pegamento Senior)
+        # 3. CONSOLIDACIÓN FINAL Y MÉTRICAS
         if piezas_reporte:
-            df_final_vista = pd.concat(piezas_reporte, ignore_index=True).astype(str)
-            # Limpiamos los "nan" visuales que genera Pandas al convertir a str
-            df_final_vista = df_final_vista.replace(["nan", "None", "NaN"], "")
+            df_final_vista = pd.concat(piezas_reporte, ignore_index=True)
+            # Asegurar que las columnas de números sean tratadas como tal para la suma
+            cols_num = ["REHAB", "MANTO", "SUST", "AMPLI"]
+            for c in cols_num: df_final_vista[c] = pd.to_numeric(df_final_vista[c], errors='coerce').fillna(0)
+            
+            total_rehab = df_final_vista["REHAB"].sum()
+            total_manto = df_final_vista["MANTO"].sum()
+            total_sust = df_final_vista["SUST"].sum()
+            total_ampli = df_final_vista["AMPLI"].sum()
+            
+            # Convertir a texto para visualización limpia (sin .0)
+            df_final_vista = df_final_vista.astype(str).replace(["nan", "None", "0.0"], "")
         else:
             df_final_vista = pd.DataFrame()
+            total_rehab = total_manto = total_sust = total_ampli = 0
 
         st.markdown("### 📊 Resumen Consolidado")
         m_r1, m_r2, m_r3, m_r4 = st.columns(4)
