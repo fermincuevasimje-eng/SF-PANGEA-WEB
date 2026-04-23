@@ -294,110 +294,81 @@ else:
 
         st.markdown("---")
         
-        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS COMBINADAS ---
+        # --- SECCIÓN DE ARCHIVO Y MÉTRICAS PERSISTENTES ---
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         
-        total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
-       # --- CONTROL MAESTRO DE FILTRADO (INTELIGENCIA CRUZADA) ---
-        col_f1, col_f2 = st.columns(2)
+        # PERSISTENCIA: Si el usuario sube un archivo nuevo, lo procesamos y guardamos en session_state
+        if up_cap:
+            try:
+                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
+                df_temp = load_massive_data(up_cap, ext)
+                # Limpieza de cabeceras basura del Excel
+                df_temp = df_temp[~df_temp.iloc[:, 0].astype(str).str.contains("IDENTIFICACION|CIUDADANO|JEFE", case=False, na=False)]
+                st.session_state.masivo_persistente = df_temp
+            except Exception as e: 
+                st.error(f"Error procesando archivo: {e}")
         
-        # Inicializamos valores en session_state si no existen
+        # Si no hay archivo subido actualmente, inicializamos la variable de memoria si no existe
+        if 'masivo_persistente' not in st.session_state:
+            st.session_state.masivo_persistente = None
+
+        total_rehab, total_manto, total_sust, total_ampli = 0, 0, 0, 0
+        
+        # --- CONTROL MAESTRO DE FILTRADO (INTELIGENCIA CRUZADA) ---
+        col_f1, col_f2 = st.columns(2)
         if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
         if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
 
-        # Lógica de Sincronización Inversa
         def sincronizar_filtros():
-            # Si el usuario elige una UTB específica, forzamos a la Delegación a ser la correcta
             u_actual = st.session_state.sel_utb_val
             if u_actual != "TODAS":
                 delegacion_perteneciente = MAPA_UTB_DEL.get(u_actual)
-                if delegacion_perteneciente:
-                    st.session_state.sel_del_val = delegacion_perteneciente
+                if delegacion_perteneciente: st.session_state.sel_del_val = delegacion_perteneciente
 
-        def cambio_delegacion():
-            # Si cambia la delegación, reseteamos la UTB para evitar conflictos
-            st.session_state.sel_utb_val = "TODAS"
+        def cambio_delegacion(): st.session_state.sel_utb_val = "TODAS"
 
-        # Listas de opciones
         lista_delegaciones = ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys()))
+        sel_del = col_f1.selectbox("📍 Filtrar TODO por Delegación:", lista_delegaciones, key="sel_del_val", on_change=cambio_delegacion)
         
-        # Selector 1: Delegación
-        sel_del = col_f1.selectbox(
-            "📍 Filtrar TODO por Delegación:", 
-            lista_delegaciones, 
-            key="sel_del_val", 
-            on_change=cambio_delegacion
-        )
-
-        # Filtramos las UTBs que se muestran según la delegación elegida
-        if sel_del == "TODAS":
-            lista_utbs_mostrar = ["TODAS"] + sorted(list(MAPA_UTB_DEL.keys()))
-        else:
-            lista_utbs_mostrar = ["TODAS"] + sorted(CATALOGO_MAESTRO.get(sel_del, []))
-
-        # Selector 2: UTB
-        sel_utb = col_f2.selectbox(
-            "🔍 Filtrar TODO por UTB:", 
-            lista_utbs_mostrar, 
-            key="sel_utb_val", 
-            on_change=sincronizar_filtros
-        )
+        opciones_utb_mostrar = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+        sel_utb = col_f2.selectbox("🔍 Filtrar TODO por UTB:", opciones_utb_mostrar, key="sel_utb_val", on_change=sincronizar_filtros)
 
         piezas_reporte = []
 
-        # 1. PROCESAR MANUAL (Si existe)
+        # 1. INTEGRAR DATOS MANUALES (Desde session_state)
         if "manual_db" in st.session_state and st.session_state.manual_db:
             df_m = pd.DataFrame(st.session_state.manual_db)
-            # Aplicar filtro de selectores al manual
             if sel_del != "TODAS": df_m = df_m[df_m['DELEGACIÓN'] == sel_del]
             if sel_utb != "TODAS": df_m = df_m[df_m['UTB'] == sel_utb]
             if not df_m.empty: piezas_reporte.append(df_m)
 
-        # 2. PROCESAR MASIVO (Si existe)
-        if up_cap:
-            try:
-                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
-                df_c = load_massive_data(up_cap, ext)
-                
-                # --- LIMPIEZA DE FILA ROJA (Cabeceras del Excel) ---
-                # Filtramos cualquier fila donde la columna de Fecha o Folio diga "IDENTIFICACION" o "No. DE VALE"
-                df_c = df_c[~df_c.iloc[:, 0].astype(str).str.contains("IDENTIFICACION|CIUDADANO|JEFE", case=False, na=False)]
-                
-                df_filt = df_c.copy()
-                
-                # Aplicar filtro de selectores al masivo
-                if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
-                if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
-                
-                if not df_filt.empty:
-                    df_archivo_v = df_filt.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
-                    df_archivo_v.columns = ["FECHA", "OT", "FOLIO", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                    df_archivo_v["OBS"] = ""
-                    piezas_reporte.append(df_archivo_v)
-            except Exception as e: st.error(f"Error en archivo: {e}")
+        # 2. INTEGRAR DATOS MASIVOS (Desde la memoria persistente)
+        if st.session_state.masivo_persistente is not None:
+            df_filt = st.session_state.masivo_persistente.copy()
+            if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
+            if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
+            
+            if not df_filt.empty:
+                df_archivo_v = df_filt.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
+                df_archivo_v.columns = ["FECHA", "OT", "FOLIO", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+                df_archivo_v["OBS"] = ""
+                piezas_reporte.append(df_archivo_v)
 
-        # 3. CONSOLIDACIÓN FINAL Y FORMATO DE CEROS
+        # 3. CONSOLIDACIÓN FINAL
         if piezas_reporte:
             df_final_vista = pd.concat(piezas_reporte, ignore_index=True)
-            
-            # Unificamos columnas numéricas y rellenamos vacíos con 0
             cols_num = ["REHAB", "MANTO", "SUST", "AMPLI"]
             for c in cols_num:
                 df_final_vista[c] = pd.to_numeric(df_final_vista[c], errors='coerce').fillna(0).astype(int)
             
-            # Totales para las métricas
             total_rehab = df_final_vista["REHAB"].sum()
             total_manto = df_final_vista["MANTO"].sum()
             total_sust = df_final_vista["SUST"].sum()
             total_ampli = df_final_vista["AMPLI"].sum()
             
-            # Limpieza visual final para la tabla
-            df_final_vista = df_final_vista.fillna("")
-            # Convertimos todo a string pero asegurando que los ceros se mantengan
-            df_final_vista = df_final_vista.astype(str).replace(["nan", "None", "<NA>"], "")
+            df_final_vista = df_final_vista.astype(str).replace(["nan", "None", "0.0"], "0")
         else:
             df_final_vista = pd.DataFrame()
-            total_rehab = total_manto = total_sust = total_ampli = 0
 
         st.markdown("### 📊 Resumen Consolidado")
         m_r1, m_r2, m_r3, m_r4 = st.columns(4)
@@ -407,7 +378,6 @@ else:
         m_r4.metric("➕ Ampliaciones", int(total_ampli))
 
         if not df_final_vista.empty:
-            # Mostramos la tabla unificada sin distinguir origen
             st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
             d_col1, d_col2 = st.columns(2)
             out_xlsx = io.BytesIO()
