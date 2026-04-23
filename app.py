@@ -744,77 +744,8 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-    st.title("🏗️ SF4 - Diseño de Procesos")
-    st.info("Generador de Flujogramas Operativos")
-
-    # Contenedor para la captura del proceso y botones de descarga
-    with st.container(border=True):
-        st.subheader("📝 Registro de Pasos del Proceso")
-        
-        # Inicializar lista de pasos si no existe
-        if "pasos_proceso" not in st.session_state:
-            st.session_state.pasos_proceso = []
-
-        # Formulario de entrada
-        with st.form("form_procesos", clear_on_submit=True):
-            col_paso, col_accion = st.columns([1, 3])
-            paso_n = col_paso.text_input("Paso No.", placeholder="Ej: 1")
-            descripcion = col_accion.text_input("Acción / Actividad", placeholder="Ej: Reporte de luminaria fundida")
-            
-            if st.form_submit_button("➕ Agregar al Proceso"):
-                if paso_n and descripcion:
-                    st.session_state.pasos_proceso.append({"id": paso_n, "act": descripcion})
-                    st.rerun()
-
-        # --- AQUÍ ESTÁN LOS 3 BOTONES DE DESCARGA ---
-        if st.session_state.pasos_proceso:
-            st.write("---")
-            col_d1, col_d2, col_d3 = st.columns(3)
-            
-            # 1. Botón Excel
-            df_proc = pd.DataFrame(st.session_state.pasos_proceso)
-            excel_data = io.BytesIO()
-            with pd.ExcelWriter(excel_data, engine='openpyxl') as writer:
-                df_proc.to_excel(writer, index=False)
-            col_d1.download_button("📗 Excel", data=excel_data.getvalue(), file_name="proceso.xlsx", use_container_width=True)
-
-            # 2. Botón Word (Simulado/Texto)
-            col_d2.download_button("📘 Word", data=df_proc.to_csv(), file_name="proceso.doc", use_container_width=True)
-
-            # 3. Botón PDF (Representación del Flujo)
-            col_d3.download_button("📕 PDF", data=df_proc.to_csv(), file_name="proceso.pdf", use_container_width=True)
-
-    # --- RENDERIZADO DEL DIAGRAMA MERMAID ---
-    if st.session_state.pasos_proceso:
-        st.subheader("📊 Visualización del Proceso")
-        
-        # Construcción dinámica del código Mermaid
-        mermaid_code = "graph TD\n"
-        for i in range(len(st.session_state.pasos_proceso)):
-            p = st.session_state.pasos_proceso[i]
-            # Conecta con el siguiente paso si existe
-            if i < len(st.session_state.pasos_proceso) - 1:
-                p_sig = st.session_state.pasos_proceso[i+1]
-                mermaid_code += f'    {p["id"]}[{p["id"]}. {p["act"]}] --> {p_sig["id"]}[{p_sig["id"]}. {p_sig["act"]}]\n'
-            else:
-                mermaid_code += f'    {p["id"]}[{p["id"]}. {p["act"]}]\n'
-
-        # Mostrar el diagrama usando Markdown
-        st.markdown(
-            f"""
-            <div style="background-color: white; padding: 20px; border-radius: 10px;">
-                <pre class="mermaid">
-                    {mermaid_code}
-                </pre>
-            </div>
-            <script type="module">
-                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                mermaid.initialize({{ startOnLoad: true }});
-            </script>
-            """,
-            unsafe_allow_html=True
-        )
-        
-        if st.button("🗑️ Reiniciar Proceso"):
-            st.session_state.pasos_proceso = []
-            st.rerun()
+        st.write("---")                       # La raya ahora separa el menú del título
+        st.title("🏗️ SF4 - Diseño de Procesos") 
+        st.info("Bienvenido a la sección de diseño...")
+        st.info("Bienvenido al Módulo de Diseño de Procesos.")
+        st.write("Seleccione una herramienta para sistematizar actividades diarias.")
