@@ -378,12 +378,77 @@ else:
 
         if not df_final_vista.empty:
             st.dataframe(df_final_vista, use_container_width=True, hide_index=True)
-            d_col1, d_col2 = st.columns(2)
-            out_xlsx = io.BytesIO()
-            with pd.ExcelWriter(out_xlsx, engine='openpyxl') as writer:
-                df_final_vista.to_excel(writer, index=False, sheet_name='METRICAS')
-            d_col1.download_button("📗 Excel", data=out_xlsx.getvalue(), file_name="REPORTE_SF.xlsx", use_container_width=True)
-            d_col2.download_button("📊 CSV", data=df_final_vista.to_csv(index=False).encode('utf-8-sig'), file_name="REPORTE_SF.csv", use_container_width=True)
+            
+            # --- FUNCIÓN SENIOR: EXCEL CON TOTALES Y GRÁFICA ---
+            def generar_reporte_con_grafica(df_input, nombre_hoja):
+                from openpyxl.chart import BarChart, Reference
+                
+                df_temp = df_input.copy()
+                cols_n = ["REHAB", "MANTO", "SUST", "AMPLI"]
+                for c in cols_n:
+                    df_temp[c] = pd.to_numeric(df_temp[c], errors='coerce').fillna(0)
+                
+                # 1. Crear fila de Totales
+                fila_tot = {col: "" for col in df_temp.columns}
+                fila_tot["FECHA"] = "TOTALES"
+                for c in cols_n: fila_tot[c] = df_temp[c].sum()
+                df_reporte = pd.concat([df_temp, pd.DataFrame([fila_tot])], ignore_index=True)
+                
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_reporte.to_excel(writer, index=False, sheet_name=nombre_hoja)
+                    wb = writer.book
+                    ws = wb[nombre_hoja]
+                    
+                    # 2. Configurar Gráfica de Barras
+                    chart = BarChart()
+                    chart.type = "col"
+                    chart.style = 10
+                    chart.title = f"Resumen de Trabajo - {nombre_hoja}"
+                    chart.y_axis.title = 'Cantidad'
+                    chart.x_axis.title = 'Actividades'
+                    
+                    # Ubicar columnas de métricas para la gráfica
+                    idx_inicio = df_reporte.columns.get_loc("REHAB") + 1
+                    idx_fin = df_reporte.columns.get_loc("AMPLI") + 1
+                    fila_totales = len(df_reporte) + 1
+                    
+                    # Datos (Fila de totales) y Categorías (Encabezados)
+                    data = Reference(ws, min_col=idx_inicio, max_col=idx_fin, min_row=fila_totales, max_row=fila_totales)
+                    cats = Reference(ws, min_col=idx_inicio, max_col=idx_fin, min_row=1, max_row=1)
+                    
+                    chart.add_data(data, titles_from_data=False)
+                    chart.set_categories(cats)
+                    ws.add_chart(chart, "M2") # Insertar a la derecha de los datos
+                return output.getvalue()
+
+            st.write("---")
+            st.subheader("📥 Descargar Reportes con Gráficas")
+            d_col1, d_col2, d_col3 = st.columns(3)
+
+            # 1. BOTÓN REPORTE MASIVO
+            if st.session_state.masivo_pangea is not None:
+                df_m_f = st.session_state.masivo_pangea.copy()
+                if sel_del != "TODAS": df_m_f = df_m_f[df_m_f['del_norm'] == normalizar_texto(sel_del)]
+                if sel_utb != "TODAS": df_m_f = df_m_f[df_m_f['utb_norm'] == normalizar_texto(sel_utb)]
+                if not df_m_f.empty:
+                    df_m_out = df_m_f.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
+                    df_m_out.columns = ["FECHA", "OT", "FOLIO", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+                    xlsx_masivo = generar_reporte_con_grafica(df_m_out, "MASIVO")
+                    d_col1.download_button("📂 Reporte MASIVO", xlsx_masivo, "REPORTE_MASIVO.xlsx", use_container_width=True)
+
+            # 2. BOTÓN REPORTE MANUAL
+            if "manual_db" in st.session_state and st.session_state.manual_db:
+                df_man_f = pd.DataFrame(st.session_state.manual_db)
+                if sel_del != "TODAS": df_man_f = df_man_f[df_man_f['DELEGACIÓN'] == sel_del]
+                if sel_utb != "TODAS": df_man_f = df_man_f[df_man_f['UTB'] == sel_utb]
+                if not df_man_f.empty:
+                    xlsx_manual = generar_reporte_con_grafica(df_man_f, "MANUAL")
+                    d_col2.download_button("📝 Reporte MANUAL", xlsx_manual, "REPORTE_MANUAL.xlsx", use_container_width=True)
+
+            # 3. BOTÓN REPORTE UNIFICADO (COMPLETO)
+            xlsx_unificado = generar_reporte_con_grafica(df_final_vista, "UNIFICADO")
+            d_col3.download_button("🚀 Reporte UNIFICADO", xlsx_unificado, "REPORTE_UNIFICADO.xlsx", use_container_width=True)
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
