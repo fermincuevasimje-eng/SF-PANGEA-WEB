@@ -798,29 +798,26 @@ else:
                 col_txt.write(texto_mostrar)
                 icon = "🟦" if tipo_mostrar == "Proceso" else "🔶"
                 col_tipo.write(f"{icon} {tipo_mostrar}")
-                if col_ed.button("✏️", key=f"ed_{idx}"):
-                    st.session_state.edit_index = idx
-                    st.rerun()
-                if col_del.button("🗑️", key=f"del_{idx}"):
-                    st.session_state.pasos_sf4.pop(idx)
-                    st.rerun()
+                if st.button("🔥 Limpiar Todo el Proceso", use_container_width=True):
+                st.session_state.pasos_sf4 = []
+                st.rerun()
 
-            # --- 3. GENERADOR DE CÓDIGO Y EXPORTACIÓN ---
+            # --- 3. GENERACIÓN DE RESULTADOS ---
+            # Esta línea debe estar alineada con el "if st.session_state.pasos_sf4:"
             st.markdown("---")
+            enfoque = st.radio("Seleccione Enfoque:", ["Técnico-Operativo", "Administrativo-Legal"], horizontal=True)
             
-            # Construcción lógica del código Mermaid
+            # Lógica para construir el código Mermaid
             def clean_m(t): return re.sub(r'[^a-zA-Z0-9 ]', '', t)
             
             mermaid_lines = ["graph TD"]
             for i, nodo in enumerate(st.session_state.pasos_sf4):
                 txt = clean_m(nodo["texto"])
-                # Si es Decisión usa {}, si es Proceso usa []
                 if nodo["tipo"] == "Decisión":
                     mermaid_lines.append(f'    Node{i}{{"{txt}"}}')
                 else:
                     mermaid_lines.append(f'    Node{i}["{txt}"]')
                 
-                # Conectar con el siguiente
                 if i < len(st.session_state.pasos_sf4) - 1:
                     mermaid_lines.append(f'    Node{i} --> Node{i+1}')
             
@@ -829,8 +826,8 @@ else:
             # Generar URL para Mermaid Live Editor
             import base64
             graph_bytes = full_mermaid_code.encode('utf-8')
-            base64_code = base64.b64encode(graph_bytes).decode('utf-8')
-            mermaid_live_url = f"https://mermaid.live/edit#base64:{base64_code}"
+            base_code = base64.b64encode(graph_bytes).decode('utf-8')
+            mermaid_live_url = f"https://mermaid.live/edit#base64:{base_code}"
 
             tab_viz, tab_code = st.tabs(["📊 Visualización Interna", "💻 Código y Exportación"])
 
@@ -852,14 +849,9 @@ else:
                 st.code(full_mermaid_code, language="mermaid")
                 st.link_button("🚀 ABRIR EN MERMAID LIVE EDITOR", mermaid_live_url, use_container_width=True)
                 
-                # Botón de Descarga de Manual simplificado
                 manual_txt = "MANUAL DE PROCEDIMIENTOS SF\n" + "="*30 + "\n"
                 for i, n in enumerate(st.session_state.pasos_sf4, 1):
                     manual_txt += f"{i}. [{n['tipo'].upper()}] {n['texto']}\n"
                 st.download_button("📥 Descargar Manual (.txt)", manual_txt, "manual_sf4.txt", use_container_width=True)
-
-            if st.button("🔥 Reiniciar Constructor", use_container_width=True):
-                st.session_state.pasos_sf4 = []
-                st.rerun()
         else:
             st.info("Inicie agregando el primer paso de su proceso municipal.")
