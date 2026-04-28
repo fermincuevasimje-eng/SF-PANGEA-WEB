@@ -178,6 +178,12 @@ if "lista_bajas" not in st.session_state:
 if "input_key" not in st.session_state:
     st.session_state.input_key = 0
 
+# --- ESTADOS PARA EL MÓDULO SF4 (DISEÑO DE PROCESOS) ---
+if "pasos_sf4" not in st.session_state:
+    st.session_state.pasos_sf4 = []
+if "edit_index" not in st.session_state:
+    st.session_state.edit_index = -1
+
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
     col_u, col_p = st.columns(2)
@@ -744,86 +750,96 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-        st.title("🏗️ SF4 - GdP (Generador de Procedimientos)")
-        st.info("Escriba la idea de un proceso municipal y el sistema generará la documentación y el diagrama de flujo automáticamente.")
+        st.title("🏗️ SF4 - Constructor de Procesos Dinámico")
+        st.info("Agregue los pasos secuencialmente para diseñar el manual y el diagrama de flujo.")
 
-        # --- PANEL DE CONTROL ---
-        with st.container():
-            col_input, col_config = st.columns([2, 1])
+        # --- 1. CAPTURA DE PASOS ---
+        with st.expander("➕ Agregar / Editar Paso del Proceso", expanded=True):
+            col_t, col_btn = st.columns([3, 1])
             
-            with col_input:
-                idea_proceso = st.text_area("💡 Describa el proceso o pegue sus notas aquí:", 
-                                           height=200, 
-                                           placeholder="Ej: El ciudadano reporta poste apagado, el jefe de unidad genera orden...")
+            # Texto sugerido para el editor
+            txt_default = ""
+            if st.session_state.edit_index != -1:
+                txt_default = st.session_state.pasos_sf4[st.session_state.edit_index]
 
-            with col_config:
-                st.write("⚙️ **Configuración de Salida**")
-                enfoque = st.radio("Enfoque del lenguaje:", 
-                                  ["Técnico-Operativo", "Administrativo-Legal"], 
-                                  help="El modo técnico se enfoca en campo; el administrativo en normativa y plazos.")
-                
-                btn_generar = st.button("🚀 GENERAR DOCUMENTACIÓN COMPLETA", use_container_width=True)
-
-        if btn_generar and idea_proceso:
-            with st.spinner("Procesando idea y dibujando diagrama..."):
-                # Simulación de procesamiento estructurado (Lógica GdP)
-                if enfoque == "Técnico-Operativo":
-                    tit = "MANUAL TÉCNICO DE CAMPO"
-                    rol = "Personal Operativo / Cuadrillas"
-                    p1 = "Arribo al sitio y verificación de condiciones de seguridad."
-                    p2 = "Evaluación de materiales (Luminarias, cable, postes)."
+            with col_t:
+                nuevo_paso = st.text_input("Descripción del paso (Acción o Decisión):", 
+                                          value=txt_default, 
+                                          key="input_paso_sf4")
+            
+            with col_btn:
+                if st.session_state.edit_index == -1:
+                    if st.button("➕ Agregar Paso", use_container_width=True):
+                        if nuevo_paso:
+                            st.session_state.pasos_sf4.append(nuevo_paso)
+                            st.rerun()
                 else:
-                    tit = "MANUAL ADMINISTRATIVO-NORMATIVO"
-                    rol = "Control Técnico / Dirección"
-                    p1 = "Validación de folio RISP en el plazo de 15 días hábiles."
-                    p2 = "Certificación de cumplimiento y firma de conformidad."
+                    if st.button("💾 Guardar Cambio", use_container_width=True):
+                        st.session_state.pasos_sf4[st.session_state.edit_index] = nuevo_paso
+                        st.session_state.edit_index = -1
+                        st.rerun()
+                    if st.button("❌ Cancelar", use_container_width=True):
+                        st.session_state.edit_index = -1
+                        st.rerun()
 
-                # Generación automática de código Mermaid para el diagrama
-                # (En una fase futura esta lógica se vuelve dinámica con IA)
-                mermaid_code = f"""
-                graph TD
-                    A[Inicio del Proceso] --> B{{¿Es Viable?}}
-                    B -- Sí --> C[{p1}]
-                    B -- No --> D[Justificar en Orden]
-                    C --> E[{p2}]
-                    D --> F[Estatus: Programada]
-                    E --> G[Cierre en RISP]
-                    F & G --> H[Fin]
+        # --- 2. GESTIÓN DE LA LISTA ---
+        if st.session_state.pasos_sf4:
+            st.subheader("📋 Secuencia del Proceso")
+            for idx, paso in enumerate(st.session_state.pasos_sf4):
+                col_n, col_txt, col_ed, col_del = st.columns([0.5, 4, 1, 1])
+                col_n.write(f"**{idx + 1}.**")
+                col_txt.write(paso)
+                if col_ed.button("✏️", key=f"ed_{idx}"):
+                    st.session_state.edit_index = idx
+                    st.rerun()
+                if col_del.button("🗑️", key=f"del_{idx}"):
+                    st.session_state.pasos_sf4.pop(idx)
+                    st.rerun()
+            
+            if st.button("🔥 Limpiar Todo el Proceso", use_container_width=True):
+                st.session_state.pasos_sf4 = []
+                st.rerun()
+
+            # --- 3. GENERACIÓN DE RESULTADOS ---
+            st.markdown("---")
+            enfoque = st.radio("Seleccione Enfoque:", ["Técnico-Operativo", "Administrativo-Legal"], horizontal=True)
+            
+            # Lógica para construir el código Mermaid automáticamente
+            # Reemplazamos espacios y caracteres raros para que Mermaid no falle
+            def clean_m(t): return re.sub(r'[^a-zA-Z0-9 ]', '', t)
+
+            mermaid_steps = []
+            for i in range(len(st.session_state.pasos_sf4) - 1):
+                p_actual = clean_m(st.session_state.pasos_sf4[i])
+                p_siguiente = clean_m(st.session_state.pasos_sf4[i+1])
+                mermaid_steps.append(f'    Step{i}["{p_actual}"] --> Step{i+1}["{p_siguiente}"]')
+            
+            mermaid_code = "graph TD\n" + "\n".join(mermaid_steps)
+
+            tab_doc, tab_flow = st.tabs(["📄 Manual de Procedimientos", "📊 Diagrama Mermaid"])
+            
+            with tab_doc:
+                st.subheader("📝 Borrador del Manual")
+                header = "MODO TÉCNICO: ENFOQUE EN CAMPO" if enfoque == "Técnico-Operativo" else "MODO ADM: ENFOQUE EN PLAZOS Y NORMATIVA"
+                contenido_manual = f"--- {header} ---\n\n"
+                for i, p in enumerate(st.session_state.pasos_sf4, 1):
+                    contenido_manual += f"PASO {i}: {p}\n"
+                
+                st.text_area("Previsualización:", contenido_manual, height=250)
+                st.download_button("📥 Descargar Manual (.txt)", contenido_manual, "manual_pangea.txt")
+
+            with tab_flow:
+                st.subheader("🖼️ Diagrama de Flujo Automático")
+                import streamlit.components.v1 as components
+                html_code = f"""
+                <div class="mermaid" style="background-color: white; display: flex; justify-content: center;">
+                    {mermaid_code}
+                </div>
+                <script type="module">
+                    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                    mermaid.initialize({{ startOnLoad: true, theme: 'forest' }});
+                </script>
                 """
-
-                st.markdown("---")
-                tab_doc, tab_flow = st.tabs(["📄 Documentación Generada", "📊 Diagrama de Flujo"])
-
-                with tab_doc:
-                    st.subheader(f"📑 {tit}")
-                    col_doc1, col_doc2 = st.columns(2)
-                    with col_doc1:
-                        st.markdown(f"**1. Perfil del Responsable:**\n{rol}")
-                        st.markdown(f"**2. Paso 1 (Inicio):**\n{p1}")
-                    with col_doc2:
-                        st.markdown(f"**3. Paso 2 (Desarrollo):**\n{p2}")
-                        st.markdown("**4. Cierre:**\nActualización de estatus en plataforma.")
-                    
-                    st.write("---")
-                    st.download_button("📥 Descargar Borrador (.txt)", 
-                                     f"{tit}\n\nIdea: {idea_proceso}\n\nPasos:\n- {p1}\n- {p2}", 
-                                     "manual_sf4.txt")
-
-                with tab_flow:
-                    st.subheader("🖼️ Visualización del Proceso")
-                    # Motor de renderizado de diagramas
-                    import streamlit.components.v1 as components
-                    
-                    html_code = f"""
-                    <pre class="mermaid" style="background-color: white;">
-                        {mermaid_code}
-                    </pre>
-                    <script type="module">
-                        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                        mermaid.initialize({{ startOnLoad: true }});
-                    </script>
-                    """
-                    components.html(html_code, height=500, scrolling=True)
-
-        elif btn_generar and not idea_proceso:
-            st.warning("⚠️ Por favor, escriba una idea primero.")
+                components.html(html_code, height=600, scrolling=True)
+        else:
+            st.info("Aún no hay pasos en el proceso. Use el cuadro de arriba para comenzar a construir.")
