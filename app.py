@@ -744,8 +744,86 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-        st.write("---")                       # La raya ahora separa el menú del título
-        st.title("🏗️ SF4 - Diseño de Procesos") 
-        st.info("Bienvenido a la sección de diseño...")
-        st.info("Bienvenido al Módulo de Diseño de Procesos.")
-        st.write("Seleccione una herramienta para sistematizar actividades diarias.")
+        st.title("🏗️ SF4 - GdP (Generador de Procedimientos)")
+        st.info("Escriba la idea de un proceso municipal y el sistema generará la documentación y el diagrama de flujo automáticamente.")
+
+        # --- PANEL DE CONTROL ---
+        with st.container():
+            col_input, col_config = st.columns([2, 1])
+            
+            with col_input:
+                idea_proceso = st.text_area("💡 Describa el proceso o pegue sus notas aquí:", 
+                                           height=200, 
+                                           placeholder="Ej: El ciudadano reporta poste apagado, el jefe de unidad genera orden...")
+
+            with col_config:
+                st.write("⚙️ **Configuración de Salida**")
+                enfoque = st.radio("Enfoque del lenguaje:", 
+                                  ["Técnico-Operativo", "Administrativo-Legal"], 
+                                  help="El modo técnico se enfoca en campo; el administrativo en normativa y plazos.")
+                
+                btn_generar = st.button("🚀 GENERAR DOCUMENTACIÓN COMPLETA", use_container_width=True)
+
+        if btn_generar and idea_proceso:
+            with st.spinner("Procesando idea y dibujando diagrama..."):
+                # Simulación de procesamiento estructurado (Lógica GdP)
+                if enfoque == "Técnico-Operativo":
+                    tit = "MANUAL TÉCNICO DE CAMPO"
+                    rol = "Personal Operativo / Cuadrillas"
+                    p1 = "Arribo al sitio y verificación de condiciones de seguridad."
+                    p2 = "Evaluación de materiales (Luminarias, cable, postes)."
+                else:
+                    tit = "MANUAL ADMINISTRATIVO-NORMATIVO"
+                    rol = "Control Técnico / Dirección"
+                    p1 = "Validación de folio RISP en el plazo de 15 días hábiles."
+                    p2 = "Certificación de cumplimiento y firma de conformidad."
+
+                # Generación automática de código Mermaid para el diagrama
+                # (En una fase futura esta lógica se vuelve dinámica con IA)
+                mermaid_code = f"""
+                graph TD
+                    A[Inicio del Proceso] --> B{{¿Es Viable?}}
+                    B -- Sí --> C[{p1}]
+                    B -- No --> D[Justificar en Orden]
+                    C --> E[{p2}]
+                    D --> F[Estatus: Programada]
+                    E --> G[Cierre en RISP]
+                    F & G --> H[Fin]
+                """
+
+                st.markdown("---")
+                tab_doc, tab_flow = st.tabs(["📄 Documentación Generada", "📊 Diagrama de Flujo"])
+
+                with tab_doc:
+                    st.subheader(f"📑 {tit}")
+                    col_doc1, col_doc2 = st.columns(2)
+                    with col_doc1:
+                        st.markdown(f"**1. Perfil del Responsable:**\n{rol}")
+                        st.markdown(f"**2. Paso 1 (Inicio):**\n{p1}")
+                    with col_doc2:
+                        st.markdown(f"**3. Paso 2 (Desarrollo):**\n{p2}")
+                        st.markdown("**4. Cierre:**\nActualización de estatus en plataforma.")
+                    
+                    st.write("---")
+                    st.download_button("📥 Descargar Borrador (.txt)", 
+                                     f"{tit}\n\nIdea: {idea_proceso}\n\nPasos:\n- {p1}\n- {p2}", 
+                                     "manual_sf4.txt")
+
+                with tab_flow:
+                    st.subheader("🖼️ Visualización del Proceso")
+                    # Motor de renderizado de diagramas
+                    import streamlit.components.v1 as components
+                    
+                    html_code = f"""
+                    <pre class="mermaid" style="background-color: white;">
+                        {mermaid_code}
+                    </pre>
+                    <script type="module">
+                        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                        mermaid.initialize({{ startOnLoad: true }});
+                    </script>
+                    """
+                    components.html(html_code, height=500, scrolling=True)
+
+        elif btn_generar and not idea_proceso:
+            st.warning("⚠️ Por favor, escriba una idea primero.")
