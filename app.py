@@ -853,20 +853,21 @@ else:
             
             with tab_code:
                 st.subheader("🛠️ Panel de Código Seguro")
-                st.code(full_code, language="mermaid")
+                # Variable unificada: full_mermaid_code
+                st.code(full_mermaid_code, language="mermaid") 
                 
                 contenido_manual = "MANUAL DE PROCEDIMIENTOS SF\n" + "="*20 + "\n\n"
                 for i, n in enumerate(st.session_state.pasos_sf4, 1):
-                    contenido_manual += f"PASO {i}: {n['texto'] if isinstance(n, dict) else n}\n"
+                    txt_manual = n['texto'] if isinstance(n, dict) else n
+                    contenido_manual += f"PASO {i}: {txt_manual}\n"
                 
                 st.download_button("📥 Descargar Manual (.txt)", contenido_manual, "manual_sf4.txt")
 
-            with tab_live:
+            with tab_live: # Sin espacio, como corregimos antes
                 st.subheader("Finalizar en el Editor Profesional")
-                # Botón de Mermaid Live (Técnica de codificación Base64)
                 import base64
-                b64 = base64.b64encode(full_code.encode('utf-8')).decode('utf-8')
-                st.link_button("🚀 🔥 IR A MERMAID LIVE EDITOR (CON CÓDIGO SEGURO)", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
-
+                # Usamos la misma variable corregida: full_mermaid_code
+                b64 = base64.b64encode(full_mermaid_code.encode('utf-8')).decode('utf-8')
+                st.link_button("🚀 🔥 IR A MERMAID LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
         else:
             st.info("Aún no hay pasos en el proceso. Use el panel superior para comenzar a construir.")
