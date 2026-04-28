@@ -822,27 +822,40 @@ else:
 
             for i, n in enumerate(st.session_state.pasos_sf4):
                 id_actual = f"N{i}"
-                txt = n["texto"]
+                
+                # PARCHE DE SEGURIDAD: Si el nodo es viejo, le asignamos valores por defecto
+                if isinstance(n, dict):
+                    txt = n.get("texto", "Sin texto")
+                    tipo = n.get("tipo", "Proceso (Rectángulo)")
+                    target = n.get("conecta_a", "Siguiente")
+                    etiqueta_flecha = n.get("etiqueta_flecha", "")
+                else:
+                    txt = n
+                    tipo = "Proceso (Rectángulo)"
+                    target = "Siguiente"
+                    etiqueta_flecha = ""
                 
                 # Definición de formas
-                if "Decisión" in n["tipo"]:
+                if "Decisión" in tipo:
                     mmd.append(f'    {id_actual}{{"{txt}"}}:::decision')
-                elif "Inicio" in n["tipo"]:
+                elif "Inicio" in tipo:
                     mmd.append(f'    {id_actual}(("{txt}"))')
                 else:
                     mmd.append(f'    {id_actual}["{txt}"]:::proceso')
 
-                # Lógica de conexión
-                target = n["conecta_a"]
-                etiqueta = f'-- "{n["etiqueta_flecha"]}" -->' if n["etiqueta_flecha"] else "-->"
+                # Lógica de conexión mejorada
+                flecha = f'-- "{etiqueta_flecha}" -->' if etiqueta_flecha else "-->"
                 
                 if target == "Siguiente" and i < len(st.session_state.pasos_sf4) - 1:
-                    mmd.append(f'    {id_actual} {etiqueta} N{i+1}')
+                    mmd.append(f'    {id_actual} {flecha} N{i+1}')
                 elif "Paso" in target:
-                    idx_target = int(target.replace("Paso ", "")) - 1
-                    mmd.append(f'    {id_actual} {etiqueta} N{idx_target}')
+                    try:
+                        idx_target = int(re.search(r'\d+', target).group()) - 1
+                        mmd.append(f'    {id_actual} {flecha} N{idx_target}')
+                    except:
+                        pass
                 elif target == "Fin":
-                    mmd.append(f'    {id_actual} {etiqueta} Fin([Fin])')
+                    mmd.append(f'    {id_actual} {flecha} Fin([Fin del Proceso])')
 
             full_code = "\n".join(mmd)
 
