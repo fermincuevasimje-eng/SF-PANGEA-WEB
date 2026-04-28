@@ -751,123 +751,128 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-        st.title("🏗️ SF4 - Constructor de Procesos Controlado")
-        st.info("Agregue, edite o elimine pasos secuenciales. Use el panel de exportación para generar el código Mermaid limpio y seguro.")
+        st.title("🏗️ SF4 - Arquitecto de Procesos Profesional")
+        st.info("Diseñe flujos complejos con decisiones, saltos de línea y etiquetas personalizadas.")
 
-        # --- ZONA DE CAPTURA Y EDICIÓN (FORMULARIO ÚNICO) ---
-        with st.expander("📝 AGREGAR / EDITAR PASO", expanded=(st.session_state.edit_index == -1)):
-            col_t, col_btn = st.columns([3, 1])
+        # --- 1. CAPTURA Y EDICIÓN DE NODOS ---
+        with st.expander("📝 Configurar Paso del Proceso", expanded=(st.session_state.edit_index == -1)):
+            # Valores por defecto para el formulario
+            txt_def, tipo_def, con_def, lab_def = "", "Proceso", "Siguiente", ""
             
-            # Texto sugerido para el editor
-            txt_default = ""
             if st.session_state.edit_index != -1:
-                # Obtenemos el texto del diccionario guardado
-                txt_default = st.session_state.pasos_sf4[st.session_state.edit_index]['texto']
+                n_edit = st.session_state.pasos_sf4[st.session_state.edit_index]
+                txt_def = n_edit.get('texto', "")
+                tipo_def = n_edit.get('tipo', "Proceso")
+                con_def = n_edit.get('conecta_a', "Siguiente")
+                lab_def = n_edit.get('etiqueta_flecha', "")
 
+            col_t, col_tp = st.columns([2, 1])
             with col_t:
-                nuevo_paso = st.text_input("Descripción detallada del paso (Acción o Decisión):", 
-                                          value=txt_default, 
-                                          key="input_paso_sf4_core")
-            
-            with col_btn:
-                # Comportamiento reactivo según el modo (Agregar o Guardar Cambio)
-                if st.session_state.edit_index == -1:
-                    if st.button("➕ AGREGAR PASO A LA LISTA", use_container_width=True):
-                        if nuevo_paso:
-                            # Guardamos texto y, de momento, 'tipo' Proceso por defecto
-                            st.session_state.pasos_sf4.append({'texto': nuevo_paso, 'tipo': 'Proceso'})
-                            st.rerun()
-                else:
-                    if st.button("💾 GUARDAR CAMBIO", use_container_width=True):
-                        st.session_state.pasos_sf4[st.session_state.edit_index]['texto'] = nuevo_paso
-                        st.session_state.edit_index = -1
-                        st.rerun()
-                    if st.button("❌ CANCELAR", use_container_width=True):
-                        st.session_state.edit_index = -1
-                        st.rerun()
+                nuevo_txt = st.text_input("Actividad o Pregunta:", value=txt_def)
+            with col_tp:
+                nuevo_tipo = st.selectbox("Forma del Nodo:", ["Proceso", "Decisión", "Inicio/Fin"], 
+                                         index=["Proceso", "Decisión", "Inicio/Fin"].index(tipo_def))
 
-        # --- ZONA DE GESTIÓN INTERACTIVA DE LA LISTA ---
+            col_con, col_lab = st.columns([1, 1])
+            with col_con:
+                # Generamos lista de destinos posibles: Siguiente, Fin, o cualquier paso existente
+                destinos = ["Siguiente", "Fin"] + [f"Paso {i+1}" for i in range(len(st.session_state.pasos_sf4))]
+                # Evitamos error si el destino guardado ya no existe
+                idx_con = destinos.index(con_def) if con_def in destinos else 0
+                nuevo_con = st.selectbox("Conectar con:", destinos, index=idx_con)
+            with col_lab:
+                nuevo_lab = st.text_input("Texto en la flecha (ej: Sí, No):", value=lab_def)
+
+            # Botones de Acción
+            st.write("")
+            b_add, b_can = st.columns([1, 4])
+            if st.session_state.edit_index == -1:
+                if b_add.button("➕ Agregar", use_container_width=True):
+                    if nuevo_txt:
+                        st.session_state.pasos_sf4.append({
+                            "texto": nuevo_txt, "tipo": nuevo_tipo, 
+                            "conecta_a": nuevo_con, "etiqueta_flecha": nuevo_lab
+                        })
+                        st.rerun()
+            else:
+                c_edit, c_can = st.columns([1, 1])
+                if c_edit.button("💾 Guardar Cambios", use_container_width=True):
+                    st.session_state.pasos_sf4[st.session_state.edit_index] = {
+                        "texto": nuevo_txt, "tipo": nuevo_tipo, 
+                        "conecta_a": nuevo_con, "etiqueta_flecha": nuevo_lab
+                    }
+                    st.session_state.edit_index = -1
+                    st.rerun()
+                if c_can.button("❌ Cancelar", use_container_width=True):
+                    st.session_state.edit_index = -1
+                    st.rerun()
+
+        # --- 2. GESTIÓN DE LA LISTA ---
         if st.session_state.pasos_sf4:
-            st.markdown("---")
-            st.subheader("📋 Secuencia del Proceso")
+            st.subheader("📋 Estructura del Proceso")
             for idx, n in enumerate(st.session_state.pasos_sf4):
-                col_n, col_txt, col_ed, col_del = st.columns([0.5, 4, 1, 1])
-                col_n.write(f"**{idx + 1}**")
+                col_n, col_txt, col_tipo, col_con, col_ops = st.columns([0.4, 3, 1, 1.2, 1])
+                col_n.write(f"**{idx+1}**")
+                col_txt.write(n['texto'])
+                col_tipo.write(f"({n['tipo']})")
+                col_con.write(f"➡️ {n['conecta_a']}")
                 
-                # Manejo de datos mixtos si hay textos viejos, sino usa 'texto'
-                t = n['texto'] if isinstance(n, dict) else n
-                col_txt.write(t)
-                
-                if col_ed.button("✏️", key=f"ed_{idx}"):
+                # Botones de edición y borrado
+                c_ed, c_del = col_ops.columns(2)
+                if c_ed.button("✏️", key=f"btn_ed_{idx}"):
                     st.session_state.edit_index = idx
                     st.rerun()
-                if col_del.button("🗑️", key=f"del_{idx}"):
+                if c_del.button("🗑️", key=f"btn_del_{idx}"):
                     st.session_state.pasos_sf4.pop(idx)
                     st.rerun()
-            
-            col_l1, col_l2 = st.columns([1,3])
-            if col_l1.button("🔥 LIMPIAR TODO EL PROCESO", use_container_width=True):
+
+            if st.button("🔥 Reiniciar Todo", use_container_width=True):
                 st.session_state.pasos_sf4 = []
                 st.session_state.edit_index = -1
                 st.rerun()
 
-            # --- PANEL DE EXPORTACIÓN Y ANÁLISIS ---
+            # --- 3. GENERACIÓN DE CÓDIGO MERMAID ---
             st.markdown("---")
-            
-            # 🔧 FUNCIÓN SENIOR DE LIMPIEZA ANTI-ERROR (Crucial para Mermaid Live)
-            def clean_m_professional(text_input):
-                if not text_input: return ""
-                # Reemplazamos caracteres peligrosos por un guion bajo
-                s_chars = '[];{}()-->]'
-                text_input = re.sub(s_chars, '_', str(text_input))
-                # Eliminamos saltos de línea internos
-                text_input = text_input.replace('\n', ' ').replace('\r', '')
-                # Limpiamos espacios dobles
-                text_input = ' '.join(text_input.split())
-                return text_input
+            def clean(t): return re.sub(r'[^a-zA-Z0-9 ]', '', str(t))
 
-            # Lógica para construir el código Mermaid automáticamente
-            mermaid_lines = ["graph TD"]
-            # Estilo básico para que no sea totalmente plano
-            mermaid_lines.append("    classDef process fill:#bbf,stroke:#333,stroke-width:2px;")
-            mermaid_lines.append("    classDef decision fill:#f9f,stroke:#333,stroke-width:2px,rx:10,ry:10;")
+            mmd = ["graph TD"]
+            # Estilos para que no sea plano
+            mmd.append("    classDef decision fill:#f9f,stroke:#333,stroke-width:2px;")
+            mmd.append("    classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;")
 
-            for i in range(len(st.session_state.pasos_sf4)):
-                # Obtenemos texto del diccionario o texto plano viejo
-                n = st.session_state.pasos_sf4[i]
-                t_raw = n['texto'] if isinstance(n, dict) else n
-                txt_safe = clean_m_professional(t_raw)
+            for i, n in enumerate(st.session_state.pasos_sf4):
+                id_a = f"N{i}"
+                txt = clean(n['texto'])
                 
-                # Definición de Nodos (con comillas internas para seguridad)
-                # i = ID, txt_safe = Contenido seguro
-                # De momento, todo proceso, pero la estructura está lista para diamantes
-                mermaid_lines.append(f'    Node{i}["{txt_safe}"]:::process')
-                
-                # Definición de Conexiones
-                if i < len(st.session_state.pasos_sf4) - 1:
-                    mermaid_lines.append(f'    Node{i} --> Node{i+1}')
-            
-            full_mermaid_code = "\n".join(mermaid_lines)
+                # Formas de los nodos
+                if n['tipo'] == "Decisión":
+                    mmd.append(f'    {id_a}{{"{txt}"}}:::decision')
+                elif n['tipo'] == "Inicio/Fin":
+                    mmd.append(f'    {id_a}(("{txt}"))')
+                else:
+                    mmd.append(f'    {id_a}["{txt}"]:::proceso')
 
-            tab_code, tab_live = st.tabs(["💻 Código y Exportación (Usa esto)", "🚀 Abrir en Mermaid Live Editor"])
-            
-            with tab_code:
-                st.subheader("🛠️ Panel de Código Seguro")
-                # Variable unificada: full_mermaid_code
-                st.code(full_mermaid_code, language="mermaid") 
+                # Conexiones
+                target = n['conecta_a']
+                flecha = f'-- "{n["etiqueta_flecha"]}" -->' if n["etiqueta_flecha"] else "-->"
                 
-                contenido_manual = "MANUAL DE PROCEDIMIENTOS SF\n" + "="*20 + "\n\n"
-                for i, n in enumerate(st.session_state.pasos_sf4, 1):
-                    txt_manual = n['texto'] if isinstance(n, dict) else n
-                    contenido_manual += f"PASO {i}: {txt_manual}\n"
-                
-                st.download_button("📥 Descargar Manual (.txt)", contenido_manual, "manual_sf4.txt")
+                if target == "Siguiente" and i < len(st.session_state.pasos_sf4) - 1:
+                    mmd.append(f'    {id_a} {flecha} N{i+1}')
+                elif "Paso" in target:
+                    idx_t = int(re.search(r'\d+', target).group()) - 1
+                    mmd.append(f'    {id_a} {flecha} N{idx_t}')
+                elif target == "Fin":
+                    mmd.append(f'    {id_a} {flecha} Fin([Fin])')
 
-            with tab_live: # Sin espacio, como corregimos antes
-                st.subheader("Finalizar en el Editor Profesional")
+            full_mermaid_code = "\n".join(mmd)
+
+            # --- 4. EXPORTACIÓN ---
+            tab_c, tab_l = st.tabs(["💻 Código", "🚀 Mermaid Live"])
+            with tab_c:
+                st.code(full_mermaid_code, language="mermaid")
+            with tab_l:
                 import base64
-                # Usamos la misma variable corregida: full_mermaid_code
                 b64 = base64.b64encode(full_mermaid_code.encode('utf-8')).decode('utf-8')
-                st.link_button("🚀 🔥 IR A MERMAID LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
+                st.link_button("🔥 ABRIR EN EDITOR PROFESIONAL", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
         else:
-            st.info("Aún no hay pasos en el proceso. Use el panel superior para comenzar a construir.")
+            st.info("Agregue el primer paso para comenzar.")
