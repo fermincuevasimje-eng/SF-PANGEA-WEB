@@ -849,7 +849,7 @@ else:
             
             full_mermaid_code = "\n".join(mermaid_lines)
 
-            tab_code, tab_ live = st.tabs(["💻 Código y Exportación (Usa esto)", "🚀 Abrir en Mermaid Live Editor"])
+            tab_code, tab_live = st.tabs(["💻 Código y Exportación (Usa esto)", "🚀 Abrir en Mermaid Live Editor"])
             
             with tab_code:
                 st.subheader("🛠️ Panel de Código Seguro")
@@ -861,7 +861,7 @@ else:
                 
                 st.download_button("📥 Descargar Manual (.txt)", contenido_manual, "manual_sf4.txt")
 
-            with tab_ live:
+            with tab_live:
                 st.subheader("Finalizar en el Editor Profesional")
                 # Botón de Mermaid Live (Técnica de codificación Base64)
                 import base64
