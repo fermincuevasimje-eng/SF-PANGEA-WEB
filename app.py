@@ -750,11 +750,11 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-        st.title("🏗️ SF4 - GdP (Arquitecto de Procesos)")
-        st.info("Diseñe procesos profesionales con nodos de decisión y exportación a Mermaid Live.")
+        st.title("🏗️ SF4 - Constructor de Procesos Dinámico")
+        st.info("Agregue los pasos secuencialmente para diseñar el manual y el diagrama de flujo.")
 
-        # --- 1. CAPTURA DE PASOS CON TIPO ---
-        with st.expander("➕ Configurar Nodo del Proceso", expanded=True):
+        # --- 1. CAPTURA DE PASOS ---
+        with st.expander("➕ Agregar / Editar Paso del Proceso", expanded=True):
             col_t, col_type, col_btn = st.columns([3, 1, 1])
             
             txt_default = ""
@@ -771,7 +771,7 @@ else:
                 nuevo_tipo = st.selectbox("Tipo de Nodo:", ["Proceso", "Decisión"], index=0 if tipo_default=="Proceso" else 1)
             
             with col_btn:
-                st.write(" ") # Espaciador
+                st.write(" ") 
                 if st.session_state.edit_index == -1:
                     if st.button("➕ Añadir", use_container_width=True):
                         if nuevo_texto:
@@ -783,33 +783,37 @@ else:
                         st.session_state.edit_index = -1
                         st.rerun()
 
-        # --- 2. GESTIÓN Y LIMPIEZA ---
-        for idx, nodo in enumerate(st.session_state.pasos_sf4):
-                # Validamos que el nodo sea un diccionario para evitar el error
-                if isinstance(nodo, dict):
-                    texto_mostrar = nodo.get("texto", "Sin texto")
-                    tipo_mostrar = nodo.get("tipo", "Proceso")
-                else:
-                    texto_mostrar = nodo
-                    tipo_mostrar = "Proceso"
-
+        # --- 2. GESTIÓN DE LA LISTA ---
+        if st.session_state.pasos_sf4:
+            st.subheader("📋 Secuencia del Proceso")
+            for idx, nodo in enumerate(st.session_state.pasos_sf4):
+                # Parche de seguridad por si hay datos viejos (strings)
+                t_v = nodo["texto"] if isinstance(nodo, dict) else nodo
+                tp_v = nodo["tipo"] if isinstance(nodo, dict) else "Proceso"
+                
                 col_n, col_txt, col_tipo, col_ed, col_del = st.columns([0.5, 4, 1.5, 1, 1])
                 col_n.write(f"**{idx + 1}**")
-                col_txt.write(texto_mostrar)
-                icon = "🟦" if tipo_mostrar == "Proceso" else "🔶"
-                col_tipo.write(f"{icon} {tipo_mostrar}")
-                if st.button("🔥 Limpiar Todo el Proceso", use_container_width=True):
+                col_txt.write(t_v)
+                icon = "🟦" if tp_v == "Proceso" else "🔶"
+                col_tipo.write(f"{icon} {tp_v}")
+                
+                if col_ed.button("✏️", key=f"ed_{idx}"):
+                    st.session_state.edit_index = idx
+                    st.rerun()
+                if col_del.button("🗑️", key=f"del_{idx}"):
+                    st.session_state.pasos_sf4.pop(idx)
+                    st.rerun()
+            
+            if st.button("🔥 Limpiar Todo el Proceso", use_container_width=True):
                 st.session_state.pasos_sf4 = []
                 st.rerun()
 
             # --- 3. GENERACIÓN DE RESULTADOS ---
-            # Esta línea debe estar alineada con el "if st.session_state.pasos_sf4:"
             st.markdown("---")
             enfoque = st.radio("Seleccione Enfoque:", ["Técnico-Operativo", "Administrativo-Legal"], horizontal=True)
             
-            # Lógica para construir el código Mermaid
-            def clean_m(t): return re.sub(r'[^a-zA-Z0-9 ]', '', t)
-            
+            def clean_m(t): return re.sub(r'[^a-zA-Z0-9 ]', '', str(t))
+
             mermaid_lines = ["graph TD"]
             for i, nodo in enumerate(st.session_state.pasos_sf4):
                 txt = clean_m(nodo["texto"])
