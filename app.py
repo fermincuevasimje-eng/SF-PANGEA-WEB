@@ -178,9 +178,9 @@ if "lista_bajas" not in st.session_state:
 if "input_key" not in st.session_state:
     st.session_state.input_key = 0
 
-# --- ESTADOS PARA EL MÓDULO SF4 (DISEÑO DE PROCESOS) ---
-if "pasos_sf4" not in st.session_state:
-    st.session_state.pasos_sf4 = []  # Ahora guardará diccionarios: {"texto": "", "tipo": ""}
+# --- ESTADOS PARA EL MÓDULO SF4 ---
+if "pasos_sf4" not in st.session_state or (len(st.session_state.pasos_sf4) > 0 and isinstance(st.session_state.pasos_sf4[0], str)):
+    st.session_state.pasos_sf4 = []  # Si detecta texto viejo, resetea la lista
 if "edit_index" not in st.session_state:
     st.session_state.edit_index = -1
 
@@ -784,14 +784,20 @@ else:
                         st.rerun()
 
         # --- 2. GESTIÓN Y LIMPIEZA ---
-        if st.session_state.pasos_sf4:
-            st.subheader("📋 Estructura del Diagrama")
-            for idx, nodo in enumerate(st.session_state.pasos_sf4):
+        for idx, nodo in enumerate(st.session_state.pasos_sf4):
+                # Validamos que el nodo sea un diccionario para evitar el error
+                if isinstance(nodo, dict):
+                    texto_mostrar = nodo.get("texto", "Sin texto")
+                    tipo_mostrar = nodo.get("tipo", "Proceso")
+                else:
+                    texto_mostrar = nodo
+                    tipo_mostrar = "Proceso"
+
                 col_n, col_txt, col_tipo, col_ed, col_del = st.columns([0.5, 4, 1.5, 1, 1])
                 col_n.write(f"**{idx + 1}**")
-                col_txt.write(nodo["texto"])
-                icon = "🟦" if nodo["tipo"] == "Proceso" else "🔶"
-                col_tipo.write(f"{icon} {nodo['tipo']}")
+                col_txt.write(texto_mostrar)
+                icon = "🟦" if tipo_mostrar == "Proceso" else "🔶"
+                col_tipo.write(f"{icon} {tipo_mostrar}")
                 if col_ed.button("✏️", key=f"ed_{idx}"):
                     st.session_state.edit_index = idx
                     st.rerun()
