@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from scipy.spatial.distance import cdist
-import re, unicodedata, simplekml, io, requests, time, random
+import re, unicodedata, simplekml, io, requests, time, random, os, json
 from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
@@ -184,6 +184,14 @@ if "pasos_sf4" not in st.session_state:
     st.session_state.pasos_sf4 = [] 
 if "edit_index" not in st.session_state:
     st.session_state.edit_index = -1
+
+# --- PROTOCOLO DE PERSISTENCIA DE BÓVEDA ---
+if "boveda_mmd" not in st.session_state:
+    if os.path.exists("boveda_pangea.json"):
+        with open("boveda_pangea.json", "r", encoding="utf-8") as f:
+            st.session_state.boveda_mmd = json.load(f)
+    else:
+        st.session_state.boveda_mmd = {}
 
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
@@ -834,7 +842,12 @@ else:
                     st.write("---")
                     nom_p = st.text_input("Nombre para Bóveda:")
                     if st.button("💾 Guardar"):
-                        if nom_p: st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}; st.success("Guardado.")
+                        if nom_p:
+                            st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
+                            # AGREGAR ESTA LÍNEA DE COMANDO PARA PERSISTENCIA FÍSICA:
+                            with open("boveda_pangea.json", "w", encoding="utf-8") as f:
+                                json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
+                            st.success("Guardado en disco y memoria.")
 
         with tab_b:
             if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
