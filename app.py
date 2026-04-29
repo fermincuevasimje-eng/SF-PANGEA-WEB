@@ -761,7 +761,7 @@ else:
     elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Arquitecto de Procesos v15.6.1")
         
-        tab_c, tab_b = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos"])
+        tab_c, tab_i, tab_b = st.tabs(["🆕 Constructor Inteligente", "📥 Importación Externa", "🗄️ Bóveda de Proyectos"])
 
         with tab_c:
             # --- 1. CAPTURA INTELIGENTE (AUTO-FILL & RESET) ---
@@ -907,6 +907,56 @@ else:
                             with open("boveda_pangea.json", "w", encoding="utf-8") as f:
                                 json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
                             st.success("Guardado en disco y memoria.")
+
+        # --- NUEVA PESTAÑA DE IMPORTACIÓN (INSERCIÓN V15.6.5) ---
+        with tab_i:
+            st.subheader("📥 Importar Código de Proceso")
+            st.info("Pega aquí el código Mermaid para rediseñar el flujo automáticamente.")
+            raw_import = st.text_area("Código de Fuente:", height=300, placeholder="graph TD\nN0[\"Inicio\"] --> N1[\"Paso 1\"]...", key="area_import_sf")
+            
+            if st.button("🚀 REDISEÑAR PROCESO", use_container_width=True):
+                if raw_import:
+                    try:
+                        nuevos_pasos = []
+                        lineas = raw_import.split('\n')
+                        nodos_dict = {}
+                        
+                        # Identificar Nodos (Procesos, Decisiones, Inicio/Fin)
+                        for l in lineas:
+                            m_p = re.search(r'(\w+)\s*\["(.*?)"\]', l) 
+                            m_d = re.search(r'(\w+)\s*\{(.*?)\}', l)  
+                            m_f = re.search(r'(\w+)\s*\(\("(.*?)"\)\)', l) 
+                            
+                            if m_p: nodos_dict[m_p.group(1)] = {"texto": m_p.group(2), "tipo": "Proceso"}
+                            elif m_d: nodos_dict[m_d.group(1)] = {"texto": m_d.group(2), "tipo": "Decisión"}
+                            elif m_f: nodos_dict[m_f.group(1)] = {"texto": m_f.group(2), "tipo": "Inicio/Fin"}
+
+                        # Mapear Conexiones y Formas
+                        for id_n, data in nodos_dict.items():
+                            p = {"texto": data['texto'], "tipo": data['tipo'], "is_decision": (data['tipo'] == "Decisión")}
+                            conns = re.findall(rf'{id_n}\s*(--\s*"(.*?)"\s*-->|-->)\s*(\w+)', raw_import)
+                            
+                            if not p["is_decision"]:
+                                if conns:
+                                    # Captura etiqueta de flecha si existe
+                                    p["etiqueta_flecha"] = conns[0][1] if conns[0][1] else ""
+                                    p["conecta_a"] = "Fin" if "Fin" in conns[0][2] else "Siguiente"
+                            else:
+                                # Lógica para SÍ/NO
+                                for _, label, dest_id in conns:
+                                    if any(x in label.upper() for x in ["SÍ", "SI", "OK", "YES", "S"]):
+                                        p["label_si"], p["dest_si"] = label, "Siguiente"
+                                    else:
+                                        p["label_no"], p["dest_no"] = label, "Fin"
+                            nuevos_pasos.append(p)
+
+                        if nuevos_pasos:
+                            st.session_state.pasos_sf4 = nuevos_pasos
+                            st.success("¡Mesa rediseñada! Revisa la pestaña de Constructor.")
+                            time.sleep(0.5)
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error en traducción: {e}")
 
         with tab_b:
             if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
