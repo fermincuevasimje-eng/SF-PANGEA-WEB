@@ -815,34 +815,65 @@ else:
                     if st.button("🔥 Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
 
                 with col_p:
-                    st.subheader("📊 Visualización de Proceso")
+                    st.subheader("📊 Visualización Premium (Gravedad Vertical)")
                     def clean(t): return re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', str(t))
                     
-                    mmd = ["graph TD", 
-                           "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", 
-                           "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
+                    # Motor de Gravedad: Prioridad de Eje Central
+                    mmd_head = ["graph TD", 
+                                "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", 
+                                "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
                     
+                    mmd_nodos = []    # Definiciones de cuadros
+                    mmd_vertical = [] # Flechas que van hacia abajo (prioritarias)
+                    mmd_bucles = []   # Flechas que regresan (secundarias)
+
                     for i, p in enumerate(st.session_state.pasos_sf4):
                         id_n = f"N{i}"; t_c = clean(p.get('texto', ''))
-                        if p.get('tipo') == "Decisión": mmd.append(f'    {id_n}{{"{t_c}"}}:::decision')
-                        elif p.get('tipo') == "Inicio/Fin": mmd.append(f'    {id_n}(("{t_c}"))')
-                        else: mmd.append(f'    {id_n}["{t_c}"]:::proceso')
                         
+                        # 1. Definimos los nodos
+                        if p.get('tipo') == "Decisión": mmd_nodos.append(f'    {id_n}{{"{t_c}"}}:::decision')
+                        elif p.get('tipo') == "Inicio/Fin": mmd_nodos.append(f'    {id_n}(("{t_c}"))')
+                        else: mmd_nodos.append(f'    {id_n}["{t_c}"]:::proceso')
+                        
+                        # 2. Clasificamos las conexiones por peso visual
                         if not p.get('is_decision', False):
                             tgt = p.get('conecta_a', "Siguiente")
                             lab = p.get('etiqueta_flecha', "")
                             f_style = f'-- "{lab}" -->' if lab else "-->"
-                            target = f"N{i+1}" if tgt == "Siguiente" else ("Fin" if tgt == "Fin" else f"N{int(re.search(r'\d+', str(tgt)).group())-1}")
-                            if not (tgt == "Siguiente" and i == len(st.session_state.pasos_sf4)-1):
-                                mmd.append(f'    {id_n} {f_style} {target}')
+                            
+                            if tgt == "Siguiente":
+                                if i < len(st.session_state.pasos_sf4)-1:
+                                    mmd_vertical.append(f'    {id_n} {f_style} N{i+1}')
+                            elif tgt == "Fin":
+                                mmd_vertical.append(f'    {id_n} {f_style} Fin([Fin])')
+                            else: # Es un salto (Paso X)
+                                p_num = int(re.search(r'\d+', str(tgt)).group()) - 1
+                                if p_num > i: mmd_vertical.append(f'    {id_n} {f_style} N{p_num}')
+                                else: mmd_bucles.append(f'    {id_n} {f_style} N{p_num}')
                         else:
-                            for label_key, dest_key in [('label_si', 'dest_si'), ('label_no', 'dest_no')]:
-                                dst = p.get(dest_key, "Siguiente")
-                                lab_f = p.get(label_key, "Opción")
-                                target = f"N{i+1}" if dst == "Siguiente" else ("Fin" if dst == "Fin" else f"N{int(re.search(r'\d+', str(dst)).group())-1}")
-                                mmd.append(f'    {id_n} -- "{lab_f}" --> {target}')
-                    
-                    full_m = "\n".join(mmd); st.code(full_m, language="mermaid")
+                            # Prioridad Vertical: SÍ abajo, NO lateral/bucle
+                            for l_key, d_key in [('label_si', 'dest_si'), ('label_no', 'dest_no')]:
+                                dst = p.get(d_key, "Siguiente")
+                                lab_f = p.get(l_key, "Opción")
+                                f_style = f'-- "{lab_f}" -->'
+                                
+                                if dst == "Siguiente":
+                                    mmd_vertical.append(f'    {id_n} {f_style} N{i+1}')
+                                elif dst == "Fin":
+                                    mmd_vertical.append(f'    {id_n} {f_style} Fin([Fin])')
+                                else:
+                                    p_num = int(re.search(r'\d+', str(dst)).group()) - 1
+                                    if p_num > i: mmd_vertical.append(f'    {id_n} {f_style} N{p_num}')
+                                    else: mmd_bucles.append(f'    {id_n} {f_style} N{p_num}')
+
+                    # El "Ancla de Gravedad"
+                    if st.session_state.pasos_sf4:
+                        last_id = f"N{len(st.session_state.pasos_sf4)-1}"
+                        mmd_vertical.append(f'    {last_id} ~~~ Fin')
+
+                    # Ensamblaje jerárquico para Mermaid
+                    full_m = "\n".join(mmd_head + mmd_nodos + mmd_vertical + mmd_bucles)
+                    st.code(full_m, language="mermaid")
                     b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
                     st.link_button("🚀 LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
                     st.write("---")
