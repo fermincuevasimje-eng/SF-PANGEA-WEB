@@ -764,42 +764,65 @@ else:
         tab_c, tab_b = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos"])
 
         with tab_c:
-            # --- 1. CAPTURA COMPACTA ---
-            with st.expander("📝 CONFIGURAR PASO", expanded=(st.session_state.edit_index == -1)):
-                val_txt = st.session_state.pasos_sf4[st.session_state.edit_index]['texto'] if st.session_state.edit_index != -1 else ""
-                txt = st.text_input("Actividad o Pregunta (usa '?' para bifurcar):", value=val_txt, key="in_sf4")
+            # --- 1. CAPTURA INTELIGENTE (AUTO-FILL & RESET) ---
+            with st.expander("📝 CONFIGURAR PASO", expanded=True):
+                # Determinamos si estamos editando o creando nuevo
+                idx = st.session_state.edit_index
+                editando = (idx != -1)
+                paso_actual = st.session_state.pasos_sf4[idx] if editando else {}
+
+                # Generamos una llave única para resetear campos al agregar
+                form_key = f"sf4_f_{len(st.session_state.pasos_sf4)}_{idx}"
+                
+                # Campos con auto-llenado
+                txt = st.text_input("Actividad o Pregunta (usa '?' para bifurcar):", 
+                                   value=paso_actual.get('texto', ""), key=f"txt_{form_key}")
                 
                 is_decision = txt.strip().endswith('?')
                 destinos = ["Siguiente", "Fin"] + [f"Paso {i+1}" for i in range(len(st.session_state.pasos_sf4))]
 
                 c1, c2, c3 = st.columns(3)
                 if not is_decision:
-                    with c1: tipo = st.selectbox("Forma:", ["Proceso", "Inicio/Fin"])
-                    with c2: destino = st.selectbox("Conecta a:", destinos)
-                    with c3: label = st.text_input("Etiqueta flecha:", placeholder="Ej: Ok")
+                    with c1: 
+                        tipo = st.selectbox("Forma:", ["Proceso", "Inicio/Fin"], 
+                                          index=0 if paso_actual.get('tipo') == "Proceso" else (1 if paso_actual.get('tipo') == "Inicio/Fin" else 0))
+                    with c2: 
+                        d_val = paso_actual.get('conecta_a', "Siguiente")
+                        destino = st.selectbox("Conecta a:", destinos, index=destinos.index(d_val) if d_val in destinos else 0)
+                    with c3: 
+                        label = st.text_input("Etiqueta flecha:", value=paso_actual.get('etiqueta_flecha', ""), placeholder="Ej: Ok")
                 else:
-                    with c1: label_si = st.text_input("Etiqueta SÍ:", value="SÍ")
-                    with c1: dest_si = st.selectbox("Destino SÍ:", destinos)
-                    with c2: label_no = st.text_input("Etiqueta NO:", value="NO")
-                    with c2: dest_no = st.selectbox("Destino NO (Salto):", destinos)
+                    with c1: 
+                        label_si = st.text_input("Etiqueta SÍ:", value=paso_actual.get('label_si', "SÍ"))
+                        d_si_val = paso_actual.get('dest_si', "Siguiente")
+                        dest_si = st.selectbox("Destino SÍ:", destinos, index=destinos.index(d_si_val) if d_si_val in destinos else 0)
+                    with c2: 
+                        label_no = st.text_input("Etiqueta NO:", value=paso_actual.get('label_no', "NO"))
+                        d_no_val = paso_actual.get('dest_no', "Siguiente")
+                        dest_no = st.selectbox("Destino NO (Salto):", destinos, index=destinos.index(d_no_val) if d_no_val in destinos else 0)
                     with c3: st.info("Las decisiones requieren dos salidas obligatorias.")
 
-                if st.session_state.edit_index == -1:
+                # BOTONERÍA DINÁMICA
+                if not editando:
                     if st.button("➕ Agregar al Flujo", use_container_width=True):
                         if txt:
                             nuevo = {"texto": txt, "is_decision": is_decision}
                             if is_decision: nuevo.update({"label_si": label_si, "dest_si": dest_si, "label_no": label_no, "dest_no": dest_no, "tipo": "Decisión"})
                             else: nuevo.update({"tipo": tipo, "conecta_a": destino, "etiqueta_flecha": label})
-                            st.session_state.pasos_sf4.append(nuevo); st.rerun()
+                            st.session_state.pasos_sf4.append(nuevo)
+                            st.rerun()
                 else:
                     cs, cc = st.columns(2)
-                    if cs.button("💾 Guardar Cambios"):
+                    if cs.button("💾 Guardar Cambios", use_container_width=True):
                         nuevo = {"texto": txt, "is_decision": is_decision}
                         if is_decision: nuevo.update({"label_si": label_si, "dest_si": dest_si, "label_no": label_no, "dest_no": dest_no, "tipo": "Decisión"})
                         else: nuevo.update({"tipo": tipo, "conecta_a": destino, "etiqueta_flecha": label})
-                        st.session_state.pasos_sf4[st.session_state.edit_index] = nuevo
-                        st.session_state.edit_index = -1; st.rerun()
-                    if cc.button("❌ Cancelar"): st.session_state.edit_index = -1; st.rerun()
+                        st.session_state.pasos_sf4[idx] = nuevo
+                        st.session_state.edit_index = -1
+                        st.rerun()
+                    if cc.button("❌ Cancelar", use_container_width=True):
+                        st.session_state.edit_index = -1
+                        st.rerun()
 
             # --- 2. VISTA DIVIDIDA ---
             if st.session_state.pasos_sf4:
