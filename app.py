@@ -40,6 +40,14 @@ URL_DB = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3P
 HOJA_PRINCIPAL = "Sheet1"
 HOJA_PAPELERA = "Trash"
 
+CHISTES = [
+    "— ¿Qué le dice un jaguar a otro jaguar? — Jaguar you.",
+    "— ¿Cómo se dice pañuelo en japonés? — Sakamoco.",
+    "— ¿Qué hace un perro con un taladro? — Adiestrando.",
+    "— ¿Qué hace una abeja en el gimnasio? — Zumba.",
+    "— ¿Cómo se queda un mago después de comer? — Magordito."
+]
+
 # --- 1.5 CATÁLOGO MAESTRO (BASE DE DATOS COMPLETA: 48 DELEGACIONES) ---
 CATALOGO_MAESTRO = {
     "ADOLFO LOPEZ MATEOS": ['PARQUES NACIONALES I', 'MIGUEL HIDALGO  (CORRALITOS)', 'PARQUES NACIONALES  I I'],
