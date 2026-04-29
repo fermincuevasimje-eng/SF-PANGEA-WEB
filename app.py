@@ -770,7 +770,6 @@ else:
             with open("boveda_pangea.json", "w", encoding="utf-8") as f:
                 json.dump(datos, f, ensure_ascii=False, indent=4)
 
-        # Carga inicial: Si existe el archivo, lo traemos a la sesión
         if "boveda_mmd" not in st.session_state or not st.session_state.boveda_mmd:
             if os.path.exists("boveda_pangea.json"):
                 with open("boveda_pangea.json", "r", encoding="utf-8") as f:
@@ -778,7 +777,7 @@ else:
             else:
                 st.session_state.boveda_mmd = {}
 
-        st.title("🏗️ SF4 - Arquitecto de Procesos v15.6.5")
+        st.title("🏗️ SF4 - Arquitecto de Procesos v15.6.6")
         
         tab_c, tab_b, tab_i = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importar Código Externo"])
 
@@ -787,28 +786,25 @@ else:
 
             with col_editor:
                 st.subheader("🛠️ Panel de Edición")
-                # --- FORMULARIO DE CAPTURA ---
                 with st.expander("📝 AÑADIR / EDITAR PASO", expanded=(st.session_state.edit_index == -1)):
                     idx = st.session_state.edit_index
-                    val_t = st.session_state.pasos_sf4[idx]['texto'] if idx != -1 else ""
+                    val_t = st.session_state.pasos_sf4[idx].get('texto', "") if idx != -1 else ""
                     txt_input = st.text_input("Descripción de la actividad:", value=val_t, key="input_sf4")
                     
                     is_q = txt_input.strip().endswith('?')
                     c1, c2 = st.columns(2)
-                    with c1: t_forma = st.selectbox("Forma del nodo:", ["Proceso", "Inicio/Fin", "Decisión"] if not is_q else ["Decisión"])
+                    with c1: t_forma = st.selectbox("Forma del nodo:", ["Proceso", "Inicio/Fin", "Decisión"])
                     with c2: t_label = st.text_input("Texto en la flecha:", placeholder="Siguiente / SÍ / NO")
 
                     if st.button("✅ Confirmar Paso", use_container_width=True):
                         if txt_input:
                             nuevo_p = {"texto": txt_input, "tipo": "Decisión" if is_q else t_forma, "etiqueta": t_label}
-                            if idx == -1:
-                                st.session_state.pasos_sf4.append(nuevo_p)
+                            if idx == -1: st.session_state.pasos_sf4.append(nuevo_p)
                             else:
                                 st.session_state.pasos_sf4[idx] = nuevo_p
                                 st.session_state.edit_index = -1
                             st.rerun()
 
-                # --- EL "PASO A PASO" (Lo que faltaba) ---
                 if st.session_state.pasos_sf4:
                     st.markdown("---")
                     st.write("📋 **Lista de Pasos en el Editor:**")
@@ -816,7 +812,7 @@ else:
                         with st.container(border=True):
                             ce1, ce2, ce3 = st.columns([0.5, 3, 1])
                             ce1.write(f"**#{i+1}**")
-                            ce2.write(f"**{p['tipo']}:** {p['texto']}")
+                            ce2.write(f"**{p.get('tipo', 'Proceso')}:** {p.get('texto', '')}")
                             if ce3.button("✏️", key=f"btn_ed_{i}"):
                                 st.session_state.edit_index = i
                                 st.rerun()
@@ -827,45 +823,41 @@ else:
             with col_preview:
                 st.subheader("📊 Vista del Diagrama")
                 if st.session_state.pasos_sf4:
-                    # Construcción de Lógica Mermaid
                     mmd_list = ["graph TD", "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
                     for i, p in enumerate(st.session_state.pasos_sf4):
                         nid = f"N{i}"
-                        clean_t = re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', p['texto'])
-                        if p['tipo'] == "Decisión": mmd_list.append(f'    {nid}{{"{clean_t}"}}:::decision')
-                        elif p['tipo'] == "Inicio/Fin": mmd_list.append(f'    {nid}(("{clean_t}"))')
+                        clean_t = re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', p.get('texto', ''))
+                        tipo_p = p.get('tipo', 'Proceso')
+                        if tipo_p == "Decisión": mmd_list.append(f'    {nid}{{"{clean_t}"}}:::decision')
+                        elif tipo_p == "Inicio/Fin": mmd_list.append(f'    {nid}(("{clean_t}"))')
                         else: mmd_list.append(f'    {nid}["{clean_t}"]:::proceso')
                         
                         if i < len(st.session_state.pasos_sf4) - 1:
-                            lbl = f'-- "{p["etiqueta"]}" -->' if p["etiqueta"] else "-->"
+                            # EL PARCHE: Usamos .get() para que si no existe 'etiqueta', no explote
+                            label_val = p.get('etiqueta', "")
+                            lbl = f'-- "{label_val}" -->' if label_val else "-->"
                             mmd_list.append(f'    {nid} {lbl} N{i+1}')
                     
                     full_mermaid = "\n".join(mmd_list)
                     st.code(full_mermaid, language="mermaid")
-                    
-                    # Botón Live para la pestaña Constructor
                     b64_c = base64.b64encode(full_mermaid.encode('utf-8')).decode('utf-8')
                     st.link_button("🚀 PROBAR EN MERMAID LIVE", f"https://mermaid.live/edit#base64:{b64_c}", use_container_width=True)
                     
                     st.write("---")
-                    save_name = st.text_input("Nombre para la Bóveda:", placeholder="Ej: Proceso Pastel")
+                    save_name = st.text_input("Nombre para la Bóveda:")
                     if st.button("💾 GUARDAR EN BÓVEDA (PERMANENTE)", use_container_width=True):
                         if save_name:
                             st.session_state.boveda_mmd[save_name] = {"code": full_mermaid, "struct": list(st.session_state.pasos_sf4)}
                             guardar_disco(st.session_state.boveda_mmd)
                             st.success(f"¡'{save_name}' guardado!")
-                        else: st.error("Escribe un nombre.")
 
         with tab_b:
-            st.subheader("🗄️ Proyectos Guardados en Disco")
-            if not st.session_state.boveda_mmd: st.info("No hay proyectos guardados.")
+            if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
             for k, v in list(st.session_state.boveda_mmd.items()):
                 with st.expander(f"📁 {k}"):
                     st.code(v['code'], language="mermaid")
-                    # Botón Live para la Bóveda
                     b64_b = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
                     st.link_button("🚀 VER EN LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64_b}", use_container_width=True)
-                    
                     cb1, cb2 = st.columns(2)
                     if cb1.button(f"📥 RECUPERAR AL EDITOR", key=f"r_btn_{k}", use_container_width=True):
                         st.session_state.pasos_sf4 = list(v['struct'])
@@ -877,21 +869,17 @@ else:
 
         with tab_i:
             st.subheader("📥 Inyectar Código Externo")
-            st.write("Pega el código de un diagrama (como el del pastel) para editarlo.")
             code_input = st.text_area("Código Mermaid:", height=200)
             if st.button("🔧 Reconstruir para Editar", use_container_width=True):
                 if code_input:
-                    # Botón Live para Importación (verificación)
-                    b64_i = base64.b64encode(code_input.encode('utf-8')).decode('utf-8')
-                    st.link_button("🚀 PREVISUALIZAR EN LIVE", f"https://mermaid.live/edit#base64:{b64_i}", use_container_width=True)
-                    
                     lineas = code_input.split('\n')
                     nuevos = []
                     for l in lineas:
                         m = re.search(r'[\(\[\{]+"?([^"\}\)\]]+)"?[\)\]\}]+', l)
                         if m and "classDef" not in l and "graph" not in l:
                             t_detectado = "Decisión" if "{" in l else ("Inicio/Fin" if "(" in l else "Proceso")
-                            nuevos.append({"texto": m.group(1).strip(), "tipo": t_detectado, "etiqueta": "Siguiente"})
+                            # Aquí inyectamos la etiqueta por defecto para evitar el KeyError
+                            nuevos.append({"texto": m.group(1).strip(), "tipo": t_detectado, "etiqueta": ""})
                     if nuevos:
                         st.session_state.pasos_sf4 = nuevos
                         st.success("¡Inyectado! Revisa la pestaña Constructor.")
