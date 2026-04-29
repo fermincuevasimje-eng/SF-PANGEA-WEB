@@ -754,7 +754,7 @@ else:
         st.title("🏗️ SF4 - Arquitecto de Procesos v15.6.1")
         
         # Pestañas para separar la creación del archivo histórico
-        tab_c, tab_b = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos"])
+        tab_crear, tab_boveda = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos"])
 
         with tab_c:
             # --- 1. FORMULARIO COMPACTO Y AUTOMÁTICO ---
