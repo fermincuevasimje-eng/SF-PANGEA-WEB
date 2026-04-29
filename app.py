@@ -918,4 +918,15 @@ else:
                         if b1.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
                         b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
                         b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
-                        if b3.button("🗑️", key=f"x_{k}"): del st.session_state.boveda_mmd[k]; st.rerun()
+                        # --- BOTÓN DE ELIMINACIÓN CON CANDADO ESTRATÉGICO ---
+                        if k.upper() == "PASTEL VERDE":
+                            b3.button("🔒", help="Ejemplo Maestro: No se puede eliminar", use_container_width=True)
+                        else:
+                            if b3.button("🗑️", key=f"x_{k}", use_container_width=True):
+                                del st.session_state.boveda_mmd[k]
+                                # Persistencia inmediata al disco
+                                with open("boveda_pangea.json", "w", encoding="utf-8") as f:
+                                    json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
+                                st.toast(f"Proyecto '{k}' eliminado", icon="🗑️")
+                                time.sleep(0.5)
+                                st.rerun()
