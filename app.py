@@ -763,135 +763,99 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-        import json, os, re, base64
-
-        # --- MOTOR DE PERSISTENCIA ---
-        def guardar_disco(datos):
-            with open("boveda_pangea.json", "w", encoding="utf-8") as f:
-                json.dump(datos, f, ensure_ascii=False, indent=4)
-
-        if "boveda_mmd" not in st.session_state or not st.session_state.boveda_mmd:
-            if os.path.exists("boveda_pangea.json"):
-                with open("boveda_pangea.json", "r", encoding="utf-8") as f:
-                    st.session_state.boveda_mmd = json.load(f)
-            else:
-                st.session_state.boveda_mmd = {}
-
-        st.title("🏗️ SF4 - Arquitecto de Procesos (Protegido v15.7.3)")
+        st.title("🏗️ SF4 - Arquitecto de Procesos v15.6.1")
         
-        tab_c, tab_b, tab_i = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importar Código Externo"])
+        tab_c, tab_b = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos"])
 
         with tab_c:
-            # --- 1. CONFIGURADOR SUPERIOR (REACTIVO) ---
-            st.subheader("📝 Configuración del Paso")
-            
-            idx_e = st.session_state.edit_index
-            p_dat = st.session_state.pasos_sf4[idx_e] if idx_e != -1 else {}
-            
-            t_input = st.text_input("Actividad o Pregunta (usa '?' para bifurcar):", value=p_dat.get('texto', ""), key="in_sf4")
-            is_q = t_input.strip().endswith('?')
-            dest_opts = ["Siguiente", "Fin"] + [f"Paso {i+1}" for i in range(len(st.session_state.pasos_sf4))]
+            # --- 1. CAPTURA COMPACTA ---
+            with st.expander("📝 CONFIGURAR PASO", expanded=(st.session_state.edit_index == -1)):
+                val_txt = st.session_state.pasos_sf4[st.session_state.edit_index]['texto'] if st.session_state.edit_index != -1 else ""
+                txt = st.text_input("Actividad o Pregunta (usa '?' para bifurcar):", value=val_txt, key="in_sf4")
+                
+                is_decision = txt.strip().endswith('?')
+                destinos = ["Siguiente", "Fin"] + [f"Paso {i+1}" for i in range(len(st.session_state.pasos_sf4))]
 
-            with st.form("form_full_width_pro"):
-                c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
-                
-                with c1:
-                    f_tipo = st.selectbox("Forma:", ["Proceso", "Inicio/Fin", "Decisión"], 
-                                         index=2 if is_q else (0 if p_dat.get('tipo') != "Inicio/Fin" else 1))
-                
-                if is_q or f_tipo == "Decisión":
-                    with c2: f_l_si = st.text_input("Etiqueta SÍ:", value=p_dat.get('label_si', "SÍ"))
-                    with c3: f_d_si = st.selectbox("Destino SÍ:", dest_opts, index=dest_opts.index(p_dat.get('dest_si')) if p_dat.get('dest_si') in dest_opts else 0)
-                    with c4: f_d_no = st.selectbox("Destino NO (Salto):", dest_opts, index=dest_opts.index(p_dat.get('dest_no')) if p_dat.get('dest_no') in dest_opts else 0)
-                    f_l_no = "NO"
+                c1, c2, c3 = st.columns(3)
+                if not is_decision:
+                    with c1: tipo = st.selectbox("Forma:", ["Proceso", "Inicio/Fin"])
+                    with c2: destino = st.selectbox("Conecta a:", destinos)
+                    with c3: label = st.text_input("Etiqueta flecha:", placeholder="Ej: Ok")
                 else:
-                    with c2: f_lab = st.text_input("Etiqueta flecha:", value=p_dat.get('etiqueta_flecha', ""), placeholder="Ej: Ok")
-                    with c3: f_dest = st.selectbox("Enlazar a:", dest_opts, index=dest_opts.index(p_dat.get('conecta_a')) if p_dat.get('conecta_a') in dest_opts else 0)
-                    with c4: st.write("✅ Modo Estándar")
+                    with c1: label_si = st.text_input("Etiqueta SÍ:", value="SÍ")
+                    with c1: dest_si = st.selectbox("Destino SÍ:", destinos)
+                    with c2: label_no = st.text_input("Etiqueta NO:", value="NO")
+                    with c2: dest_no = st.selectbox("Destino NO (Salto):", destinos)
+                    with c3: st.info("Las decisiones requieren dos salidas obligatorias.")
 
-                if st.form_submit_button("🚀 ACTUALIZAR ESTRUCTURA", use_container_width=True):
-                    if t_input:
-                        n_p = {"texto": t_input, "is_decision": (is_q or f_tipo == "Decisión")}
-                        if n_p["is_decision"]:
-                            n_p.update({"label_si": f_l_si, "dest_si": f_d_si, "label_no": f_l_no, "dest_no": f_d_no, "tipo": "Decisión"})
-                        else:
-                            n_p.update({"tipo": f_tipo, "conecta_a": f_dest, "etiqueta_flecha": f_lab})
-                        
-                        if idx_e == -1: st.session_state.pasos_sf4.append(n_p)
-                        else: 
-                            st.session_state.pasos_sf4[idx_e] = n_p
-                            st.session_state.edit_index = -1
-                        st.rerun()
+                if st.session_state.edit_index == -1:
+                    if st.button("➕ Agregar al Flujo", use_container_width=True):
+                        if txt:
+                            nuevo = {"texto": txt, "is_decision": is_decision}
+                            if is_decision: nuevo.update({"label_si": label_si, "dest_si": dest_si, "label_no": label_no, "dest_no": dest_no, "tipo": "Decisión"})
+                            else: nuevo.update({"tipo": tipo, "conecta_a": destino, "etiqueta_flecha": label})
+                            st.session_state.pasos_sf4.append(nuevo); st.rerun()
+                else:
+                    cs, cc = st.columns(2)
+                    if cs.button("💾 Guardar Cambios"):
+                        nuevo = {"texto": txt, "is_decision": is_decision}
+                        if is_decision: nuevo.update({"label_si": label_si, "dest_si": dest_si, "label_no": label_no, "dest_no": dest_no, "tipo": "Decisión"})
+                        else: nuevo.update({"tipo": tipo, "conecta_a": destino, "etiqueta_flecha": label})
+                        st.session_state.pasos_sf4[st.session_state.edit_index] = nuevo
+                        st.session_state.edit_index = -1; st.rerun()
+                    if cc.button("❌ Cancelar"): st.session_state.edit_index = -1; st.rerun()
 
-            # --- 2. VISTA INFERIOR ---
-            st.divider()
-            col_lista, col_viz = st.columns([1, 1.5])
-            
-            with col_lista:
-                st.subheader("📋 Pasos")
-                for i, p in enumerate(st.session_state.pasos_sf4):
-                    with st.container(border=True):
-                        cl1, cl2, cl3 = st.columns([0.5, 3, 1])
-                        cl1.write(f"**#{i+1}**")
-                        cl2.write(f"**{p.get('tipo', 'Proceso')}:** {p.get('texto', '')}")
-                        if cl3.button("✏️", key=f"ed_{i}"):
-                            st.session_state.edit_index = i
-                            st.rerun()
-                if st.button("🗑️ Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
+            # --- 2. VISTA DIVIDIDA ---
+            if st.session_state.pasos_sf4:
+                col_l, col_p = st.columns([1, 1.2])
+                with col_l:
+                    st.subheader("📋 Pasos")
+                    for i, p in enumerate(st.session_state.pasos_sf4):
+                        with st.container(border=True):
+                            cx, cy, cz = st.columns([0.5, 3, 1])
+                            cx.write(f"#{i+1}"); cy.write(p['texto'])
+                            if cz.button("✏️", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
+                            if cz.button("🗑️", key=f"d_{i}"): st.session_state.pasos_sf4.pop(i); st.rerun()
+                    if st.button("🔥 Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
 
-            with col_viz:
-                st.subheader("📊 Diagrama")
-                if st.session_state.pasos_sf4:
+                with col_p:
+                    st.subheader("💻 Mermaid JS")
+                    def clean(t): return re.sub(r'[^a-zA-Z0-9 ]', '', str(t))
                     mmd = ["graph TD", "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
                     for i, p in enumerate(st.session_state.pasos_sf4):
-                        id_n = f"N{i}"; t_c = re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', p.get('texto', ''))
-                        if p.get('tipo') == "Decisión": mmd.append(f'    {id_n}{{"{t_c}"}}:::decision')
-                        elif p.get('tipo') == "Inicio/Fin": mmd.append(f'    {id_n}(("{t_c}"))')
+                        id_n = f"N{i}"; t_c = clean(p['texto'])
+                        if p['tipo'] == "Decisión": mmd.append(f'    {id_n}{{"{t_c}"}}:::decision')
+                        elif p['tipo'] == "Inicio/Fin": mmd.append(f'    {id_n}(("{t_c}"))')
                         else: mmd.append(f'    {id_n}["{t_c}"]:::proceso')
-                        
-                        if p.get('is_decision'):
-                            for l_key, d_key in [('label_si', 'dest_si'), ('label_no', 'dest_no')]:
-                                dst = p.get(d_key, "Siguiente")
-                                target = f"N{i+1}" if dst == "Siguiente" else ("Fin" if dst == "Fin" else f"N{int(re.search(r'\d+', str(dst)).group())-1}")
-                                mmd.append(f'    {id_n} -- "{p.get(l_key, "Opción")}" --> {target}')
+                        if not p.get('is_decision', False):
+                            tgt = p['conecta_a']; f = f'-- "{p["etiqueta_flecha"]}" -->' if p["etiqueta_flecha"] else "-->"
+                            if tgt == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd.append(f'    {id_n} {f} N{i+1}')
+                            elif "Paso" in tgt: mmd.append(f'    {id_n} {f} N{int(re.search(r"\d+", tgt).group())-1}')
+                            elif tgt == "Fin": mmd.append(f'    {id_n} {f} Fin([Fin])')
                         else:
-                            dst = p.get('conecta_a', "Siguiente")
-                            # CIRUGÍA AQUÍ: Usamos .get() para evitar el error de la fila 883
-                            lab = p.get('etiqueta_flecha', "")
-                            f_style = f'-- "{lab}" -->' if lab else "-->"
-                            target = f"N{i+1}" if dst == "Siguiente" else ("Fin" if dst == "Fin" else f"N{int(re.search(r'\d+', str(dst)).group())-1}")
-                            if not (dst == "Siguiente" and i == len(st.session_state.pasos_sf4)-1):
-                                mmd.append(f'    {id_n} {f_style} {target}')
+                            dsi, dno = p['dest_si'], p['dest_no']; fsi, fno = f'-- "{p["label_si"]}" -->', f'-- "{p["label_no"]}" -->'
+                            if dsi == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd.append(f'    {id_n} {fsi} N{i+1}')
+                            elif "Paso" in dsi: mmd.append(f'    {id_n} {fsi} N{int(re.search(r"\d+", dsi).group())-1}')
+                            if "Paso" in dno: mmd.append(f'    {id_n} {fno} N{int(re.search(r"\d+", dno).group())-1}')
+                            elif dno == "Fin": mmd.append(f'    {id_n} {fno} Fin([Fin])')
                     
                     full_m = "\n".join(mmd); st.code(full_m, language="mermaid")
+                    import base64
                     b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
                     st.link_button("🚀 LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
-                    
-                    n_bov = st.text_input("Nombre para Bóveda:", key="nbov_v15")
-                    if st.button("💾 GUARDAR", use_container_width=True):
-                        if n_bov:
-                            st.session_state.boveda_mmd[n_bov] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
-                            guardar_disco(st.session_state.boveda_mmd); st.success("¡Guardado!")
+                    st.write("---")
+                    nom_p = st.text_input("Nombre para Bóveda:")
+                    if st.button("💾 Guardar"):
+                        if nom_p: st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}; st.success("Guardado.")
 
         with tab_b:
             if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
-            for k, v in list(st.session_state.boveda_mmd.items()):
-                with st.expander(f"📁 {k}"):
-                    st.code(v['code'], language="mermaid")
-                    b1, b2, b3 = st.columns(3)
-                    if b1.button("📥 RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
-                    b64_v = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
-                    b2.link_button("🚀 LIVE", f"https://mermaid.live/edit#base64:{b64_v}")
-                    if b3.button("🗑️", key=f"x_{k}"): del st.session_state.boveda_mmd[k]; guardar_disco(st.session_state.boveda_mmd); st.rerun()
-
-        with tab_i:
-            st.subheader("📥 Importar Código")
-            c_in = st.text_area("Pega el código aquí:", height=200)
-            if st.button("🔧 INYECTAR"):
-                lineas = c_in.split('\n')
-                nuevos = []
-                for l in lineas:
-                    match = re.search(r'[\(\[\{]+"?([^"\}\)\]]+)"?[\)\]\}]+', l)
-                    if match and "classDef" not in l and "graph" not in l:
-                        nuevos.append({"texto": match.group(1).strip(), "tipo": "Decisión" if "{" in l else ("Inicio/Fin" if "(" in l else "Proceso"), "conecta_a": "Siguiente", "etiqueta_flecha": ""})
-                if nuevos: st.session_state.pasos_sf4 = nuevos; st.rerun()
+            else:
+                for k, v in list(st.session_state.boveda_mmd.items()):
+                    with st.expander(f"📁 {k}"):
+                        st.code(v['code'], language="mermaid")
+                        b1, b2, b3 = st.columns(3)
+                        if b1.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
+                        b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
+                        b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
+                        if b3.button("🗑️", key=f"x_{k}"): del st.session_state.boveda_mmd[k]; st.rerun()
