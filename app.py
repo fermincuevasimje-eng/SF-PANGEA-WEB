@@ -843,7 +843,7 @@ else:
                         # Lógica de flechas (simplificada para el ejemplo)
                         if i < len(st.session_state.pasos_sf4)-1: mmd.append(f'    {id_n} --> N{i+1}')
                     
-                    full_m = "\n".join(mmd); st.mermaid(full_m)
+                    full_m = "\n".join(mmd); st.code(full_m, language="mermaid")
                     st.text_area("📋 Código Mermaid:", value=full_m, height=100)
                     nom_p = st.text_input("Nombre para Bóveda:")
                     if st.button("💾 Guardar en Bóveda"):
@@ -854,7 +854,7 @@ else:
         with tab_b:
             for k, v in list(st.session_state.boveda_mmd.items()):
                 with st.expander(f"📁 {k}"):
-                    st.mermaid(v['code'])
+                    st.code(..., language="mermaid")
                     if st.button(f"📥 RECUPERAR {k}", key=f"rec_{k}"):
                         st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
 
