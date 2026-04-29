@@ -969,7 +969,7 @@ else:
                         b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
                         b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
                         # --- BOTÓN DE ELIMINACIÓN CON CANDADO ESTRATÉGICO ---
-                        if k.upper() == "Pastel Verde":
+                        if k.strip().upper() == "PASTEL VERDE":
                             b3.button("🔒", help="Ejemplo Maestro: No se puede eliminar", use_container_width=True)
                         else:
                             if b3.button("🗑️", key=f"x_{k}", use_container_width=True):
