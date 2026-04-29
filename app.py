@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from scipy.spatial.distance import cdist
-import re, unicodedata, simplekml, io, requests, time, random
+import re, unicodedata, simplekml, io, requests, time, random, base64
 from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
@@ -836,6 +836,7 @@ else:
                             elif dno == "Fin": mmd.append(f'    {id_n} {fno} Fin([Fin])')
                     
                     full_m = "\n".join(mmd); st.code(full_m, language="mermaid")
+                    st.button("📋 Copiar Código Mermaid", on_click=lambda: st.write(f"Copiado al portapapeles: {full_m}"), use_container_width=True)
                     import base64
                     b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
                     st.link_button("🚀 LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
