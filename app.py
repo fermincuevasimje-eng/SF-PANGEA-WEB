@@ -815,25 +815,32 @@ else:
                     if st.button("🔥 Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
 
                 with col_p:
-                    st.subheader("💻 Mermaid JS")
-                    def clean(t): return re.sub(r'[^a-zA-Z0-9 ]', '', str(t))
-                    mmd = ["graph TD", "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
+                    st.subheader("📊 Visualización de Proceso")
+                    def clean(t): return re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', str(t))
+                    
+                    mmd = ["graph TD", 
+                           "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", 
+                           "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
+                    
                     for i, p in enumerate(st.session_state.pasos_sf4):
-                        id_n = f"N{i}"; t_c = clean(p['texto'])
-                        if p['tipo'] == "Decisión": mmd.append(f'    {id_n}{{"{t_c}"}}:::decision')
-                        elif p['tipo'] == "Inicio/Fin": mmd.append(f'    {id_n}(("{t_c}"))')
+                        id_n = f"N{i}"; t_c = clean(p.get('texto', ''))
+                        if p.get('tipo') == "Decisión": mmd.append(f'    {id_n}{{"{t_c}"}}:::decision')
+                        elif p.get('tipo') == "Inicio/Fin": mmd.append(f'    {id_n}(("{t_c}"))')
                         else: mmd.append(f'    {id_n}["{t_c}"]:::proceso')
+                        
                         if not p.get('is_decision', False):
-                            tgt = p['conecta_a']; f = f'-- "{p["etiqueta_flecha"]}" -->' if p["etiqueta_flecha"] else "-->"
-                            if tgt == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd.append(f'    {id_n} {f} N{i+1}')
-                            elif "Paso" in tgt: mmd.append(f'    {id_n} {f} N{int(re.search(r"\d+", tgt).group())-1}')
-                            elif tgt == "Fin": mmd.append(f'    {id_n} {f} Fin([Fin])')
+                            tgt = p.get('conecta_a', "Siguiente")
+                            lab = p.get('etiqueta_flecha', "")
+                            f_style = f'-- "{lab}" -->' if lab else "-->"
+                            target = f"N{i+1}" if tgt == "Siguiente" else ("Fin" if tgt == "Fin" else f"N{int(re.search(r'\d+', str(tgt)).group())-1}")
+                            if not (tgt == "Siguiente" and i == len(st.session_state.pasos_sf4)-1):
+                                mmd.append(f'    {id_n} {f_style} {target}')
                         else:
-                            dsi, dno = p['dest_si'], p['dest_no']; fsi, fno = f'-- "{p["label_si"]}" -->', f'-- "{p["label_no"]}" -->'
-                            if dsi == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd.append(f'    {id_n} {fsi} N{i+1}')
-                            elif "Paso" in dsi: mmd.append(f'    {id_n} {fsi} N{int(re.search(r"\d+", dsi).group())-1}')
-                            if "Paso" in dno: mmd.append(f'    {id_n} {fno} N{int(re.search(r"\d+", dno).group())-1}')
-                            elif dno == "Fin": mmd.append(f'    {id_n} {fno} Fin([Fin])')
+                            for label_key, dest_key in [('label_si', 'dest_si'), ('label_no', 'dest_no')]:
+                                dst = p.get(dest_key, "Siguiente")
+                                lab_f = p.get(label_key, "Opción")
+                                target = f"N{i+1}" if dst == "Siguiente" else ("Fin" if dst == "Fin" else f"N{int(re.search(r'\d+', str(dst)).group())-1}")
+                                mmd.append(f'    {id_n} -- "{lab_f}" --> {target}')
                     
                     full_m = "\n".join(mmd); st.code(full_m, language="mermaid")
                     b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
@@ -843,7 +850,6 @@ else:
                     if st.button("💾 Guardar"):
                         if nom_p:
                             st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
-                            # AGREGAR ESTA LÍNEA DE COMANDO PARA PERSISTENCIA FÍSICA:
                             with open("boveda_pangea.json", "w", encoding="utf-8") as f:
                                 json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
                             st.success("Guardado en disco y memoria.")
