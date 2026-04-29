@@ -759,22 +759,18 @@ else:
                 except: st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
-        st.title("🏗️ SF4 - Arquitecto de Procesos v15.6.1")
+        st.title("🏗️ SF4 - Arquitecto de Procesos v16.2")
         
         tab_c, tab_b, tab_i = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa"])
 
         with tab_c:
-            # --- 1. CAPTURA INTELIGENTE (AUTO-FILL & RESET) ---
+            # --- 1. CAPTURA INTELIGENTE ---
             with st.expander("📝 CONFIGURAR PASO", expanded=True):
-                # Determinamos si estamos editando o creando nuevo
                 idx = st.session_state.edit_index
                 editando = (idx != -1)
                 paso_actual = st.session_state.pasos_sf4[idx] if editando else {}
-
-                # Generamos una llave única para resetear campos al agregar
                 form_key = f"sf4_f_{len(st.session_state.pasos_sf4)}_{idx}"
                 
-                # Campos con auto-llenado
                 txt = st.text_input("Actividad o Pregunta (usa '?' para bifurcar):", 
                                    value=paso_actual.get('texto', ""), key=f"txt_{form_key}")
                 
@@ -802,7 +798,6 @@ else:
                         dest_no = st.selectbox("Destino NO (Salto):", destinos, index=destinos.index(d_no_val) if d_no_val in destinos else 0)
                     with c3: st.info("Las decisiones requieren dos salidas obligatorias.")
 
-                # BOTONERÍA DINÁMICA
                 if not editando:
                     if st.button("➕ Agregar al Flujo", use_container_width=True):
                         if txt:
@@ -824,7 +819,7 @@ else:
                         st.session_state.edit_index = -1
                         st.rerun()
 
-            # --- 2. VISTA DIVIDIDA ---
+            # --- 2. VISTA DIVIDIDA Y MOTOR V16.2 ---
             if st.session_state.pasos_sf4:
                 col_l, col_p = st.columns([1, 1.2])
                 with col_l:
@@ -838,64 +833,45 @@ else:
                     if st.button("🔥 Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
 
                 with col_p:
-                    st.subheader("📊 Visualización Premium (Gravedad Vertical)")
+                    st.subheader("📊 Visualización Premium")
+                    
                     def clean(t): return re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', str(t))
                     
-                    # --- MOTOR DE RENDERIZADO PREMIUM V16.2 ---
-                    mmd_head = [
-                        "graph TD", 
-                        "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", 
-                        "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"
-                    ]
-                    
+                    mmd_head = ["graph TD", "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
                     mmd_nodos = []
                     mmd_conexiones = []
 
-                    # 1. Definición de Nodos (Garantiza que existan antes de conectarlos)
                     for i, p in enumerate(st.session_state.pasos_sf4):
                         id_n = f"N{i}"
-                        def clean(t): return re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', str(t))
                         t_c = clean(p.get('texto', ''))
-                        
-                        if p.get('tipo') == "Decisión":
-                            mmd_nodos.append(f'    {id_n}{{"{t_c}"}}:::decision')
-                        elif p.get('tipo') == "Inicio/Fin":
-                            mmd_nodos.append(f'    {id_n}(("{t_c}"))')
-                        else:
-                            mmd_nodos.append(f'    {id_n}["{t_c}"]:::proceso')
+                        if p.get('tipo') == "Decisión": mmd_nodos.append(f'    {id_n}{{"{t_c}"}}:::decision')
+                        elif p.get('tipo') == "Inicio/Fin": mmd_nodos.append(f'    {id_n}(("{t_c}"))')
+                        else: mmd_nodos.append(f'    {id_n}["{t_c}"]:::proceso')
 
-                    # 2. Generación de Conexiones Limpias
                     for i, p in enumerate(st.session_state.pasos_sf4):
                         id_n = f"N{i}"
                         if not p.get('is_decision', False):
                             tgt = p.get('conecta_a', "Siguiente")
                             lab = p.get('etiqueta_flecha', "")
                             f_style = f'-- "{lab}" -->' if lab else "-->"
-                            
-                            if tgt == "Siguiente" and i < len(st.session_state.pasos_sf4)-1:
-                                mmd_conexiones.append(f'    {id_n} {f_style} N{i+1}')
-                            elif tgt == "Fin":
-                                mmd_conexiones.append(f'    {id_n} {f_style} Fin([Fin])')
+                            if tgt == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd_conexiones.append(f'    {id_n} {f_style} N{i+1}')
+                            elif tgt == "Fin": mmd_conexiones.append(f'    {id_n} {f_style} Fin([Fin])')
                             elif "Paso" in str(tgt):
                                 p_num = int(re.search(r'\d+', str(tgt)).group()) - 1
                                 mmd_conexiones.append(f'    {id_n} {f_style} N{p_num}')
                         else:
-                            # Lógica para Decisiones (SÍ / NO)
                             for l_key, d_key in [('label_si', 'dest_si'), ('label_no', 'dest_no')]:
                                 dst = p.get(d_key, "Siguiente")
                                 lab_f = p.get(l_key, "Opción")
                                 f_style = f'-- "{lab_f}" -->'
-                                
-                                if dst == "Siguiente" and i < len(st.session_state.pasos_sf4)-1:
-                                    mmd_conexiones.append(f'    {id_n} {f_style} N{i+1}')
-                                elif dst == "Fin":
-                                    mmd_conexiones.append(f'    {id_n} {f_style} Fin([Fin])')
+                                if dst == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd_conexiones.append(f'    {id_n} {f_style} N{i+1}')
+                                elif dst == "Fin": mmd_conexiones.append(f'    {id_n} {f_style} Fin([Fin])')
                                 elif "Paso" in str(dst):
                                     p_num = int(re.search(r'\d+', str(dst)).group()) - 1
                                     mmd_conexiones.append(f'    {id_n} {f_style} N{p_num}')
 
-                    # Ensamblaje Final sin basura
                     full_m = "\n".join(mmd_head + mmd_nodos + mmd_conexiones)
+                    st.code(full_m, language="mermaid")
                     b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
                     st.link_button("🚀 LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
                     st.write("---")
@@ -905,57 +881,7 @@ else:
                             st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
                             with open("boveda_pangea.json", "w", encoding="utf-8") as f:
                                 json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
-                            st.success("Guardado en disco y memoria.")
-
-        # --- NUEVA PESTAÑA DE IMPORTACIÓN (INSERCIÓN V15.6.5) ---
-        with tab_i:
-            st.subheader("📥 Importar Código de Proceso")
-            st.info("Pega aquí el código Mermaid para rediseñar el flujo automáticamente.")
-            raw_import = st.text_area("Código de Fuente:", height=300, placeholder="graph TD\nN0[\"Inicio\"] --> N1[\"Paso 1\"]...", key="area_import_sf")
-            
-            if st.button("🚀 REDISEÑAR PROCESO", use_container_width=True):
-                if raw_import:
-                    try:
-                        nuevos_pasos = []
-                        lineas = raw_import.split('\n')
-                        nodos_dict = {}
-                        
-                        # Identificar Nodos (Procesos, Decisiones, Inicio/Fin)
-                        for l in lineas:
-                            m_p = re.search(r'(\w+)\s*\["(.*?)"\]', l) 
-                            m_d = re.search(r'(\w+)\s*\{(.*?)\}', l)  
-                            m_f = re.search(r'(\w+)\s*\(\("(.*?)"\)\)', l) 
-                            
-                            if m_p: nodos_dict[m_p.group(1)] = {"texto": m_p.group(2), "tipo": "Proceso"}
-                            elif m_d: nodos_dict[m_d.group(1)] = {"texto": m_d.group(2), "tipo": "Decisión"}
-                            elif m_f: nodos_dict[m_f.group(1)] = {"texto": m_f.group(2), "tipo": "Inicio/Fin"}
-
-                        # Mapear Conexiones y Formas
-                        for id_n, data in nodos_dict.items():
-                            p = {"texto": data['texto'], "tipo": data['tipo'], "is_decision": (data['tipo'] == "Decisión")}
-                            conns = re.findall(rf'{id_n}\s*(--\s*"(.*?)"\s*-->|-->)\s*(\w+)', raw_import)
-                            
-                            if not p["is_decision"]:
-                                if conns:
-                                    # Captura etiqueta de flecha si existe
-                                    p["etiqueta_flecha"] = conns[0][1] if conns[0][1] else ""
-                                    p["conecta_a"] = "Fin" if "Fin" in conns[0][2] else "Siguiente"
-                            else:
-                                # Lógica para SÍ/NO
-                                for _, label, dest_id in conns:
-                                    if any(x in label.upper() for x in ["SÍ", "SI", "OK", "YES", "S"]):
-                                        p["label_si"], p["dest_si"] = label, "Siguiente"
-                                    else:
-                                        p["label_no"], p["dest_no"] = label, "Fin"
-                            nuevos_pasos.append(p)
-
-                        if nuevos_pasos:
-                            st.session_state.pasos_sf4 = nuevos_pasos
-                            st.success("¡Mesa rediseñada! Revisa la pestaña de Constructor.")
-                            time.sleep(0.5)
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Error en traducción: {e}")
+                            st.success("Guardado correctamente.")
 
         with tab_b:
             if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
@@ -967,14 +893,50 @@ else:
                         if b1.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
                         b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
                         b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
-                        # --- BOTÓN DE ELIMINACIÓN CON CANDADO ESTRATÉGICO ---
+                        
                         if k.strip().upper() == "PASTEL VERDE":
-                            b3.button("🔒", help="Ejemplo Maestro: No se puede eliminar", use_container_width=True)
+                            b3.button("🔒", help="Ejemplo Maestro Protegido", use_container_width=True)
                         else:
                             if b3.button("🗑️", key=f"x_{k}", use_container_width=True):
                                 del st.session_state.boveda_mmd[k]
                                 with open("boveda_pangea.json", "w", encoding="utf-8") as f:
                                     json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
-                                st.toast(f"Proyecto '{k}' eliminado", icon="🗑️")
-                                time.sleep(0.5)
                                 st.rerun()
+
+        with tab_i:
+            st.subheader("📥 Importación Externa")
+            raw_import = st.text_area("Pega el código Mermaid aquí:", height=300, key="area_import_sf")
+            if st.button("🚀 REDISEÑAR PROCESO", use_container_width=True):
+                if raw_import:
+                    try:
+                        nuevos_pasos = []
+                        lineas = raw_import.split('\n')
+                        nodos_dict = {}
+                        for l in lineas:
+                            m_p = re.search(r'(\w+)\s*\["(.*?)"\]', l) 
+                            m_d = re.search(r'(\w+)\s*\{(.*?)\}', l)  
+                            m_f = re.search(r'(\w+)\s*\(\("(.*?)"\)\)', l) 
+                            if m_p: nodos_dict[m_p.group(1)] = {"texto": m_p.group(2), "tipo": "Proceso"}
+                            elif m_d: nodos_dict[m_d.group(1)] = {"texto": m_d.group(2), "tipo": "Decisión"}
+                            elif m_f: nodos_dict[m_f.group(1)] = {"texto": m_f.group(2), "tipo": "Inicio/Fin"}
+
+                        for id_n, data in nodos_dict.items():
+                            p = {"texto": data['texto'], "tipo": data['tipo'], "is_decision": (data['tipo'] == "Decisión")}
+                            conns = re.findall(rf'{id_n}\s*(--\s*"(.*?)"\s*-->|-->)\s*(\w+)', raw_import)
+                            if not p["is_decision"]:
+                                if conns:
+                                    p["etiqueta_flecha"] = conns[0][1] if conns[0][1] else ""
+                                    p["conecta_a"] = "Fin" if "Fin" in conns[0][2] else "Siguiente"
+                            else:
+                                for _, label, dest_id in conns:
+                                    if any(x in label.upper() for x in ["SÍ", "SI", "OK", "YES", "S"]):
+                                        p["label_si"], p["dest_si"] = label, "Siguiente"
+                                    else:
+                                        p["label_no"], p["dest_no"] = label, "Fin"
+                            nuevos_pasos.append(p)
+                        if nuevos_pasos:
+                            st.session_state.pasos_sf4 = nuevos_pasos
+                            st.success("Rediseño completado.")
+                            time.sleep(0.5)
+                            st.rerun()
+                    except Exception as e: st.error(f"Error: {e}")
