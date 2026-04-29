@@ -761,7 +761,7 @@ else:
     elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Arquitecto de Procesos v15.6.1")
         
-        tab_c, tab_i, tab_b = st.tabs(["🆕 Constructor Inteligente", "📥 Importación Externa", "🗄️ Bóveda de Proyectos"])
+        tab_c, tab_b, tab_i = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa"])
 
         with tab_c:
             # --- 1. CAPTURA INTELIGENTE (AUTO-FILL & RESET) ---
