@@ -841,6 +841,7 @@ else:
                     mmd_nodos = []
                     mmd_conexiones = []
 
+                    # 1. Definición de Nodos
                     for i, p in enumerate(st.session_state.pasos_sf4):
                         id_n = f"N{i}"
                         t_c = clean(p.get('texto', ''))
@@ -848,6 +849,7 @@ else:
                         elif p.get('tipo') == "Inicio/Fin": mmd_nodos.append(f'    {id_n}(("{t_c}"))')
                         else: mmd_nodos.append(f'    {id_n}["{t_c}"]:::proceso')
 
+                    # 2. Generación de Conexiones
                     for i, p in enumerate(st.session_state.pasos_sf4):
                         id_n = f"N{i}"
                         if not p.get('is_decision', False):
@@ -870,13 +872,28 @@ else:
                                     p_num = int(re.search(r'\d+', str(dst)).group()) - 1
                                     mmd_conexiones.append(f'    {id_n} {f_style} N{p_num}')
 
+                    # 3. Ensamblaje y Generación de Objetivos Automáticos
                     full_m = "\n".join(mmd_head + mmd_nodos + mmd_conexiones)
                     st.code(full_m, language="mermaid")
+                    
+                    if st.session_state.pasos_sf4:
+                        tema = st.session_state.pasos_sf4[0]['texto'].replace('?', '')
+                        st.markdown("---")
+                        st.subheader("📝 Objetivos del Proceso")
+                        adm, tec = st.columns(2)
+                        with adm:
+                            st.info("**Administrativo-Normativo**")
+                            st.caption(f"Establecer el marco procedimental de '{tema}', asegurando el cumplimiento de los criterios de validación y la correcta canalización de recursos de la Dirección.")
+                        with tec:
+                            st.success("**Técnico-Operativo**")
+                            st.caption(f"Optimizar la respuesta de las cuadrillas en '{tema}', mediante la estandarización técnica y el control de insumos para reducir tiempos de atención.")
+
+                    # Botones de Acción
                     b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
                     st.link_button("🚀 LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
                     st.write("---")
                     nom_p = st.text_input("Nombre para Bóveda:")
-                    if st.button("💾 Guardar"):
+                    if st.button("💾 Guardar en Bóveda Pangea"):
                         if nom_p:
                             st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
                             with open("boveda_pangea.json", "w", encoding="utf-8") as f:
