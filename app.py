@@ -252,7 +252,7 @@ else:
         
         rk = st.session_state.reset_key
 
-        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
+        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=True):
             # --- SELECCIÓN REACTIVA (FUERA DEL FORMULARIO) ---
             st.write("📍 **Paso 1: Ubicación**")
             col_geo1, col_geo2 = st.columns(2)
