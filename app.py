@@ -567,31 +567,35 @@ else:
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
                             
-                            # --- MOTOR DE OPTIMIZACIÓN V2 (LÓGICA PARABÓLICA) ---
-                            # 1. Encontrar el punto más lejano a la base para que sea el PUNTO 1
+                            # --- MOTOR DE OPTIMIZACIÓN V3 (ATRACCIÓN A BASE) ---
                             coords_base = np.array([BASE_COORDS])
                             coords_puntos = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
                             distancias_a_base = cdist(coords_base, coords_puntos)[0]
                             
+                            # Empezamos por el más lejano
                             idx_mas_lejano = np.argmax(distancias_a_base)
                             punto_inicial = pts.pop(idx_mas_lejano)
-                            
                             ordenados = [punto_inicial]
                             last_coord = (punto_inicial['lat_aux'], punto_inicial['lon_aux'])
 
-                            # 2. Ordenar el resto por proximidad desde ese punto lejano hacia la base
                             while pts:
-                                rest = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
-                                # Calculamos distancia al último punto Y a la base para forzar el "regreso"
-                                dist_al_ultimo = cdist([last_coord], rest)[0]
+                                rest_coords = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
                                 
-                                # Seleccionamos el que esté más cerca del último punto
-                                idx_proximo = np.argmin(dist_al_ultimo)
+                                # 1. Distancia del último punto a los restantes
+                                dist_al_ultimo = cdist([last_coord], rest_coords)[0]
                                 
+                                # 2. Distancia de los restantes a la BASE
+                                dist_a_base = cdist(coords_base, rest_coords)[0]
+                                
+                                # PENALIZACIÓN: Multiplicamos la distancia entre puntos por 
+                                # un factor de cercanía a la base. Esto rompe los bucles.
+                                # Buscamos minimizar (Distancia_Vecino + Distancia_a_Base * 0.2)
+                                puntuacion_ruta = dist_al_ultimo + (dist_a_base * 0.2)
+                                
+                                idx_proximo = np.argmin(puntuacion_ruta)
                                 proximo_punto = pts.pop(idx_proximo)
                                 ordenados.append(proximo_punto)
                                 last_coord = (proximo_punto['lat_aux'], proximo_punto['lon_aux'])
-                            # ----------------------------------------------------
 
                             # TRAZO VIAL
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ordenados] + [BASE_COORDS]
