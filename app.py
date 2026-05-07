@@ -941,19 +941,28 @@ else:
                     # (Aquí va tu lógica de importación original completa...)
                     st.info("Procesando importación...")
 
-        # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (SOLUCIÓN ANTIBLOQUEO) ---
+        # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN FINAL V16.7) ---
         with tab_o:
             st.subheader("🏛️ Gestión Avanzada de Correspondencia DAP")
             
+            # --- 1. PREPARACIÓN DE MOTOR Y ESTADOS ---
             try:
                 from fpdf import FPDF
-                import pandas as pd
                 libreria_lista = True
             except ImportError:
                 libreria_lista = False
                 st.error("⚠️ Error: Instala 'fpdf' en tu requirements.txt")
 
-            # --- 1. PERSISTENCIA ---
+            # Asegurar que las plantillas existan antes de cualquier lectura
+            if "plantillas_oficios" not in st.session_state:
+                st.session_state.plantillas_oficios = {
+                    "EXITOSA": "Se hace de su conocimiento que la petición con folio [FOLIO] ha sido atendida en su totalidad por las brigadas de esta Dirección.",
+                    "SERVICIO": "Tras la inspección realizada, se confirma que la luminaria correspondiente al reporte [FOLIO] se encuentra actualmente en correcto funcionamiento.",
+                    "PARCIAL": "Se informa que la atención al reporte [FOLIO] se encuentra en estado parcial, quedando pendiente la conclusión por requerimiento de material especializado.",
+                    "BAJADA": "Por medio de la presente, se autoriza el servicio de bajada de luz solicitado bajo el folio [FOLIO].",
+                    "NEGATIVA": "Derivado del análisis técnico, se determina la improcedencia de la petición [FOLIO] debido a que el punto solicitado no pertenece a la infraestructura municipal."
+                }
+
             PATH_OFICIOS = "boveda_oficios.json"
             if "boveda_permanente" not in st.session_state:
                 if os.path.exists(PATH_OFICIOS):
@@ -962,7 +971,7 @@ else:
                 else:
                     st.session_state.boveda_permanente = {}
 
-            # --- 2. ÁREA DE TRABAJO ---
+            # --- 2. ÁREA DE TRABAJO (REDACCIÓN) ---
             col_form, col_view = st.columns([1, 1])
             
             with col_form:
@@ -982,40 +991,56 @@ else:
                 
                 c1, c2 = st.columns(2)
                 num_of = c1.text_input("No. Oficio:", value=datos_previos.get('Oficio', "DAP/___/2026"))
-                fecha_doc = c2.date_input("Fecha:", value=pd.to_datetime(datos_previos.get('Fecha')).date() if datos_previos.get('Fecha') else None)
+                # Corrección de fecha para evitar errores de formato
+                fecha_default = pd.to_datetime(datos_previos.get('Fecha')).date() if datos_previos.get('Fecha') else None
+                fecha_doc = c2.date_input("Fecha:", value=fecha_default)
                 
                 dest = st.text_input("Destinatario:", value=datos_previos.get('Destinatario', ""))
                 cargo = st.text_input("Cargo:", value=datos_previos.get('Cargo', "PRESENTE"))
                 folio_ref = st.text_input("Folio Ref:", value=datos_previos.get('Folio', ""))
                 
-                mensaje_base = datos_previos.get('Cuerpo', st.session_state.plantillas_oficios[mapa_op[op_tipo]])
+                # Acceso seguro a la plantilla
+                mensaje_base = datos_previos.get('Cuerpo', st.session_state.plantillas_oficios.get(mapa_op[op_tipo], ""))
                 mensaje_editado = st.text_area("Cuerpo del Oficio:", value=mensaje_base, height=150)
                 
-                with st.expander("🖋️ Firmas, C.c.p. y Detalles Finales"):
+                with st.expander("🖋️ Detalles de Pie de Página"):
                     firmante = st.text_input("Nombre de quien firma:", value=datos_previos.get('Firmante', "ING. NOMBRE DEL DIRECTOR"))
                     ccp = st.text_area("C.c.p. (Separar con comas):", value=datos_previos.get('CCP', "Archivo / Minutario"))
-                    uso_membrete = st.checkbox("Dejar espacio para membrete físico", value=True)
+                    uso_membrete = st.checkbox("Dejar margen de 5cm (Membrete Físico)", value=True)
 
             with col_view:
                 st.markdown("### 👁️ Vista Previa")
                 cuerpo_v = mensaje_editado.replace("[FOLIO]", f"**{folio_ref}**" if folio_ref else "_______")
                 
+                # Vista previa visual corregida (Sin etiquetas HTML visibles)
                 st.markdown(f"""
-                <div style="background-color: white; color: black; padding: 25px; font-family: 'Arial'; border: 1px solid #ddd; font-size: 12px;">
-                    <p style="text-align: right;">Toluca, Méx; a {fecha_doc.strftime('%d/%m/%Y') if fecha_doc else '____'}<br>
-                    <b>Oficio: {num_of}</b></p>
-                    <p><b>{dest.upper()}</b><br>{cargo.upper()}</p>
-                    <p style="text-align: justify;">{cuerpo_v}</p>
-                    <p style="text-align: center; margin-top: 30px;"><b>A T E N T A M E N T E</b><br><br><br>
-                    ___________________________<br><b>{firmante}</b><br>DIRECCIÓN DE ALUMBRADO PÚBLICO</p>
-                    <p style="font-size: 10px; color: #666; margin-top: 20px;">C.c.p. {ccp}</p>
+                <div style="background-color: white; color: black; padding: 25px; font-family: 'Arial'; border: 1px solid #ddd; font-size: 13px; line-height: 1.4;">
+                    <div style="text-align: right;">
+                        Toluca, Méx; a {fecha_doc.strftime('%d/%m/%Y') if fecha_doc else '____'}<br>
+                        <b>Oficio: {num_of}</b>
+                    </div>
+                    <br>
+                    <p><b>{dest.upper() if dest else 'DESTINATARIO'}</b><br>
+                    {cargo.upper()}</p>
+                    <br>
+                    <div style="text-align: justify;">{cuerpo_v}</div>
+                    <br><br>
+                    <div style="text-align: center; margin-top: 30px;">
+                        <b>A T E N T A M E N T E</b><br><br><br>
+                        ___________________________<br>
+                        <b>{firmante}</b><br>
+                        DIRECCIÓN DE ALUMBRADO PÚBLICO
+                    </div>
+                    <div style="font-size: 10px; color: #666; margin-top: 30px; border-top: 1px solid #eee; padding-top: 5px;">
+                        C.c.p. {ccp}
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
 
                 if libreria_lista:
-                    c_b1, c_b2 = st.columns(2)
-                    if c_b1.button("💾 GUARDAR/ACTUALIZAR", use_container_width=True):
-                        # Extraemos año y mes para la nueva estructura de la bóveda
+                    st.write("---")
+                    cb1, cb2 = st.columns(2)
+                    if cb1.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
                         anio = str(fecha_doc.year) if fecha_doc else "2026"
                         meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
                         mes = meses[fecha_doc.month - 1] if fecha_doc else "S-M"
@@ -1028,65 +1053,69 @@ else:
                         }
                         with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
                             json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
-                        st.success("Guardado en Bóveda.")
+                        st.toast("✅ Guardado en Bóveda Permanente")
+                        time.sleep(0.5)
                         st.rerun()
 
-                    if c_b2.button("🚀 GENERAR PDF", use_container_width=True):
+                    if cb2.button("🚀 GENERAR PDF", use_container_width=True):
                         pdf = FPDF()
                         pdf.add_page()
-                        pdf.set_y(50 if uso_membrete else 20)
+                        pdf.set_y(55 if uso_membrete else 20)
                         pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 8, f"Toluca, Méx; a {fecha_doc.strftime('%d/%m/%Y') if fecha_of else ''}", ln=True, align='R')
+                        pdf.cell(0, 8, f"Toluca, Méx; a {fecha_doc.strftime('%d/%m/%Y') if fecha_doc else ''}", ln=True, align='R')
                         pdf.cell(0, 8, f"Oficio: {num_of}", ln=True, align='R')
-                        pdf.ln(10); pdf.cell(0, 8, dest.upper(), ln=True, align='L'); pdf.cell(0, 8, cargo.upper(), ln=True, align='L')
-                        pdf.ln(10); pdf.set_font("Arial", '', 11)
-                        pdf.multi_cell(0, 8, txt=mensaje_editado.replace("[FOLIO]", folio_ref).encode('latin-1', 'replace').decode('latin-1'), align='J')
-                        pdf.ln(30); pdf.set_font("Arial", 'B', 11); pdf.cell(0, 8, "A T E N T A M E N T E", ln=True, align='C')
-                        pdf.ln(20); pdf.cell(0, 8, "___________________________", ln=True, align='C')
-                        pdf.cell(0, 8, firmante, ln=True, align='C'); pdf.cell(0, 8, "DIRECTOR DE ALUMBRADO PÚBLICO", ln=True, align='C')
-                        pdf.ln(10); pdf.set_font("Arial", 'I', 9); pdf.cell(0, 8, f"C.c.p. {ccp}", ln=True, align='L')
+                        pdf.ln(12)
+                        pdf.cell(0, 8, dest.upper() if dest else "A QUIEN CORRESPONDA", ln=True, align='L')
+                        pdf.cell(0, 8, cargo.upper(), ln=True, align='L')
+                        pdf.ln(12)
+                        pdf.set_font("Arial", '', 11)
+                        texto_limpio = mensaje_editado.replace("[FOLIO]", folio_ref if folio_ref else "_______")
+                        pdf.multi_cell(0, 8, txt=texto_limpio.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                        pdf.ln(35)
+                        pdf.set_font("Arial", 'B', 11)
+                        pdf.cell(0, 8, "A T E N T A M E N T E", ln=True, align='C')
+                        pdf.ln(20)
+                        pdf.cell(0, 8, "___________________________", ln=True, align='C')
+                        pdf.cell(0, 8, firmante, ln=True, align='C')
+                        pdf.cell(0, 8, "DIRECTOR DE ALUMBRADO PÚBLICO", ln=True, align='C')
+                        pdf.set_y(-30)
+                        pdf.set_font("Arial", 'I', 8)
+                        pdf.cell(0, 5, f"C.c.p. {ccp}", ln=True, align='L')
                         
-                        st.download_button("📥 DESCARGAR", data=pdf.output(dest='S').encode('latin-1', 'replace'), file_name=f"Oficio_{id_of}.pdf", mime="application/pdf")
+                        pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
+                        st.download_button("📥 DESCARGAR DOCUMENTO", data=pdf_data, file_name=f"Oficio_{id_of}.pdf", mime="application/pdf", use_container_width=True)
 
-            # --- 3. BÓVEDA ORGANIZADA (CARPETAS) CON PARCHE ANTICRASH ---
+            # --- 3. BÓVEDA ORGANIZADA (CARPETAS) ---
             st.divider()
             st.markdown("### 🗄️ Bóveda Clasificada")
             
             if st.session_state.boveda_permanente:
-                # Convertimos a DataFrame para procesar filtros
                 df_b = pd.DataFrame(st.session_state.boveda_permanente).T
                 
-                # Verificamos que existan las columnas necesarias para evitar el KeyError
                 if not df_b.empty and 'Anio' in df_b.columns:
-                    # Filtros de navegación
-                    f_col1, f_col2, f_col3 = st.columns(3)
+                    f1, f2, f3 = st.columns(3)
+                    anios = sorted(df_b['Anio'].unique(), reverse=True)
+                    s_anio = f1.selectbox("Año:", anios)
                     
-                    anios_disp = sorted(df_b['Anio'].unique(), reverse=True)
-                    sel_anio = f_col1.selectbox("Año:", anios_disp)
+                    meses = sorted(df_b[df_b['Anio'] == s_anio]['Mes'].unique())
+                    s_mes = f2.selectbox("Mes:", meses)
                     
-                    meses_disp = sorted(df_b[df_b['Anio'] == sel_anio]['Mes'].unique())
-                    sel_mes = f_col2.selectbox("Mes:", meses_disp)
-                    
-                    tipos_disp = ["TODOS"] + sorted(df_b[(df_b['Anio'] == sel_anio) & (df_b['Mes'] == sel_mes)]['Tipo'].unique())
-                    sel_tipo = f_col3.selectbox("Tipo de Oficio:", tipos_disp)
+                    tipos = ["TODOS"] + sorted(df_b[(df_b['Anio'] == s_anio) & (df_b['Mes'] == s_mes)]['Tipo'].unique())
+                    s_tipo = f3.selectbox("Tipo:", tipos)
 
-                    # Filtrado final para mostrar los resultados
-                    df_final = df_b[(df_b['Anio'] == sel_anio) & (df_b['Mes'] == sel_mes)]
-                    if sel_tipo != "TODOS":
-                        df_final = df_final[df_final['Tipo'] == sel_tipo]
+                    df_f = df_b[(df_b['Anio'] == s_anio) & (df_b['Mes'] == s_mes)]
+                    if s_tipo != "TODOS": df_f = df_f[df_f['Tipo'] == s_tipo]
 
-                    # Despliegue de los oficios filtrados
-                    for idx, row in df_final.iterrows():
-                        with st.expander(f"📄 {row['Oficio']} | {row['Destinatario']} ({row['Tipo']})"):
-                            c_inf, c_acc = st.columns([4, 1])
-                            c_inf.write(f"**Folio Pangea:** {row['Folio']} | **Firmado por:** {row['Firmante']}")
-                            
-                            if c_acc.button("🗑️ Eliminar", key=f"del_v2_{idx}"):
+                    for idx, row in df_f.iterrows():
+                        with st.expander(f"📄 {row['Oficio']} | {row['Destinatario']}"):
+                            c_i, c_a = st.columns([4, 1])
+                            c_i.write(f"**Folio Pangea:** {row['Folio']} | **Firmante:** {row['Firmante']}")
+                            if c_a.button("🗑️", key=f"del_v3_{idx}"):
                                 del st.session_state.boveda_permanente[idx]
                                 with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
                                     json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
                                 st.rerun()
                 else:
-                    st.info("Bóveda inicializada. Guarde su primer oficio para activar los filtros.")
+                    st.info("Bóveda lista. Guarde un oficio para activar los filtros.")
             else:
-                st.info("📭 La bóveda está vacía actualmente.")
+                st.info("📭 Bóveda vacía.")
