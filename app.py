@@ -859,24 +859,25 @@ else:
 
         with tab_i: st.info("Pegue su código Mermaid aquí para rediseñar (Funcionalidad V1)")
 
-        # --- 📄 GENERADOR DE OFICIOS (EL CORAZÓN DEL MÓDULO) ---
+        # --- 📄 GENERADOR DE OFICIOS (VERSIÓN BLINDADA V16.9) ---
         with tab_o:
             st.subheader("🏛️ Gestión de Correspondencia DAP")
             PATH_OFICIOS = "boveda_oficios.json"
             
-            # Carga Inicial de Bóveda
+            # 1. CARGA INICIAL SEGURA
             if "boveda_permanente" not in st.session_state:
+                st.session_state.boveda_permanente = {}
                 if os.path.exists(PATH_OFICIOS):
                     try:
                         with open(PATH_OFICIOS, "r", encoding="utf-8") as f:
                             st.session_state.boveda_permanente = json.load(f)
-                    except: st.session_state.boveda_permanente = {}
-                else: st.session_state.boveda_permanente = {}
+                    except: pass
 
             c_red, c_vis = st.columns([1, 1])
             with c_red:
                 modo_of = st.radio("Modo:", ["✨ Nuevo", "✏️ Rediseñar"], horizontal=True)
                 datos_prev = {}
+                # Solo intentamos rediseñar si hay datos con el formato correcto
                 if modo_of == "✏️ Rediseñar" and st.session_state.boveda_permanente:
                     sel_id = st.selectbox("Seleccionar guardado:", list(st.session_state.boveda_permanente.keys()))
                     datos_prev = st.session_state.boveda_permanente[sel_id]
@@ -893,50 +894,70 @@ else:
             with c_vis:
                 st.markdown("### 👁️ Vista Previa")
                 cuerpo_preview = mensaje.replace("[FOLIO]", f"**{folio_ref}**")
-                st.markdown(f"""<div style="background:white; color:black; padding:20px; border:1px solid #ccc;">
+                st.markdown(f"""<div style="background:white; color:black; padding:20px; border:1px solid #ccc; font-family:Arial; font-size:12px;">
                     <div style="text-align:right;">Toluca, a {fecha_of.strftime('%d/%m/%Y')}<br><b>{num_of}</b></div><br>
                     <b>{dest.upper()}</b><br>{cargo.upper()}<br><br>
                     <div style="text-align:justify;">{cuerpo_preview}</div><br><br>
                     <div style="text-align:center;">ATENTAMENTE<br><br>________________<br><b>{firmante}</b></div>
                 </div>""", unsafe_allow_html=True)
                 
-                # BOTONES DE ACCIÓN
                 id_file = num_of.replace("/", "-")
                 col_b1, col_b2 = st.columns(2)
                 
                 if col_b1.button("💾 GUARDAR BÓVEDA", use_container_width=True):
                     meses = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"]
-                    st.session_state.boveda_permanente[id_file] = {
+                    # Guardamos con estructura garantizada
+                    nuevo_registro = {
                         "Oficio": num_of, "Fecha": str(fecha_of), "Anio": str(fecha_of.year), "Mes": meses[fecha_of.month-1],
                         "Destinatario": dest, "Cargo": cargo, "Folio": folio_ref, "Cuerpo": mensaje, "Tipo": "Oficio", "Firmante": firmante, "CCP": ccp
                     }
-                    with open(PATH_OFICIOS, "w", encoding="utf-8") as f: json.dump(st.session_state.boveda_permanente, f, indent=4)
-                    st.success("Guardado"); time.sleep(0.5); st.rerun()
+                    st.session_state.boveda_permanente[id_file] = nuevo_registro
+                    with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                        json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
+                    st.success("✅ Guardado"); time.sleep(0.6); st.rerun()
 
-                if col_b2.button("🚀 PDF", use_container_width=True):
+                if col_b2.button("🚀 GENERAR PDF", use_container_width=True):
                     from fpdf import FPDF
                     pdf = FPDF()
                     pdf.add_page()
                     pdf.set_font("Arial", size=11)
                     pdf.cell(0, 10, f"Oficio: {num_of}", ln=True, align='R')
-                    pdf.multi_cell(0, 10, txt=mensaje.replace("[FOLIO]", folio_ref))
+                    pdf.ln(10)
+                    pdf.multi_cell(0, 10, txt=mensaje.replace("[FOLIO]", folio_ref).encode('latin-1', 'replace').decode('latin-1'))
                     pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
                     st.download_button("📥 Descargar PDF", pdf_out, f"{id_file}.pdf", "application/pdf")
 
-            # --- BÓVEDA CLASIFICADA ---
+            # --- 3. BÓVEDA CLASIFICADA (EL PARCHE ANTICRASH) ---
             st.divider()
+            st.markdown("### 🗄️ Bóveda de Correspondencia")
+            
             if st.session_state.boveda_permanente:
                 df_b = pd.DataFrame(st.session_state.boveda_permanente).T
-                if not df_b.empty and 'Anio' in df_b.columns:
-                    f1, f2 = st.columns(2)
-                    sel_a = f1.selectbox("Año:", sorted(df_b['Anio'].unique(), reverse=True))
-                    sel_m = f2.selectbox("Mes:", sorted(df_b[df_b['Anio']==sel_a]['Mes'].unique()))
-                    df_v = df_b[(df_b['Anio']==sel_a) & (df_b['Mes']==sel_m)]
-                    for i, r in df_v.iterrows():
-                        with st.expander(f"📄 {r['Oficio']} - {r['Destinatario']}"):
-                            st.write(f"Folio: {r['Folio']}")
-                            if st.button("🗑️", key=f"del_{i}"):
-                                del st.session_state.boveda_permanente[i]
-                                with open(PATH_OFICIOS, "w") as f: json.dump(st.session_state.boveda_permanente, f)
-                                st.rerun()
-            else: st.info("Bóveda vacía.")
+                
+                # VERIFICACIÓN QUIRÚRGICA DE COLUMNAS
+                if not df_b.empty and 'Anio' in df_b.columns and 'Mes' in df_b.columns:
+                    try:
+                        f1, f2 = st.columns(2)
+                        anios_list = sorted(df_b['Anio'].unique(), reverse=True)
+                        sel_a = f1.selectbox("Año:", anios_list, key="filtro_a")
+                        
+                        meses_list = sorted(df_b[df_b['Anio'] == sel_a]['Mes'].unique())
+                        sel_m = f2.selectbox("Mes:", meses_list, key="filtro_m")
+                        
+                        df_v = df_b[(df_b['Anio'] == sel_a) & (df_b['Mes'] == sel_m)]
+                        
+                        for i, r in df_v.iterrows():
+                            with st.expander(f"📄 {r['Oficio']} - {r['Destinatario']}"):
+                                col_info, col_del = st.columns([4, 1])
+                                col_info.write(f"**Folio:** {r['Folio']} | **Firma:** {r['Firmante']}")
+                                if col_del.button("🗑️", key=f"del_of_{i}"):
+                                    del st.session_state.boveda_permanente[i]
+                                    with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                                        json.dump(st.session_state.boveda_permanente, f, indent=4)
+                                    st.rerun()
+                    except Exception as e:
+                        st.info("🔄 Actualizando índices de la bóveda...")
+                else:
+                    st.warning("📂 Bóveda lista. Guarde un oficio para activar los filtros de búsqueda.")
+            else:
+                st.info("📭 No hay oficios guardados aún.")
