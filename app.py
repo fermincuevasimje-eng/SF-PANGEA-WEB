@@ -946,7 +946,7 @@ else:
             st.subheader("📄 Correspondencia Oficial DAP")
             PATH_OFICIOS = "boveda_oficios.json"
             
-            # 1. CARGA INICIAL SEGURA (Evita el error si el archivo no existe)
+            # 1. CARGA INICIAL SEGURA
             if "boveda_oficios_db" not in st.session_state:
                 if os.path.exists(PATH_OFICIOS):
                     try:
@@ -977,7 +977,7 @@ else:
                 cargo_of = st.text_input("Cargo:", value=datos_of.get('Cargo', "PRESENTE"))
                 folio_of = st.text_input("Folio Ref:", value=datos_of.get('Folio', ""))
                 
-                cuerpo_of = st.text_area("Contenido:", value=datos_of.get('Cuerpo', "Se informa que la petición [FOLIO] fue atendida..."), height=150)
+                cuerpo_of = st.text_area("Contenido:", value=datos_of.get('Cuerpo', "Se informa que la petición [FOLIO] fue atendida exitosamente."), height=150)
                 
                 st.markdown("---")
                 firmante_of = st.text_input("Firma del Oficio:", value=datos_of.get('Firmante', "ING. DIRECTOR DE ALUMBRADO PÚBLICO"))
@@ -1047,7 +1047,7 @@ else:
                     except Exception as e:
                         st.error(f"Error PDF: {e}")
 
-            # --- 3. BÓVEDA CLASIFICADA (EL BLINDAJE ANTICRASH) ---
+            # --- 3. BÓVEDA CLASIFICADA ---
             st.divider()
             if st.session_state.boveda_oficios_db:
                 df_b = pd.DataFrame(st.session_state.boveda_oficios_db).T
