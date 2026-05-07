@@ -1045,20 +1045,39 @@ else:
                     cb1, cb2 = st.columns(2)
                     
                     if cb1.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
-                        anio = str(fecha_doc.year) if fecha_doc else "2026"
-                        meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
-                        mes = meses[fecha_doc.month - 1] if fecha_doc else "S-M"
+                        # 1. Preparar datos de tiempo
+                        anio_actual = str(fecha_doc.year) if fecha_doc else "2026"
+                        meses_lista = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
+                        mes_actual = meses_lista[fecha_doc.month - 1] if fecha_doc else "S-M"
                         
-                        st.session_state.boveda_permanente[id_of_archivo] = {
-                            "Oficio": num_of, "Fecha": str(fecha_doc), "Anio": anio, "Mes": mes,
-                            "Destinatario": dest, "Cargo": cargo, "Folio": folio_ref, 
-                            "Cuerpo": mensaje_editado, "Tipo": op_tipo, "Firmante": firmante, "CCP": ccp
+                        # 2. Estructurar el nuevo registro
+                        nuevo_registro = {
+                            "Oficio": num_of, 
+                            "Fecha": str(fecha_doc), 
+                            "Anio": anio_actual, 
+                            "Mes": mes_actual,
+                            "Destinatario": dest, 
+                            "Cargo": cargo, 
+                            "Folio": folio_ref, 
+                            "Cuerpo": mensaje_editado, 
+                            "Tipo": op_tipo, 
+                            "Firmante": firmante, 
+                            "CCP": ccp
                         }
-                        with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
-                            json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
-                        st.toast("✅ Guardado en Bóveda Permanente")
-                        time.sleep(0.5)
-                        st.rerun()
+                        
+                        # 3. Actualizar Session State y Archivo Físico
+                        st.session_state.boveda_permanente[id_of_archivo] = nuevo_registro
+                        
+                        try:
+                            with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                                json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
+                            
+                            # 4. Confirmación visual y forzado de refresco
+                            st.success(f"✅ Oficio {num_of} guardado correctamente.")
+                            time.sleep(1) # Pausa breve para que veas el mensaje de éxito
+                            st.rerun() 
+                        except Exception as e:
+                            st.error(f"Error al escribir en disco: {e}")
 
                     if cb2.button("🚀 GENERAR PDF", use_container_width=True):
                         pdf = FPDF()
