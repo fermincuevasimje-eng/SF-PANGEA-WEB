@@ -943,134 +943,133 @@ else:
 
         # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (SOLUCIÓN ANTIBLOQUEO) ---
         with tab_o:
-            st.subheader("🏛️ Generador de Oficios Institucionales - DAP")
+            st.subheader("🏛️ Sistema de Gestión de Correspondencia Permanente")
             
             try:
                 from fpdf import FPDF
+                import pandas as pd
                 libreria_lista = True
             except ImportError:
                 libreria_lista = False
-                st.warning("⚠️ El motor de PDF no está instalado. Revisa requirements.txt.")
+                st.error("⚠️ Error: Instala 'fpdf' en tu requirements.txt")
 
-            # --- CONFIGURACIÓN DEL OFICIO ---
+            # --- 1. LÓGICA DE PERSISTENCIA (BÓVEDA PERMANENTE) ---
+            PATH_OFICIOS = "boveda_oficios.json"
+            if "boveda_permanente" not in st.session_state:
+                if os.path.exists(PATH_OFICIOS):
+                    with open(PATH_OFICIOS, "r", encoding="utf-8") as f:
+                        st.session_state.boveda_permanente = json.load(f)
+                else:
+                    st.session_state.boveda_permanente = {}
+
+            # --- 2. CONFIGURACIÓN E INPUTS ---
+            if "plantillas_oficios" not in st.session_state:
+                st.session_state.plantillas_oficios = {
+                    "EXITOSA": "Se hace de su conocimiento que la petición con folio [FOLIO] ha sido atendida en su totalidad por las brigadas de esta Dirección.",
+                    "SERVICIO": "Tras la inspección realizada, se confirma que la luminaria correspondiente al reporte [FOLIO] se encuentra actualmente en correcto funcionamiento.",
+                    "PARCIAL": "Se informa que la atención al reporte [FOLIO] se encuentra en estado parcial, quedando pendiente la conclusión por requerimiento de material especializado.",
+                    "BAJADA": "Por medio de la presente, se autoriza el servicio de bajada de luz solicitado bajo el folio [FOLIO].",
+                    "NEGATIVA": "Derivado del análisis técnico, se determina la improcedencia de la petición [FOLIO] debido a que el punto solicitado no pertenece a la infraestructura municipal."
+                }
+
             col_form, col_view = st.columns([1, 1])
             
             with col_form:
-                st.info("Complete los datos para generar el documento oficial.")
+                st.markdown("### 📝 Redacción del Oficio")
+                
+                # Selector de modo: Nuevo o Editar
+                modo = st.radio("Modo de trabajo:", ["✨ Nuevo Oficio", "✏️ Rediseñar Guardado"], horizontal=True)
+                
+                if modo == "✏️ Rediseñar Guardado" and st.session_state.boveda_permanente:
+                    seleccion = st.selectbox("Seleccione oficio a rediseñar:", list(st.session_state.boveda_permanente.keys()))
+                    datos_previos = st.session_state.boveda_permanente[seleccion]
+                else:
+                    datos_previos = {}
+
+                op_tipo = st.selectbox("Tipo de Plantilla:", 
+                                     ["Atención Exitosa", "Ya en Servicio", "Programado/Parcial", "Bajadas de Luz", "Atención Negativa"],
+                                     index=0 if not datos_previos else ["Atención Exitosa", "Ya en Servicio", "Programado/Parcial", "Bajadas de Luz", "Atención Negativa"].index(datos_previos.get('Tipo', "Atención Exitosa")))
+                
+                mapa_op = {"Atención Exitosa":"EXITOSA", "Ya en Servicio":"SERVICIO", "Programado/Parcial":"PARCIAL", "Bajadas de Luz":"BAJADA", "Atención Negativa":"NEGATIVA"}
+                
                 c1, c2 = st.columns(2)
-                num_of = c1.text_input("Número de Oficio:", value="DAP/___/2026")
-                fecha_of = c2.date_input("Fecha del Documento:", value=None)
+                num_of = c1.text_input("No. Oficio:", value=datos_previos.get('Oficio', "DAP/___/2026"))
+                fecha_doc = c2.date_input("Fecha:", value=pd.to_datetime(datos_previos.get('Fecha')).date() if datos_previos.get('Fecha') else None)
                 
-                asunto = st.text_input("Asunto (Resumen):", placeholder="Ej. Respuesta a Petición de Alumbrado")
-                destinatario = st.text_input("Nombre del Destinatario:", placeholder="C. Nombre del Ciudadano")
-                cargo_dest = st.text_input("Cargo/Domicilio:", value="PRESENTE")
-                folio_ref = st.text_input("Folio de Referencia (Pangea/SIAT):")
+                dest = st.text_input("Destinatario:", value=datos_previos.get('Destinatario', ""))
+                cargo = st.text_input("Cargo/Presente:", value=datos_previos.get('Cargo', "PRESENTE"))
+                folio_ref = st.text_input("Folio de Referencia:", value=datos_previos.get('Folio', ""))
                 
-                mensaje = st.text_area("Cuerpo del Oficio:", height=150, 
-                                     placeholder="Escriba aquí el dictamen o respuesta detallada...")
+                with st.expander("✏️ Editar Cuerpo del Mensaje"):
+                    mensaje_base = datos_previos.get('Cuerpo', st.session_state.plantillas_oficios[mapa_op[op_tipo]])
+                    mensaje_editado = st.text_area("Cuerpo:", value=mensaje_base, height=150)
                 
-                # SECCIÓN DE FIRMAS (Personalizable para el Director o Jefe de Depto)
-                st.divider()
-                st.write("✒️ **Datos de Firma**")
-                firmante = st.text_input("Nombre de quien firma:", value="ING. NOMBRE DEL DIRECTOR")
-                puesto_firmante = st.text_input("Puesto:", value="DIRECTOR DE ALUMBRADO PÚBLICO")
-                con_copia = st.text_area("C.c.p. (Opcional):", value="Archivo / Minutario")
+                uso_membrete = st.checkbox("Margen para Papel Membrete Físico", value=True)
 
             with col_view:
-                st.write("👁️ **Vista Previa Institucional**")
-                # Estilo visual de "Hoja Membretada"
+                st.markdown("### 👁️ Vista Previa")
+                cuerpo_vista = mensaje_editado.replace("[FOLIO]", f"**{folio_ref}**" if folio_ref else "_______")
+                
                 st.markdown(f"""
-                <div style="background-color: white; color: black; padding: 40px; border: 2px solid #800020; font-family: 'Arial'; line-height: 1.2; font-size: 13px;">
-                    <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #800020; padding-bottom: 10px; margin-bottom: 20px;">
-                        <div style="font-weight: bold; color: #800020;">TOLUCA<br><span style="font-size: 10px; color: #555;">MUNICIPIO LLENO DE VIDA</span></div>
-                        <div style="text-align: right; font-size: 11px;"><b>Dirección General de Servicios Públicos</b><br>Dirección de Alumbrado Público</div>
-                    </div>
-                    
-                    <div style="text-align: right; margin-bottom: 20px;">
-                        <b>Oficio No:</b> {num_of}<br>
-                        <b>Asunto:</b> {asunto.upper()}<br>
-                        Toluca, México; a {fecha_of.strftime('%d de %B de %Y') if fecha_of else '____'}
-                    </div>
-
-                    <div style="margin-bottom: 25px;">
-                        <b>{destinatario.upper()}</b><br>
-                        <b>{cargo_dest.upper()}</b>
-                    </div>
-
-                    <div style="text-align: justify; margin-bottom: 40px; min-height: 150px;">
-                        {mensaje if mensaje else "<i>(Contenido del oficio)</i>"}
-                        <br><br>Sin más por el momento, le envío un cordial saludo.
-                    </div>
-
-                    <div style="text-align: center; margin-top: 50px;">
-                        <b>A T E N T A M E N T E</b><br><br><br>
-                        __________________________________<br>
-                        <b>{firmante}</b><br>
-                        {puesto_firmante}
-                    </div>
-                    
-                    <div style="font-size: 9px; margin-top: 40px; border-top: 1px solid #ccc; padding-top: 5px; color: #777;">
-                        C.c.p. {con_copia}
-                    </div>
+                <div style="background-color: white; color: black; padding: 25px; font-family: 'Arial'; border: 1px solid #ddd; border-top: 5px solid #800020;">
+                    <p style="text-align: right;">Toluca, Méx; a {fecha_doc.strftime('%d/%m/%Y') if fecha_doc else '____'}<br>
+                    <b>Oficio: {num_of}</b></p>
+                    <p><b>{dest.upper()}</b><br>{cargo.upper()}</p>
+                    <p style="text-align: justify;">{cuerpo_vista}</p>
+                    <p style="text-align: center; margin-top: 30px;"><b>A T E N T A M E N T E</b><br><br><br>
+                    ___________________________<br><b>ING. NOMBRE DEL DIRECTOR</b><br>DIRECTOR DE ALUMBRADO PÚBLICO</p>
                 </div>
                 """, unsafe_allow_html=True)
 
                 if libreria_lista:
-                    if st.button("📄 GENERAR PDF OFICIAL", use_container_width=True):
+                    c_btn1, c_btn2 = st.columns(2)
+                    if c_btn1.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
+                        # Guardar en el diccionario persistente usando el No. Oficio como llave
+                        id_oficio = num_of.replace("/", "-")
+                        st.session_state.boveda_permanente[id_oficio] = {
+                            "Oficio": num_of, "Fecha": str(fecha_doc), "Destinatario": dest, 
+                            "Cargo": cargo, "Folio": folio_ref, "Cuerpo": mensaje_editado, "Tipo": op_tipo
+                        }
+                        with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                            json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
+                        st.success(f"Oficio {num_of} guardado permanentemente.")
+                        st.rerun()
+
+                    if c_btn2.button("🚀 GENERAR PDF", use_container_width=True):
                         pdf = FPDF()
                         pdf.add_page()
-                        
-                        # --- ENCABEZADO ESTILO TOLUCA ---
-                        pdf.set_draw_color(128, 0, 32) # Color Guinda/Vino institucional
-                        pdf.set_line_width(0.8)
-                        pdf.line(10, 25, 200, 25)
-                        
-                        pdf.set_font("Arial", 'B', 10)
-                        pdf.set_text_color(128, 0, 32)
-                        pdf.cell(0, 5, "TOLUCA - MUNICIPIO LLENO DE VIDA", ln=True, align='L')
-                        pdf.set_text_color(0, 0, 0)
-                        pdf.set_font("Arial", '', 9)
-                        pdf.cell(0, 5, "Dirección de Alumbrado Público", ln=True, align='L')
-                        
-                        pdf.ln(10)
-                        
-                        # --- DATOS DE REFERENCIA ---
-                        pdf.set_font("Arial", 'B', 10)
-                        pdf.cell(0, 6, f"Oficio No: {num_of}", ln=True, align='R')
-                        pdf.cell(0, 6, f"Asunto: {asunto.upper()}", ln=True, align='R')
-                        pdf.set_font("Arial", '', 10)
-                        pdf.cell(0, 6, f"Toluca, Méx; a {fecha_of.strftime('%d de %m de %Y') if fecha_of else '____'}", ln=True, align='R')
-                        
-                        pdf.ln(10)
-                        
-                        # --- DESTINATARIO ---
+                        pdf.set_y(50 if uso_membrete else 20)
                         pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 6, destinatario.upper(), ln=True, align='L')
-                        pdf.cell(0, 6, cargo_dest.upper(), ln=True, align='L')
-                        
+                        pdf.cell(0, 8, f"Toluca, Méx; a {fecha_doc.strftime('%d/%m/%Y') if fecha_doc else ''}", ln=True, align='R')
+                        pdf.cell(0, 8, f"Oficio: {num_of}", ln=True, align='R')
+                        pdf.ln(15)
+                        pdf.cell(0, 8, dest.upper(), ln=True, align='L')
+                        pdf.cell(0, 8, cargo.upper(), ln=True, align='L')
                         pdf.ln(10)
-                        
-                        # --- CUERPO ---
                         pdf.set_font("Arial", '', 11)
-                        texto_final = mensaje + "\n\nSin más por el momento, le envío un cordial saludo."
-                        pdf.multi_cell(0, 7, txt=texto_final.encode('latin-1', 'replace').decode('latin-1'), align='J')
-                        
-                        # --- ÁREA DE FIRMA (Ubicación fija al final) ---
-                        pdf.ln(30)
+                        pdf.multi_cell(0, 8, txt=mensaje_editado.replace("[FOLIO]", folio_ref).encode('latin-1', 'replace').decode('latin-1'), align='J')
+                        pdf.ln(40)
                         pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 6, "A T E N T A M E N T E", ln=True, align='C')
+                        pdf.cell(0, 8, "A T E N T A M E N T E", ln=True, align='C')
                         pdf.ln(20)
-                        pdf.cell(0, 6, "__________________________________", ln=True, align='C')
-                        pdf.cell(0, 6, firmante, ln=True, align='C')
-                        pdf.set_font("Arial", '', 10)
-                        pdf.cell(0, 6, puesto_firmante, ln=True, align='C')
+                        pdf.cell(0, 8, "___________________________", ln=True, align='C')
+                        pdf.cell(0, 8, "DIRECTOR DE ALUMBRADO PÚBLICO", ln=True, align='C')
                         
-                        # --- PIE DE PÁGINA ---
-                        pdf.set_y(-30)
-                        pdf.set_font("Arial", 'I', 8)
-                        pdf.set_text_color(100, 100, 100)
-                        pdf.cell(0, 5, f"C.c.p. {con_copia}", ln=True, align='L')
-                        
-                        pdf_output = pdf.output(dest='S').encode('latin-1', 'replace')
-                        st.download_button(label="📥 DESCARGAR PDF OFICIAL", data=pdf_output, 
-                                         file_name=f"Oficio_{num_of.replace('/','-')}.pdf", mime="application/pdf")
+                        pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
+                        st.download_button("📥 DESCARGAR ARCHIVO", data=pdf_bytes, file_name=f"Oficio_{num_of}.pdf", mime="application/pdf")
+
+            # --- 3. GESTIÓN DE BÓVEDA PERMANENTE ---
+            st.divider()
+            st.markdown("### 🗄️ Bóveda Permanente de Oficios")
+            if st.session_state.boveda_permanente:
+                for k, v in list(st.session_state.boveda_permanente.items()):
+                    with st.expander(f"📁 {v['Oficio']} - {v['Destinatario']}"):
+                        col_info, col_del = st.columns([4, 1])
+                        col_info.write(f"**Folio Pangea:** {v['Folio']} | **Fecha:** {v['Fecha']}")
+                        if col_del.button("🗑️ Eliminar", key=f"del_{k}"):
+                            del st.session_state.boveda_permanente[k]
+                            with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                                json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
+                            st.rerun()
+            else:
+                st.info("Bóveda vacía. Los oficios que guardes aparecerán aquí.")
