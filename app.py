@@ -785,7 +785,7 @@ else:
         ])
 
         with tab_c:
-            # --- 1. CAPTURA INTELIGENTE (TU LÓGICA ORIGINAL) ---
+            # --- 1. CAPTURA INTELIGENTE ---
             with st.expander("📝 CONFIGURAR PASO", expanded=True):
                 idx = st.session_state.edit_index
                 editando = (idx != -1)
@@ -817,7 +817,7 @@ else:
                         label_no = st.text_input("Etiqueta NO:", value=paso_actual.get('label_no', "NO"))
                         d_no_val = paso_actual.get('dest_no', "Siguiente")
                         dest_no = st.selectbox("Destino NO (Salto):", destinos, index=destinos.index(d_no_val) if d_no_val in destinos else 0)
-                    with c3: st.info("Las decisiones requieren dos salidas obligatorias.")
+                    with c3: st.info("Las decisiones requieren dos salidas.")
 
                 if not editando:
                     if st.button("➕ Agregar al Flujo", use_container_width=True):
@@ -840,7 +840,6 @@ else:
                         st.session_state.edit_index = -1
                         st.rerun()
 
-            # --- 2. VISTA DIVIDIDA Y MOTOR (TU LÓGICA ORIGINAL) ---
             if st.session_state.pasos_sf4:
                 col_l, col_p = st.columns([1, 1.2])
                 with col_l:
@@ -854,13 +853,11 @@ else:
                     if st.button("🔥 Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
 
                 with col_p:
-                    st.subheader("📊 Visualización Premium")
+                    st.subheader("📊 Visualización")
                     def clean(t): return re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', str(t))
-                    
                     mmd_head = ["graph TD", "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
                     mmd_nodos = []
                     mmd_conexiones = []
-
                     for i, p in enumerate(st.session_state.pasos_sf4):
                         id_n = f"N{i}"
                         t_c = clean(p.get('texto', ''))
@@ -889,32 +886,10 @@ else:
                                 elif "Paso" in str(dst):
                                     p_num = int(re.search(r'\d+', str(dst)).group()) - 1
                                     mmd_conexiones.append(f'    {id_n} {f_style} N{p_num}')
-
                     full_m = "\n".join(mmd_head + mmd_nodos + mmd_conexiones)
                     st.code(full_m, language="mermaid")
-                    
-                    if st.session_state.pasos_sf4:
-                        tema = st.session_state.pasos_sf4[0]['texto'].replace('?', '')
-                        st.markdown("---")
-                        st.subheader("📝 Objetivos del Proceso")
-                        adm, tec = st.columns(2)
-                        with adm:
-                            st.info("**Administrativo-Normativo**")
-                            st.caption(f"Establecer el marco procedimental de '{tema}', asegurando el cumplimiento de los criterios de validación.")
-                        with tec:
-                            st.success("**Técnico-Operativo**")
-                            st.caption(f"Optimizar la respuesta de las cuadrillas en '{tema}', mediante la estandarización técnica.")
-
                     b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
                     st.link_button("🚀 LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
-                    st.write("---")
-                    nom_p = st.text_input("Nombre para Bóveda:")
-                    if st.button("💾 Guardar en Bóveda Pangea"):
-                        if nom_p:
-                            st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
-                            with open("boveda_pangea.json", "w", encoding="utf-8") as f:
-                                json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
-                            st.success("Guardado correctamente.")
 
         with tab_b:
             if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
@@ -922,31 +897,17 @@ else:
                 for k, v in list(st.session_state.boveda_mmd.items()):
                     with st.expander(f"📁 {k}"):
                         st.code(v['code'], language="mermaid")
-                        b1, b2, b3 = st.columns(3)
-                        if b1.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
-                        b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
-                        b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
-                        if k.strip().upper() != "PASTEL VERDE":
-                            if b3.button("🗑️", key=f"x_{k}", use_container_width=True):
-                                del st.session_state.boveda_mmd[k]
-                                with open("boveda_pangea.json", "w", encoding="utf-8") as f:
-                                    json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
-                                st.rerun()
+                        if st.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
 
         with tab_i:
-            st.subheader("📥 Importación Externa")
-            raw_import = st.text_area("Pega el código Mermaid aquí:", height=300, key="area_import_sf")
-            if st.button("🚀 REDISEÑAR PROCESO", use_container_width=True):
-                if raw_import:
-                    # (Aquí va tu lógica de importación original completa...)
-                    st.info("Procesando importación...")
+            st.subheader("📥 Importación")
+            raw_import = st.text_area("Pega el código Mermaid aquí:", height=200)
 
-        # --- 📄 PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN BLINDADA Y PERMANENTE) ---
+        # --- 📄 PESTAÑA: GENERADOR DE OFICIOS (BLINDADA) ---
         with tab_o:
             st.subheader("📄 Correspondencia Oficial DAP")
             PATH_OFICIOS = "boveda_oficios.json"
             
-            # 1. CARGA INICIAL SEGURA
             if "boveda_oficios_db" not in st.session_state:
                 if os.path.exists(PATH_OFICIOS):
                     try:
@@ -956,111 +917,78 @@ else:
                 else:
                     st.session_state.boveda_oficios_db = {}
 
-            # 2. CONFIGURACIÓN DE FORMULARIO E INTERFAZ
-            col_form, col_view = st.columns([1, 1])
-            
-            with col_form:
-                modo = st.radio("Acción:", ["✨ Nuevo Oficio", "📂 Editar desde Bóveda"], horizontal=True)
+            c_form, c_view = st.columns([1, 1])
+            with c_form:
+                modo = st.radio("Acción:", ["✨ Nuevo", "📂 Bóveda"], horizontal=True)
                 datos_of = {}
-                
-                if modo == "📂 Editar desde Bóveda" and st.session_state.boveda_oficios_db:
-                    sel_id = st.selectbox("Seleccionar registro:", list(st.session_state.boveda_oficios_db.keys())[::-1])
+                if modo == "📂 Bóveda" and st.session_state.boveda_oficios_db:
+                    sel_id = st.selectbox("Registros:", list(st.session_state.boveda_oficios_db.keys())[::-1])
                     datos_of = st.session_state.boveda_oficios_db[sel_id]
-                elif modo == "📂 Editar desde Bóveda":
-                    st.info("La bóveda está vacía actualmente.")
 
-                c1, c2 = st.columns(2)
-                num_of = c1.text_input("No. Oficio:", value=datos_of.get('Oficio', "DAP/___/2026"))
-                fecha_of = c2.date_input("Fecha:", value=pd.to_datetime(datos_of.get('Fecha')).date() if datos_of.get('Fecha') else pd.Timestamp.now().date())
-                
+                n_of = st.text_input("No. Oficio:", value=datos_of.get('Oficio', "DAP/___/2026"))
+                f_of = st.date_input("Fecha:", value=pd.to_datetime(datos_of.get('Fecha')).date() if datos_of.get('Fecha') else pd.Timestamp.now().date())
                 dest_of = st.text_input("Destinatario:", value=datos_of.get('Destinatario', ""))
                 cargo_of = st.text_input("Cargo:", value=datos_of.get('Cargo', "PRESENTE"))
                 folio_of = st.text_input("Folio Ref:", value=datos_of.get('Folio', ""))
-                
-                cuerpo_of = st.text_area("Contenido:", value=datos_of.get('Cuerpo', "Se informa que la petición [FOLIO] fue atendida exitosamente."), height=150)
-                
+                cuerpo_of = st.text_area("Contenido:", value=datos_of.get('Cuerpo', "Por medio de la presente se informa que la petición con folio [FOLIO]..."), height=150)
                 st.markdown("---")
-                firmante_of = st.text_input("Firma del Oficio:", value=datos_of.get('Firmante', "ING. DIRECTOR DE ALUMBRADO PÚBLICO"))
+                firmante_of = st.text_input("Firma:", value=datos_of.get('Firmante', "ING. DIRECTOR DE ALUMBRADO PÚBLICO"))
                 ccp_of = st.text_input("C.c.p.:", value=datos_of.get('CCP', "Archivo."))
 
-            with col_view:
+            with c_view:
                 st.markdown("### 👁️ Vista Previa")
-                cuerpo_vista = cuerpo_of.replace("[FOLIO]", f"**{folio_of}**")
-                
+                c_p = cuerpo_of.replace("[FOLIO]", f"**{folio_of}**")
                 st.markdown(f"""
-                <div style="background:white; color:black; padding:30px; border:1px solid #ccc; font-family:Arial; line-height:1.4;">
-                    <div style="text-align:right;">Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y')}<br><b>Oficio: {num_of}</b></div>
-                    <br><br><b>{dest_of.upper() if dest_of else 'A QUIEN CORRESPONDA'}</b><br>{cargo_of.upper()}<br><br>
-                    <div style="text-align:justify;">{cuerpo_vista}</div>
-                    <br><br><br>
-                    <div style="text-align:center;"><b>ATENTAMENTE</b><br><br><br>__________________________<br><b>{firmante_of.upper()}</b></div>
-                    <br><br><div style="font-size:10px;">C.c.p. {ccp_of}</div>
+                <div style="background:white; color:black; padding:25px; border:1px solid #ccc; font-family:Arial; font-size:12px;">
+                    <div style="text-align:right;">Toluca, Méx; a {f_of.strftime('%d/%m/%Y')}<br>Oficio: {n_of}</div><br>
+                    <b>{dest_of.upper()}</b><br>{cargo_of.upper()}<br><br>
+                    <div style="text-align:justify;">{c_p}</div><br><br>
+                    <div style="text-align:center;"><b>ATENTAMENTE</b><br><br>__________________________<br><b>{firmante_of.upper()}</b></div>
+                    <div style="font-size:9px; margin-top:20px;">C.c.p. {ccp_of}</div>
                 </div>""", unsafe_allow_html=True)
                 
-                st.write("")
-                b_save, b_pdf = st.columns(2)
-                
-                if b_save.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
+                b1, b2 = st.columns(2)
+                if b1.button("💾 GUARDAR", use_container_width=True):
                     meses = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"]
-                    id_reg = num_of.replace("/", "-")
-                    st.session_state.boveda_oficios_db[id_reg] = {
-                        "Oficio": num_of, "Fecha": str(fecha_of), 
-                        "Anio": str(fecha_of.year), "Mes": meses[fecha_of.month-1],
-                        "Destinatario": dest_of, "Cargo": cargo_of, "Folio": folio_of, 
-                        "Cuerpo": cuerpo_of, "Firmante": firmante_of, "CCP": ccp_of
+                    id_r = n_of.replace("/", "-")
+                    st.session_state.boveda_oficios_db[id_r] = {
+                        "Oficio": n_of, "Fecha": str(f_of), "Anio": str(f_of.year), "Mes": meses[f_of.month-1],
+                        "Destinatario": dest_of, "Cargo": cargo_of, "Folio": folio_of, "Cuerpo": cuerpo_of,
+                        "Firmante": firmante_of, "CCP": ccp_of
                     }
                     with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
                         json.dump(st.session_state.boveda_oficios_db, f, indent=4, ensure_ascii=False)
-                    st.success("✅ Guardado correctamente")
-                    time.sleep(1)
-                    st.rerun()
+                    st.success("Guardado"); time.sleep(1); st.rerun()
 
-                if b_pdf.button("🚀 GENERAR PDF", use_container_width=True):
+                if b2.button("🚀 PDF", use_container_width=True):
                     try:
                         from fpdf import FPDF
                         pdf = FPDF()
-                        pdf.add_page()
-                        pdf.set_font("Arial", size=12)
-                        pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 10, txt=f"Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y')}", ln=True, align='R')
-                        pdf.cell(0, 10, txt=f"Oficio: {num_of}", ln=True, align='R')
-                        pdf.ln(10)
-                        pdf.set_font("Arial", 'B', 12)
-                        pdf.cell(0, 10, txt=dest_of.upper() if dest_of else "A QUIEN CORRESPONDA", ln=True)
-                        pdf.set_font("Arial", '', 11)
-                        pdf.cell(0, 10, txt=cargo_of.upper(), ln=True)
-                        pdf.ln(10)
-                        pdf.set_font("Arial", '', 12)
-                        txt_limpio = cuerpo_of.replace("[FOLIO]", folio_of).encode('latin-1', 'replace').decode('latin-1')
-                        pdf.multi_cell(0, 10, txt=txt_limpio, align='J')
-                        pdf.ln(20)
-                        pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 10, txt="ATENTAMENTE", ln=True, align='C')
-                        pdf.ln(15)
+                        pdf.add_page(); pdf.set_font("Arial", size=11)
+                        pdf.cell(0, 10, txt=f"Toluca, Méx; a {f_of.strftime('%d/%m/%Y')}", ln=True, align='R')
+                        pdf.cell(0, 10, txt=f"Oficio: {n_of}", ln=True, align='R'); pdf.ln(10)
+                        pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, txt=dest_of.upper(), ln=True)
+                        pdf.set_font("Arial", '', 11); pdf.cell(0, 10, txt=cargo_of.upper(), ln=True); pdf.ln(10)
+                        pdf.multi_cell(0, 10, txt=cuerpo_of.replace("[FOLIO]", folio_of).encode('latin-1', 'replace').decode('latin-1'), align='J'); pdf.ln(20)
+                        pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, txt="ATENTAMENTE", ln=True, align='C'); pdf.ln(10)
                         pdf.cell(0, 10, txt="__________________________", ln=True, align='C')
                         pdf.cell(0, 10, txt=firmante_of.upper(), ln=True, align='C')
-                        pdf.ln(10)
-                        pdf.set_font("Arial", '', 8)
-                        pdf.cell(0, 10, txt=f"C.c.p. {ccp_of}", ln=True)
                         pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
-                        st.download_button("📥 Descargar Archivo", pdf_out, f"{num_of.replace('/','-')}.pdf", "application/pdf")
-                    except Exception as e:
-                        st.error(f"Error PDF: {e}")
+                        st.download_button("📥 Descargar", pdf_out, f"{n_of}.pdf", "application/pdf")
+                    except Exception as e: st.error(f"Error: {e}")
 
-            # --- 3. BÓVEDA CLASIFICADA ---
             st.divider()
             if st.session_state.boveda_oficios_db:
                 df_b = pd.DataFrame(st.session_state.boveda_oficios_db).T
+                # PROTECCIÓN CONTRA ERROR 1057: Verifica existencia de columna 'Anio'
                 if not df_b.empty and 'Anio' in df_b.columns:
-                    st.markdown("### 🗄️ Historial de Correspondencia")
-                    f_col1, f_col2 = st.columns(2)
-                    lista_anios = sorted(df_b['Anio'].unique(), reverse=True)
-                    sel_a = f_col1.selectbox("Año:", lista_anios)
-                    lista_meses = sorted(df_b[df_b['Anio'] == sel_a]['Mes'].unique())
-                    sel_m = f_col2.selectbox("Mes:", lista_meses)
+                    st.markdown("### 🗄️ Historial")
+                    f1, f2 = st.columns(2)
+                    anios = sorted(df_b['Anio'].unique(), reverse=True)
+                    sel_a = f1.selectbox("Año:", anios)
+                    meses = sorted(df_b[df_b['Anio'] == sel_a]['Mes'].unique())
+                    sel_m = f2.selectbox("Mes:", meses)
                     df_v = df_b[(df_b['Anio'] == sel_a) & (df_b['Mes'] == sel_m)]
                     st.dataframe(df_v[['Oficio', 'Fecha', 'Destinatario', 'Folio']], use_container_width=True, hide_index=True)
-                else:
-                    st.info("📂 Bóveda lista para recibir registros.")
-            else:
-                st.info("📭 No hay oficios registrados.")
+                else: st.info("Bóveda lista.")
+            else: st.info("Sin registros.")
