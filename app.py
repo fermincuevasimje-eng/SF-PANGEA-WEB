@@ -1099,37 +1099,49 @@ else:
                             use_container_width=True
                         )
 
-            # --- 3. BÓVEDA ORGANIZADA (CARPETAS) ---
+            # --- 3. BÓVEDA ORGANIZADA (CARPETAS) CON BLOQUE DE SEGURIDAD ---
             st.divider()
             st.markdown("### 🗄️ Bóveda Clasificada")
             
             if st.session_state.boveda_permanente:
+                # Convertimos a DataFrame
                 df_b = pd.DataFrame(st.session_state.boveda_permanente).T
                 
-                if not df_b.empty and 'Anio' in df_b.columns:
-                    f1, f2, f3 = st.columns(3)
-                    anios = sorted(df_b['Anio'].unique(), reverse=True)
-                    s_anio = f1.selectbox("Año:", anios)
-                    
-                    meses = sorted(df_b[df_b['Anio'] == s_anio]['Mes'].unique())
-                    s_mes = f2.selectbox("Mes:", meses)
-                    
-                    tipos = ["TODOS"] + sorted(df_b[(df_b['Anio'] == s_anio) & (df_b['Mes'] == s_mes)]['Tipo'].unique())
-                    s_tipo = f3.selectbox("Tipo:", tipos)
+                # --- PARCHE ANTICRASH: Solo procedemos si el DataFrame tiene las columnas de tiempo ---
+                if not df_b.empty and 'Anio' in df_b.columns and 'Mes' in df_b.columns:
+                    try:
+                        f1, f2, f3 = st.columns(3)
+                        
+                        # Obtener años disponibles
+                        anios = sorted(df_b['Anio'].unique(), reverse=True)
+                        s_anio = f1.selectbox("Año:", anios)
+                        
+                        # Obtener meses disponibles para ese año
+                        meses_disp = sorted(df_b[df_b['Anio'] == s_anio]['Mes'].unique())
+                        s_mes = f2.selectbox("Mes:", meses_disp)
+                        
+                        # Obtener tipos disponibles para ese mes
+                        tipos_disp = ["TODOS"] + sorted(df_b[(df_b['Anio'] == s_anio) & (df_b['Mes'] == s_mes)]['Tipo'].unique())
+                        s_tipo = f3.selectbox("Tipo:", tipos_disp)
 
-                    df_f = df_b[(df_b['Anio'] == s_anio) & (df_b['Mes'] == s_mes)]
-                    if s_tipo != "TODOS": df_f = df_f[df_f['Tipo'] == s_tipo]
+                        # Filtrado final
+                        df_f = df_b[(df_b['Anio'] == s_anio) & (df_b['Mes'] == s_mes)]
+                        if s_tipo != "TODOS": 
+                            df_f = df_f[df_f['Tipo'] == s_tipo]
 
-                    for idx, row in df_f.iterrows():
-                        with st.expander(f"📄 {row['Oficio']} | {row['Destinatario']}"):
-                            c_i, c_a = st.columns([4, 1])
-                            c_i.write(f"**Folio Pangea:** {row['Folio']} | **Firmante:** {row['Firmante']}")
-                            if c_a.button("🗑️", key=f"del_v3_{idx}"):
-                                del st.session_state.boveda_permanente[idx]
-                                with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
-                                    json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
-                                st.rerun()
+                        # Despliegue de resultados
+                        for idx, row in df_f.iterrows():
+                            with st.expander(f"📄 {row['Oficio']} | {row['Destinatario']}"):
+                                c_i, c_a = st.columns([4, 1])
+                                c_i.write(f"**Folio Pangea:** {row['Folio']} | **Firmante:** {row['Firmante']}")
+                                if c_a.button("🗑️", key=f"del_v4_{idx}"):
+                                    del st.session_state.boveda_permanente[idx]
+                                    with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                                        json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
+                                    st.rerun()
+                    except Exception as e:
+                        st.info("Actualizando índices de la bóveda...")
                 else:
-                    st.info("Bóveda lista. Guarde un oficio para activar los filtros.")
+                    st.info("📂 Bóveda inicializada. Guarde su primer oficio para activar los filtros de búsqueda.")
             else:
-                st.info("📭 Bóveda vacía.")
+                st.info("📭 La bóveda está vacía actualmente.")
