@@ -941,10 +941,13 @@ else:
                     # (Aquí va tu lógica de importación original completa...)
                     st.info("Procesando importación...")
 
-        # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (BLOQUE SF5) ---
+        # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (CON MOTOR DE DESCARGA REAL) ---
         with tab_o:
             st.subheader("📄 Generador de Correspondencia Oficial")
             
+            # 1. Aseguramos que la librería esté disponible
+            from fpdf import FPDF
+
             if "plantillas_oficios" not in st.session_state:
                 st.session_state.plantillas_oficios = {
                     "EXITOSA": "Se informa que la petición [FOLIO] fue atendida exitosamente.",
@@ -975,14 +978,57 @@ else:
             with col_view:
                 st.markdown("""<style>.paper { background: white; color: black; padding: 30px; border: 1px solid #ccc; font-family: sans-serif; min-height: 400px; }</style>""", unsafe_allow_html=True)
                 
-                cuerpo = st.session_state.plantillas_oficios[mapa_op[op_tipo]].replace("[FOLIO]", f"**{folio_doc}**" if folio_doc else "_______")
+                cuerpo_limpio = st.session_state.plantillas_oficios[mapa_op[op_tipo]].replace("[FOLIO]", folio_doc if folio_doc else "_______")
+                cuerpo_vista = st.session_state.plantillas_oficios[mapa_op[op_tipo]].replace("[FOLIO]", f"**{folio_doc}**" if folio_doc else "_______")
                 
                 st.markdown(f"""<div class="paper">
                     <div style="text-align: right;">Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y') if fecha_of else '____'}<br><b>Oficio: {num_of}</b></div>
                     <br><br><b>{dest.upper() if dest else 'A QUIEN CORRESPONDA'}</b><br>{cargo.upper() if cargo else 'PRESENTE'}<br><br>
-                    <div style="text-align: justify;">{cuerpo}</div>
+                    <div style="text-align: justify;">{cuerpo_vista}</div>
                     <br><br><br><div style="text-align: center;"><b>ATENTAMENTE</b><br><br><br>__________________________<br>DIRECCIÓN DE ALUMBRADO PÚBLICO</div>
                 </div>""", unsafe_allow_html=True)
                 
-                if st.button("📥 Descargar PDF (Prototipo)", use_container_width=True):
-                    st.success("Formato listo para exportación.")
+                # --- MOTOR DE GENERACIÓN PDF ---
+                if st.button("🚀 GENERAR DOCUMENTO PDF", use_container_width=True):
+                    try:
+                        pdf = FPDF()
+                        pdf.add_page()
+                        pdf.set_font("Arial", size=12)
+                        
+                        # Encabezado (Fecha y Oficio)
+                        pdf.set_font("Arial", 'B', 11)
+                        pdf.cell(0, 10, txt=f"Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y') if fecha_of else '____'}", ln=True, align='R')
+                        pdf.cell(0, 10, txt=f"Oficio: {num_of}", ln=True, align='R')
+                        pdf.ln(15)
+                        
+                        # Destinatario
+                        pdf.set_font("Arial", 'B', 12)
+                        pdf.cell(0, 10, txt=dest.upper() if dest else "A QUIEN CORRESPONDA", ln=True, align='L')
+                        pdf.cell(0, 10, txt=cargo.upper() if cargo else "PRESENTE", ln=True, align='L')
+                        pdf.ln(10)
+                        
+                        # Cuerpo
+                        pdf.set_font("Arial", size=12)
+                        pdf.multi_cell(0, 10, txt=cuerpo_limpio, align='J')
+                        pdf.ln(30)
+                        
+                        # Firma
+                        pdf.set_font("Arial", 'B', 12)
+                        pdf.cell(0, 10, txt="ATENTAMENTE", ln=True, align='C')
+                        pdf.ln(20)
+                        pdf.cell(0, 10, txt="__________________________", ln=True, align='C')
+                        pdf.cell(0, 10, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
+                        
+                        # Stream para descarga
+                        pdf_stream = pdf.output(dest='S').encode('latin-1', 'replace')
+                        
+                        st.download_button(
+                            label="📥 DESCARGAR ARCHIVO PDF",
+                            data=pdf_stream,
+                            file_name=f"OFICIO_{folio_doc if folio_doc else 'SIN_FOLIO'}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                        st.success("Documento procesado. Haz clic arriba para descargar.")
+                    except Exception as e:
+                        st.error(f"Error técnico en PDF: {e}")
