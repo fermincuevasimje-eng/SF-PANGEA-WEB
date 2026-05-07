@@ -941,12 +941,18 @@ else:
                     # (Aquí va tu lógica de importación original completa...)
                     st.info("Procesando importación...")
 
-        # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (CON MOTOR DE DESCARGA REAL) ---
+        # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (SOLUCIÓN ANTIBLOQUEO) ---
         with tab_o:
             st.subheader("📄 Generador de Correspondencia Oficial")
             
-            # 1. Aseguramos que la librería esté disponible
-            from fpdf import FPDF
+            # Intentamos importar; si no está, la app no se muere
+            try:
+                from fpdf import FPDF
+                libreria_lista = True
+            except ImportError:
+                libreria_lista = False
+                st.warning("⚠️ El motor de PDF no está instalado en este servidor.")
+                st.info("Para activar las descargas, añade 'fpdf' a tu archivo requirements.txt en GitHub.")
 
             if "plantillas_oficios" not in st.session_state:
                 st.session_state.plantillas_oficios = {
@@ -967,9 +973,9 @@ else:
                 num_of = c1.text_input("No. Oficio:", value="DAP/001/2026")
                 fecha_of = c2.date_input("Fecha:", value=None)
                 
-                dest = st.text_input("Destinatario:", placeholder="Nombre del Ciudadano o Autoridad")
-                cargo = st.text_input("Cargo:", placeholder="Delegado / Residente")
-                folio_doc = st.text_input("Folio de Referencia (ID/Ticket):")
+                dest = st.text_input("Destinatario:", placeholder="Nombre del Ciudadano")
+                cargo = st.text_input("Cargo:", placeholder="Presente")
+                folio_doc = st.text_input("Folio de Referencia:")
                 
                 with st.expander("📝 Editar contenido del mensaje"):
                     txt_base = st.text_area("Texto base:", value=st.session_state.plantillas_oficios[mapa_op[op_tipo]], height=100)
@@ -988,47 +994,22 @@ else:
                     <br><br><br><div style="text-align: center;"><b>ATENTAMENTE</b><br><br><br>__________________________<br>DIRECCIÓN DE ALUMBRADO PÚBLICO</div>
                 </div>""", unsafe_allow_html=True)
                 
-                # --- MOTOR DE GENERACIÓN PDF ---
-                if st.button("🚀 GENERAR DOCUMENTO PDF", use_container_width=True):
-                    try:
+                if libreria_lista:
+                    if st.button("🚀 GENERAR DOCUMENTO PDF", use_container_width=True):
                         pdf = FPDF()
                         pdf.add_page()
                         pdf.set_font("Arial", size=12)
-                        
-                        # Encabezado (Fecha y Oficio)
                         pdf.set_font("Arial", 'B', 11)
                         pdf.cell(0, 10, txt=f"Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y') if fecha_of else '____'}", ln=True, align='R')
                         pdf.cell(0, 10, txt=f"Oficio: {num_of}", ln=True, align='R')
-                        pdf.ln(15)
-                        
-                        # Destinatario
+                        pdf.ln(10)
                         pdf.set_font("Arial", 'B', 12)
                         pdf.cell(0, 10, txt=dest.upper() if dest else "A QUIEN CORRESPONDA", ln=True, align='L')
                         pdf.cell(0, 10, txt=cargo.upper() if cargo else "PRESENTE", ln=True, align='L')
                         pdf.ln(10)
-                        
-                        # Cuerpo
                         pdf.set_font("Arial", size=12)
-                        pdf.multi_cell(0, 10, txt=cuerpo_limpio, align='J')
-                        pdf.ln(30)
-                        
-                        # Firma
-                        pdf.set_font("Arial", 'B', 12)
-                        pdf.cell(0, 10, txt="ATENTAMENTE", ln=True, align='C')
-                        pdf.ln(20)
-                        pdf.cell(0, 10, txt="__________________________", ln=True, align='C')
-                        pdf.cell(0, 10, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
-                        
-                        # Stream para descarga
+                        pdf.multi_cell(0, 10, txt=cuerpo_limpio.encode('latin-1', 'replace').decode('latin-1'), align='J')
                         pdf_stream = pdf.output(dest='S').encode('latin-1', 'replace')
-                        
-                        st.download_button(
-                            label="📥 DESCARGAR ARCHIVO PDF",
-                            data=pdf_stream,
-                            file_name=f"OFICIO_{folio_doc if folio_doc else 'SIN_FOLIO'}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-                        st.success("Documento procesado. Haz clic arriba para descargar.")
-                    except Exception as e:
-                        st.error(f"Error técnico en PDF: {e}")
+                        st.download_button(label="📥 DESCARGAR PDF", data=pdf_stream, file_name="OFICIO_DAP.pdf", mime="application/pdf", use_container_width=True)
+                else:
+                    st.error("❌ Función de descarga deshabilitada (Falta librería fpdf)")
