@@ -941,75 +941,146 @@ else:
                     # (Aquí va tu lógica de importación original completa...)
                     st.info("Procesando importación...")
 
-        # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (SOLUCIÓN ANTIBLOQUEO) ---
+        # --- 🚀 PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN PRO CON BÓVEDA) ---
         with tab_o:
             st.subheader("📄 Generador de Correspondencia Oficial")
+            PATH_OFICIOS = "boveda_oficios.json"
             
-            # Intentamos importar; si no está, la app no se muere
+            # 1. CARGA INICIAL DE BÓVEDA PERMANENTE
+            if "boveda_oficios_db" not in st.session_state:
+                if os.path.exists(PATH_OFICIOS):
+                    try:
+                        with open(PATH_OFICIOS, "r", encoding="utf-8") as f:
+                            st.session_state.boveda_oficios_db = json.load(f)
+                    except: st.session_state.boveda_oficios_db = {}
+                else: st.session_state.boveda_oficios_db = {}
+
+            # Intentamos importar FPDF
             try:
                 from fpdf import FPDF
                 libreria_lista = True
             except ImportError:
                 libreria_lista = False
-                st.warning("⚠️ El motor de PDF no está instalado en este servidor.")
-                st.info("Para activar las descargas, añade 'fpdf' a tu archivo requirements.txt en GitHub.")
+                st.warning("⚠️ Falta librería 'fpdf'. Añádela a requirements.txt")
 
-            if "plantillas_oficios" not in st.session_state:
-                st.session_state.plantillas_oficios = {
-                    "EXITOSA": "Se informa que la petición [FOLIO] fue atendida exitosamente.",
-                    "SERVICIO": "La luminaria del reporte [FOLIO] ya se encuentra en servicio.",
-                    "PARCIAL": "Atención parcial para [FOLIO]; pendiente por falta de material.",
-                    "BAJADA": "Se autoriza la bajada de luz solicitada en [FOLIO].",
-                    "NEGATIVA": "Petición [FOLIO] rechazada por improcedencia técnica."
-                }
-
-            col_form, col_view = st.columns([1, 1])
+            # --- INTERFAZ DE CONTROL ---
+            c_form, c_view = st.columns([1, 1])
             
-            with col_form:
-                op_tipo = st.selectbox("Tipo de Oficio:", ["Atención Exitosa", "Ya en Servicio", "Programado/Parcial", "Bajadas de Luz", "Atención Negativa"])
-                mapa_op = {"Atención Exitosa":"EXITOSA", "Ya en Servicio":"SERVICIO", "Programado/Parcial":"PARCIAL", "Bajadas de Luz":"BAJADA", "Atención Negativa":"NEGATIVA"}
+            with c_form:
+                modo_oficio = st.radio("Acción:", ["✨ Crear Nuevo", "📂 Consultar/Editar Bóveda"], horizontal=True)
                 
-                c1, c2 = st.columns(2)
-                num_of = c1.text_input("No. Oficio:", value="DAP/001/2026")
-                fecha_of = c2.date_input("Fecha:", value=None)
+                datos_of = {}
+                if modo_oficio == "📂 Consultar/Editar Bóveda" and st.session_state.boveda_oficios_db:
+                    sel_id = st.selectbox("Seleccionar oficio guardado:", list(st.session_state.boveda_oficios_db.keys())[::-1])
+                    datos_of = st.session_state.boveda_oficios_db[sel_id]
                 
-                dest = st.text_input("Destinatario:", placeholder="Nombre del Ciudadano")
-                cargo = st.text_input("Cargo:", placeholder="Presente")
-                folio_doc = st.text_input("Folio de Referencia:")
+                # Campos de entrada
+                col1, col2 = st.columns(2)
+                n_oficio = col1.text_input("No. Oficio:", value=datos_of.get('Oficio', "DAP/___/2026"))
+                f_oficio = col2.date_input("Fecha:", value=pd.to_datetime(datos_of.get('Fecha')).date() if datos_of.get('Fecha') else pd.Timestamp.now().date())
                 
-                with st.expander("📝 Editar contenido del mensaje"):
-                    txt_base = st.text_area("Texto base:", value=st.session_state.plantillas_oficios[mapa_op[op_tipo]], height=100)
-                    st.session_state.plantillas_oficios[mapa_op[op_tipo]] = txt_base
+                dest_of = st.text_input("Destinatario:", value=datos_of.get('Destinatario', ""))
+                cargo_of = st.text_input("Cargo:", value=datos_of.get('Cargo', "PRESENTE"))
+                folio_of = st.text_input("Folio Ref:", value=datos_of.get('Folio', ""))
+                
+                # Plantilla dinámica
+                if "plantillas_oficios" not in st.session_state:
+                    st.session_state.plantillas_oficios = {"EXITOSA": "Se informa que la petición [FOLIO] fue atendida exitosamente."}
+                
+                cuerpo_of = st.text_area("Contenido del Oficio:", value=datos_of.get('Cuerpo', st.session_state.plantillas_oficios["EXITOSA"]), height=150)
+                
+                st.markdown("---")
+                st.write("✒️ **Finalización del Documento**")
+                firmante_of = st.text_input("Nombre de quien firma:", value=datos_of.get('Firmante', "ING. DIRECTOR DE ALUMBRADO PÚBLICO"))
+                ccp_of = st.text_input("C.c.p. (Separados por coma):", value=datos_of.get('CCP', "Archivo."))
 
-            with col_view:
-                st.markdown("""<style>.paper { background: white; color: black; padding: 30px; border: 1px solid #ccc; font-family: sans-serif; min-height: 400px; }</style>""", unsafe_allow_html=True)
+            with c_view:
+                st.markdown("### 👁️ Vista Previa")
+                cuerpo_preview = cuerpo_of.replace("[FOLIO]", f"**{folio_of}**")
                 
-                cuerpo_limpio = st.session_state.plantillas_oficios[mapa_op[op_tipo]].replace("[FOLIO]", folio_doc if folio_doc else "_______")
-                cuerpo_vista = st.session_state.plantillas_oficios[mapa_op[op_tipo]].replace("[FOLIO]", f"**{folio_doc}**" if folio_doc else "_______")
-                
-                st.markdown(f"""<div class="paper">
-                    <div style="text-align: right;">Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y') if fecha_of else '____'}<br><b>Oficio: {num_of}</b></div>
-                    <br><br><b>{dest.upper() if dest else 'A QUIEN CORRESPONDA'}</b><br>{cargo.upper() if cargo else 'PRESENTE'}<br><br>
-                    <div style="text-align: justify;">{cuerpo_vista}</div>
-                    <br><br><br><div style="text-align: center;"><b>ATENTAMENTE</b><br><br><br>__________________________<br>DIRECCIÓN DE ALUMBRADO PÚBLICO</div>
+                # Estética del papel
+                st.markdown(f"""<div style="background:white; color:black; padding:30px; border:1px solid #ccc; font-family:Arial; font-size:13px; line-height:1.4;">
+                    <div style="text-align:right;">Toluca, Méx; a {f_oficio.strftime('%d/%m/%Y')}<br><b>Oficio: {n_oficio}</b></div>
+                    <br><br><b>{dest_of.upper() if dest_of else 'A QUIEN CORRESPONDA'}</b><br>{cargo_of.upper()}<br><br>
+                    <div style="text-align:justify;">{cuerpo_preview}</div>
+                    <br><br><br>
+                    <div style="text-align:center;"><b>ATENTAMENTE</b><br><br><br>__________________________<br><b>{firmante_of.upper()}</b></div>
+                    <br><br><div style="font-size:10px;">C.c.p. {ccp_of}</div>
                 </div>""", unsafe_allow_html=True)
                 
-                if libreria_lista:
-                    if st.button("🚀 GENERAR DOCUMENTO PDF", use_container_width=True):
+                # --- BOTONES DE ACCIÓN ---
+                st.write("")
+                b1, b2 = st.columns(2)
+                
+                # GUARDAR EN BÓVEDA
+                if b1.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
+                    meses = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"]
+                    id_registro = n_oficio.replace("/", "-")
+                    
+                    st.session_state.boveda_oficios_db[id_registro] = {
+                        "Oficio": n_oficio, "Fecha": str(f_oficio), "Anio": str(f_oficio.year), "Mes": meses[f_oficio.month-1],
+                        "Destinatario": dest_of, "Cargo": cargo_of, "Folio": folio_of, "Cuerpo": cuerpo_of,
+                        "Firmante": firmante_of, "CCP": ccp_of
+                    }
+                    with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                        json.dump(st.session_state.boveda_oficios_db, f, indent=4, ensure_ascii=False)
+                    st.success("✅ Oficio guardado permanentemente.")
+                    time.sleep(1)
+                    st.rerun()
+
+                # GENERAR PDF PROFESIONAL
+                if b2.button("🚀 GENERAR PDF", use_container_width=True):
+                    if libreria_lista:
                         pdf = FPDF()
                         pdf.add_page()
-                        pdf.set_font("Arial", size=12)
+                        pdf.set_margins(25, 25, 25)
+                        
+                        # Encabezado
                         pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 10, txt=f"Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y') if fecha_of else '____'}", ln=True, align='R')
-                        pdf.cell(0, 10, txt=f"Oficio: {num_of}", ln=True, align='R')
-                        pdf.ln(10)
+                        pdf.cell(0, 7, txt=f"Toluca, Méx; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
+                        pdf.cell(0, 7, txt=f"Oficio: {n_oficio}", ln=True, align='R')
+                        pdf.ln(15)
+                        
+                        # Destinatario
                         pdf.set_font("Arial", 'B', 12)
-                        pdf.cell(0, 10, txt=dest.upper() if dest else "A QUIEN CORRESPONDA", ln=True, align='L')
-                        pdf.cell(0, 10, txt=cargo.upper() if cargo else "PRESENTE", ln=True, align='L')
+                        pdf.cell(0, 7, txt=dest_of.upper() if dest_of else "A QUIEN CORRESPONDA", ln=True)
+                        pdf.set_font("Arial", '', 11)
+                        pdf.cell(0, 7, txt=cargo_of.upper(), ln=True)
                         pdf.ln(10)
-                        pdf.set_font("Arial", size=12)
-                        pdf.multi_cell(0, 10, txt=cuerpo_limpio.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                        
+                        # Cuerpo
+                        pdf.set_font("Arial", '', 12)
+                        pdf.multi_cell(0, 8, txt=cuerpo_of.replace("[FOLIO]", folio_of).encode('latin-1', 'replace').decode('latin-1'), align='J')
+                        pdf.ln(20)
+                        
+                        # Firma
+                        pdf.set_font("Arial", 'B', 11)
+                        pdf.cell(0, 7, txt="ATENTAMENTE", ln=True, align='C')
+                        pdf.ln(15)
+                        pdf.cell(0, 7, txt="__________________________", ln=True, align='C')
+                        pdf.cell(0, 7, txt=firmante_of.upper(), ln=True, align='C')
+                        
+                        # CCP
+                        pdf.ln(20)
+                        pdf.set_font("Arial", '', 8)
+                        pdf.cell(0, 5, txt=f"C.c.p. {ccp_of}", ln=True)
+                        
                         pdf_stream = pdf.output(dest='S').encode('latin-1', 'replace')
-                        st.download_button(label="📥 DESCARGAR PDF", data=pdf_stream, file_name="OFICIO_DAP.pdf", mime="application/pdf", use_container_width=True)
-                else:
-                    st.error("❌ Función de descarga deshabilitada (Falta librería fpdf)")
+                        st.download_button(label="📥 Descargar PDF Ahora", data=pdf_stream, file_name=f"{id_registro}.pdf", mime="application/pdf", use_container_width=True)
+                    else:
+                        st.error("Librería fpdf no disponible.")
+
+            # --- HISTORIAL CLASIFICADO AL FINAL ---
+            if st.session_state.boveda_oficios_db:
+                st.divider()
+                st.markdown("### 🗄️ Bóveda Clasificada")
+                df_b = pd.DataFrame(st.session_state.boveda_oficios_db).T
+                if 'Anio' in df_b.columns:
+                    col_f1, col_f2 = st.columns(2)
+                    anios = sorted(df_b['Anio'].unique(), reverse=True)
+                    sel_a = col_f1.selectbox("Año:", anios)
+                    meses_disponibles = sorted(df_b[df_b['Anio']==sel_a]['Mes'].unique())
+                    sel_m = col_f2.selectbox("Mes:", meses_disponibles)
+                    
+                    df_v = df_b[(df_b['Anio']==sel_a) & (df_b['Mes']==sel_m)]
+                    st.dataframe(df_v[['Oficio', 'Fecha', 'Destinatario', 'Folio']], use_container_width=True, hide_index=True)
