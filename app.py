@@ -1048,36 +1048,45 @@ else:
                         
                         st.download_button("📥 DESCARGAR", data=pdf.output(dest='S').encode('latin-1', 'replace'), file_name=f"Oficio_{id_of}.pdf", mime="application/pdf")
 
-            # --- 3. BÓVEDA ORGANIZADA (CARPETAS) ---
+            # --- 3. BÓVEDA ORGANIZADA (CARPETAS) CON PARCHE ANTICRASH ---
             st.divider()
             st.markdown("### 🗄️ Bóveda Clasificada")
+            
             if st.session_state.boveda_permanente:
+                # Convertimos a DataFrame para procesar filtros
                 df_b = pd.DataFrame(st.session_state.boveda_permanente).T
                 
-                # Filtros de navegación
-                f_col1, f_col2, f_col3 = st.columns(3)
-                anios_disp = sorted(df_b['Anio'].unique(), reverse=True)
-                sel_anio = f_col1.selectbox("Año:", anios_disp)
-                
-                meses_disp = sorted(df_b[df_b['Anio'] == sel_anio]['Mes'].unique())
-                sel_mes = f_col2.selectbox("Mes:", meses_disp)
-                
-                tipos_disp = ["TODOS"] + sorted(df_b[(df_b['Anio'] == sel_anio) & (df_b['Mes'] == sel_mes)]['Tipo'].unique())
-                sel_tipo = f_col3.selectbox("Tipo de Oficio:", tipos_disp)
+                # Verificamos que existan las columnas necesarias para evitar el KeyError
+                if not df_b.empty and 'Anio' in df_b.columns:
+                    # Filtros de navegación
+                    f_col1, f_col2, f_col3 = st.columns(3)
+                    
+                    anios_disp = sorted(df_b['Anio'].unique(), reverse=True)
+                    sel_anio = f_col1.selectbox("Año:", anios_disp)
+                    
+                    meses_disp = sorted(df_b[df_b['Anio'] == sel_anio]['Mes'].unique())
+                    sel_mes = f_col2.selectbox("Mes:", meses_disp)
+                    
+                    tipos_disp = ["TODOS"] + sorted(df_b[(df_b['Anio'] == sel_anio) & (df_b['Mes'] == sel_mes)]['Tipo'].unique())
+                    sel_tipo = f_col3.selectbox("Tipo de Oficio:", tipos_disp)
 
-                # Filtrado final
-                df_final = df_b[(df_b['Anio'] == sel_anio) & (df_b['Mes'] == sel_mes)]
-                if sel_tipo != "TODOS":
-                    df_final = df_final[df_final['Tipo'] == sel_tipo]
+                    # Filtrado final para mostrar los resultados
+                    df_final = df_b[(df_b['Anio'] == sel_anio) & (df_b['Mes'] == sel_mes)]
+                    if sel_tipo != "TODOS":
+                        df_final = df_final[df_final['Tipo'] == sel_tipo]
 
-                for idx, row in df_final.iterrows():
-                    with st.expander(f"📄 {row['Oficio']} | {row['Destinatario']} ({row['Tipo']})"):
-                        c_inf, c_acc = st.columns([4, 1])
-                        c_inf.write(f"**Folio Pangea:** {row['Folio']} | **Firmado por:** {row['Firmante']}")
-                        if c_acc.button("🗑️ Eliminar", key=f"del_v2_{idx}"):
-                            del st.session_state.boveda_permanente[idx]
-                            with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
-                                json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
-                            st.rerun()
+                    # Despliegue de los oficios filtrados
+                    for idx, row in df_final.iterrows():
+                        with st.expander(f"📄 {row['Oficio']} | {row['Destinatario']} ({row['Tipo']})"):
+                            c_inf, c_acc = st.columns([4, 1])
+                            c_inf.write(f"**Folio Pangea:** {row['Folio']} | **Firmado por:** {row['Firmante']}")
+                            
+                            if c_acc.button("🗑️ Eliminar", key=f"del_v2_{idx}"):
+                                del st.session_state.boveda_permanente[idx]
+                                with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                                    json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
+                                st.rerun()
+                else:
+                    st.info("Bóveda inicializada. Guarde su primer oficio para activar los filtros.")
             else:
-                st.info("Bóveda vacía.")
+                st.info("📭 La bóveda está vacía actualmente.")
