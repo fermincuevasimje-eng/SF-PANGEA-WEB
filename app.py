@@ -941,146 +941,126 @@ else:
                     # (Aquí va tu lógica de importación original completa...)
                     st.info("Procesando importación...")
 
-        # --- 🚀 PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN PRO CON BÓVEDA) ---
+        # --- 📄 PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN BLINDADA Y PERMANENTE) ---
         with tab_o:
-            st.subheader("📄 Generador de Correspondencia Oficial")
+            st.subheader("📄 Correspondencia Oficial DAP")
             PATH_OFICIOS = "boveda_oficios.json"
             
-            # 1. CARGA INICIAL DE BÓVEDA PERMANENTE
+            # 1. CARGA INICIAL SEGURA (Evita el error si el archivo no existe)
             if "boveda_oficios_db" not in st.session_state:
                 if os.path.exists(PATH_OFICIOS):
                     try:
                         with open(PATH_OFICIOS, "r", encoding="utf-8") as f:
                             st.session_state.boveda_oficios_db = json.load(f)
                     except: st.session_state.boveda_oficios_db = {}
-                else: st.session_state.boveda_oficios_db = {}
+                else:
+                    st.session_state.boveda_oficios_db = {}
 
-            # Intentamos importar FPDF
-            try:
-                from fpdf import FPDF
-                libreria_lista = True
-            except ImportError:
-                libreria_lista = False
-                st.warning("⚠️ Falta librería 'fpdf'. Añádela a requirements.txt")
-
-            # --- INTERFAZ DE CONTROL ---
-            c_form, c_view = st.columns([1, 1])
+            # 2. CONFIGURACIÓN DE FORMULARIO E INTERFAZ
+            col_form, col_view = st.columns([1, 1])
             
-            with c_form:
-                modo_oficio = st.radio("Acción:", ["✨ Crear Nuevo", "📂 Consultar/Editar Bóveda"], horizontal=True)
-                
+            with col_form:
+                modo = st.radio("Acción:", ["✨ Nuevo Oficio", "📂 Editar desde Bóveda"], horizontal=True)
                 datos_of = {}
-                if modo_oficio == "📂 Consultar/Editar Bóveda" and st.session_state.boveda_oficios_db:
-                    sel_id = st.selectbox("Seleccionar oficio guardado:", list(st.session_state.boveda_oficios_db.keys())[::-1])
-                    datos_of = st.session_state.boveda_oficios_db[sel_id]
                 
-                # Campos de entrada
-                col1, col2 = st.columns(2)
-                n_oficio = col1.text_input("No. Oficio:", value=datos_of.get('Oficio', "DAP/___/2026"))
-                f_oficio = col2.date_input("Fecha:", value=pd.to_datetime(datos_of.get('Fecha')).date() if datos_of.get('Fecha') else pd.Timestamp.now().date())
+                if modo == "📂 Editar desde Bóveda" and st.session_state.boveda_oficios_db:
+                    sel_id = st.selectbox("Seleccionar registro:", list(st.session_state.boveda_oficios_db.keys())[::-1])
+                    datos_of = st.session_state.boveda_oficios_db[sel_id]
+                elif modo == "📂 Editar desde Bóveda":
+                    st.info("La bóveda está vacía actualmente.")
+
+                c1, c2 = st.columns(2)
+                num_of = c1.text_input("No. Oficio:", value=datos_of.get('Oficio', "DAP/___/2026"))
+                fecha_of = c2.date_input("Fecha:", value=pd.to_datetime(datos_of.get('Fecha')).date() if datos_of.get('Fecha') else pd.Timestamp.now().date())
                 
                 dest_of = st.text_input("Destinatario:", value=datos_of.get('Destinatario', ""))
                 cargo_of = st.text_input("Cargo:", value=datos_of.get('Cargo', "PRESENTE"))
                 folio_of = st.text_input("Folio Ref:", value=datos_of.get('Folio', ""))
                 
-                # Plantilla dinámica
-                if "plantillas_oficios" not in st.session_state:
-                    st.session_state.plantillas_oficios = {"EXITOSA": "Se informa que la petición [FOLIO] fue atendida exitosamente."}
-                
-                cuerpo_of = st.text_area("Contenido del Oficio:", value=datos_of.get('Cuerpo', st.session_state.plantillas_oficios["EXITOSA"]), height=150)
+                cuerpo_of = st.text_area("Contenido:", value=datos_of.get('Cuerpo', "Se informa que la petición [FOLIO] fue atendida..."), height=150)
                 
                 st.markdown("---")
-                st.write("✒️ **Finalización del Documento**")
-                firmante_of = st.text_input("Nombre de quien firma:", value=datos_of.get('Firmante', "ING. DIRECTOR DE ALUMBRADO PÚBLICO"))
-                ccp_of = st.text_input("C.c.p. (Separados por coma):", value=datos_of.get('CCP', "Archivo."))
+                firmante_of = st.text_input("Firma del Oficio:", value=datos_of.get('Firmante', "ING. DIRECTOR DE ALUMBRADO PÚBLICO"))
+                ccp_of = st.text_input("C.c.p.:", value=datos_of.get('CCP', "Archivo."))
 
-            with c_view:
+            with col_view:
                 st.markdown("### 👁️ Vista Previa")
-                cuerpo_preview = cuerpo_of.replace("[FOLIO]", f"**{folio_of}**")
+                cuerpo_vista = cuerpo_of.replace("[FOLIO]", f"**{folio_of}**")
                 
-                # Estética del papel
-                st.markdown(f"""<div style="background:white; color:black; padding:30px; border:1px solid #ccc; font-family:Arial; font-size:13px; line-height:1.4;">
-                    <div style="text-align:right;">Toluca, Méx; a {f_oficio.strftime('%d/%m/%Y')}<br><b>Oficio: {n_oficio}</b></div>
+                st.markdown(f"""
+                <div style="background:white; color:black; padding:30px; border:1px solid #ccc; font-family:Arial; line-height:1.4;">
+                    <div style="text-align:right;">Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y')}<br><b>Oficio: {num_of}</b></div>
                     <br><br><b>{dest_of.upper() if dest_of else 'A QUIEN CORRESPONDA'}</b><br>{cargo_of.upper()}<br><br>
-                    <div style="text-align:justify;">{cuerpo_preview}</div>
+                    <div style="text-align:justify;">{cuerpo_vista}</div>
                     <br><br><br>
                     <div style="text-align:center;"><b>ATENTAMENTE</b><br><br><br>__________________________<br><b>{firmante_of.upper()}</b></div>
                     <br><br><div style="font-size:10px;">C.c.p. {ccp_of}</div>
                 </div>""", unsafe_allow_html=True)
                 
-                # --- BOTONES DE ACCIÓN ---
                 st.write("")
-                b1, b2 = st.columns(2)
+                b_save, b_pdf = st.columns(2)
                 
-                # GUARDAR EN BÓVEDA
-                if b1.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
+                if b_save.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
                     meses = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"]
-                    id_registro = n_oficio.replace("/", "-")
-                    
-                    st.session_state.boveda_oficios_db[id_registro] = {
-                        "Oficio": n_oficio, "Fecha": str(f_oficio), "Anio": str(f_oficio.year), "Mes": meses[f_oficio.month-1],
-                        "Destinatario": dest_of, "Cargo": cargo_of, "Folio": folio_of, "Cuerpo": cuerpo_of,
-                        "Firmante": firmante_of, "CCP": ccp_of
+                    id_reg = num_of.replace("/", "-")
+                    st.session_state.boveda_oficios_db[id_reg] = {
+                        "Oficio": num_of, "Fecha": str(fecha_of), 
+                        "Anio": str(fecha_of.year), "Mes": meses[fecha_of.month-1],
+                        "Destinatario": dest_of, "Cargo": cargo_of, "Folio": folio_of, 
+                        "Cuerpo": cuerpo_of, "Firmante": firmante_of, "CCP": ccp_of
                     }
                     with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
                         json.dump(st.session_state.boveda_oficios_db, f, indent=4, ensure_ascii=False)
-                    st.success("✅ Oficio guardado permanentemente.")
+                    st.success("✅ Guardado correctamente")
                     time.sleep(1)
                     st.rerun()
 
-                # GENERAR PDF PROFESIONAL
-                if b2.button("🚀 GENERAR PDF", use_container_width=True):
-                    if libreria_lista:
+                if b_pdf.button("🚀 GENERAR PDF", use_container_width=True):
+                    try:
+                        from fpdf import FPDF
                         pdf = FPDF()
                         pdf.add_page()
-                        pdf.set_margins(25, 25, 25)
-                        
-                        # Encabezado
+                        pdf.set_font("Arial", size=12)
                         pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 7, txt=f"Toluca, Méx; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
-                        pdf.cell(0, 7, txt=f"Oficio: {n_oficio}", ln=True, align='R')
-                        pdf.ln(15)
-                        
-                        # Destinatario
-                        pdf.set_font("Arial", 'B', 12)
-                        pdf.cell(0, 7, txt=dest_of.upper() if dest_of else "A QUIEN CORRESPONDA", ln=True)
-                        pdf.set_font("Arial", '', 11)
-                        pdf.cell(0, 7, txt=cargo_of.upper(), ln=True)
+                        pdf.cell(0, 10, txt=f"Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y')}", ln=True, align='R')
+                        pdf.cell(0, 10, txt=f"Oficio: {num_of}", ln=True, align='R')
                         pdf.ln(10)
-                        
-                        # Cuerpo
+                        pdf.set_font("Arial", 'B', 12)
+                        pdf.cell(0, 10, txt=dest_of.upper() if dest_of else "A QUIEN CORRESPONDA", ln=True)
+                        pdf.set_font("Arial", '', 11)
+                        pdf.cell(0, 10, txt=cargo_of.upper(), ln=True)
+                        pdf.ln(10)
                         pdf.set_font("Arial", '', 12)
-                        pdf.multi_cell(0, 8, txt=cuerpo_of.replace("[FOLIO]", folio_of).encode('latin-1', 'replace').decode('latin-1'), align='J')
+                        txt_limpio = cuerpo_of.replace("[FOLIO]", folio_of).encode('latin-1', 'replace').decode('latin-1')
+                        pdf.multi_cell(0, 10, txt=txt_limpio, align='J')
                         pdf.ln(20)
-                        
-                        # Firma
                         pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 7, txt="ATENTAMENTE", ln=True, align='C')
+                        pdf.cell(0, 10, txt="ATENTAMENTE", ln=True, align='C')
                         pdf.ln(15)
-                        pdf.cell(0, 7, txt="__________________________", ln=True, align='C')
-                        pdf.cell(0, 7, txt=firmante_of.upper(), ln=True, align='C')
-                        
-                        # CCP
-                        pdf.ln(20)
+                        pdf.cell(0, 10, txt="__________________________", ln=True, align='C')
+                        pdf.cell(0, 10, txt=firmante_of.upper(), ln=True, align='C')
+                        pdf.ln(10)
                         pdf.set_font("Arial", '', 8)
-                        pdf.cell(0, 5, txt=f"C.c.p. {ccp_of}", ln=True)
-                        
-                        pdf_stream = pdf.output(dest='S').encode('latin-1', 'replace')
-                        st.download_button(label="📥 Descargar PDF Ahora", data=pdf_stream, file_name=f"{id_registro}.pdf", mime="application/pdf", use_container_width=True)
-                    else:
-                        st.error("Librería fpdf no disponible.")
+                        pdf.cell(0, 10, txt=f"C.c.p. {ccp_of}", ln=True)
+                        pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
+                        st.download_button("📥 Descargar Archivo", pdf_out, f"{num_of.replace('/','-')}.pdf", "application/pdf")
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
 
-            # --- HISTORIAL CLASIFICADO AL FINAL ---
+            # --- 3. BÓVEDA CLASIFICADA (EL BLINDAJE ANTICRASH) ---
+            st.divider()
             if st.session_state.boveda_oficios_db:
-                st.divider()
-                st.markdown("### 🗄️ Bóveda Clasificada")
                 df_b = pd.DataFrame(st.session_state.boveda_oficios_db).T
-                if 'Anio' in df_b.columns:
-                    col_f1, col_f2 = st.columns(2)
-                    anios = sorted(df_b['Anio'].unique(), reverse=True)
-                    sel_a = col_f1.selectbox("Año:", anios)
-                    meses_disponibles = sorted(df_b[df_b['Anio']==sel_a]['Mes'].unique())
-                    sel_m = col_f2.selectbox("Mes:", meses_disponibles)
-                    
-                    df_v = df_b[(df_b['Anio']==sel_a) & (df_b['Mes']==sel_m)]
+                if not df_b.empty and 'Anio' in df_b.columns:
+                    st.markdown("### 🗄️ Historial de Correspondencia")
+                    f_col1, f_col2 = st.columns(2)
+                    lista_anios = sorted(df_b['Anio'].unique(), reverse=True)
+                    sel_a = f_col1.selectbox("Año:", lista_anios)
+                    lista_meses = sorted(df_b[df_b['Anio'] == sel_a]['Mes'].unique())
+                    sel_m = f_col2.selectbox("Mes:", lista_meses)
+                    df_v = df_b[(df_b['Anio'] == sel_a) & (df_b['Mes'] == sel_m)]
                     st.dataframe(df_v[['Oficio', 'Fecha', 'Destinatario', 'Folio']], use_container_width=True, hide_index=True)
+                else:
+                    st.info("📂 Bóveda lista para recibir registros.")
+            else:
+                st.info("📭 No hay oficios registrados.")
