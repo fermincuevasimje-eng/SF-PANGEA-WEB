@@ -1039,14 +1039,17 @@ else:
 
                 if libreria_lista:
                     st.write("---")
+                    # CREAMOS LA VARIABLE AQUÍ AFUERA PARA QUE AMBOS BOTONES LA VEAN
+                    id_of_archivo = num_of.replace("/", "-") if num_of else "SIN_NUMERO"
+                    
                     cb1, cb2 = st.columns(2)
+                    
                     if cb1.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
                         anio = str(fecha_doc.year) if fecha_doc else "2026"
                         meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
                         mes = meses[fecha_doc.month - 1] if fecha_doc else "S-M"
                         
-                        id_of = num_of.replace("/", "-")
-                        st.session_state.boveda_permanente[id_of] = {
+                        st.session_state.boveda_permanente[id_of_archivo] = {
                             "Oficio": num_of, "Fecha": str(fecha_doc), "Anio": anio, "Mes": mes,
                             "Destinatario": dest, "Cargo": cargo, "Folio": folio_ref, 
                             "Cuerpo": mensaje_editado, "Tipo": op_tipo, "Firmante": firmante, "CCP": ccp
@@ -1070,7 +1073,10 @@ else:
                         pdf.ln(12)
                         pdf.set_font("Arial", '', 11)
                         texto_limpio = mensaje_editado.replace("[FOLIO]", folio_ref if folio_ref else "_______")
+                        
+                        # Limpieza de caracteres para evitar errores de codificación
                         pdf.multi_cell(0, 8, txt=texto_limpio.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                        
                         pdf.ln(35)
                         pdf.set_font("Arial", 'B', 11)
                         pdf.cell(0, 8, "A T E N T A M E N T E", ln=True, align='C')
@@ -1083,7 +1089,15 @@ else:
                         pdf.cell(0, 5, f"C.c.p. {ccp}", ln=True, align='L')
                         
                         pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
-                        st.download_button("📥 DESCARGAR DOCUMENTO", data=pdf_data, file_name=f"Oficio_{id_of}.pdf", mime="application/pdf", use_container_width=True)
+                        
+                        # USAMOS LA VARIABLE YA DEFINIDA ARRIBA
+                        st.download_button(
+                            label="📥 DESCARGAR DOCUMENTO", 
+                            data=pdf_data, 
+                            file_name=f"Oficio_{id_of_archivo}.pdf", 
+                            mime="application/pdf", 
+                            use_container_width=True
+                        )
 
             # --- 3. BÓVEDA ORGANIZADA (CARPETAS) ---
             st.divider()
