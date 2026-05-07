@@ -1118,11 +1118,11 @@ else:
                             use_container_width=True
                         )
 
-           # --- 3. BÓVEDA ORGANIZADA (CARPETAS) ---
+           # --- 3. BÓVEDA ORGANIZADA (BLOQUE BLINDADO V16.8) ---
             st.divider()
             st.markdown("### 🗄️ Bóveda Clasificada")
 
-            # Intentamos cargar desde el archivo si el session_state parece vacío
+            # Forzar lectura si el estado parece vacío
             if not st.session_state.boveda_permanente:
                 if os.path.exists(PATH_OFICIOS):
                     try:
@@ -1132,41 +1132,50 @@ else:
                         st.session_state.boveda_permanente = {}
 
             if st.session_state.boveda_permanente:
+                # Creamos el DataFrame
                 df_b = pd.DataFrame(st.session_state.boveda_permanente).T
                 
-                # Verificamos que las columnas existan
-                columnas_necesarias = ['Anio', 'Mes', 'Tipo']
-                if all(col in df_b.columns for col in columnas_necesarias):
-                    f1, f2, f3 = st.columns(3)
-                    
-                    anios = sorted(df_b['Anio'].unique(), reverse=True)
-                    s_anio = f1.selectbox("Año:", anios, key="sel_anio")
-                    
-                    meses_disp = sorted(df_b[df_b['Anio'] == s_anio]['Mes'].unique())
-                    s_mes = f2.selectbox("Mes:", meses_disp, key="sel_mes")
-                    
-                    tipos_disp = ["TODOS"] + sorted(df_b[(df_b['Anio'] == s_anio) & (df_b['Mes'] == s_mes)]['Tipo'].unique())
-                    s_tipo = f3.selectbox("Tipo:", tipos_disp, key="sel_tipo")
+                # REGLA DE SEGURIDAD: Solo si el DataFrame tiene datos y las columnas de tiempo
+                if not df_b.empty and 'Anio' in df_b.columns:
+                    try:
+                        f1, f2, f3 = st.columns(3)
+                        
+                        # 1. Filtro de Año
+                        anios_list = sorted(df_b['Anio'].unique(), reverse=True)
+                        s_anio = f1.selectbox("Año:", anios_list, key="filtro_anio_final")
+                        
+                        # 2. Filtro de Mes (dependiente del año)
+                        df_anio = df_b[df_b['Anio'] == s_anio]
+                        meses_list = sorted(df_anio['Mes'].unique())
+                        s_mes = f2.selectbox("Mes:", meses_list, key="filtro_mes_final")
+                        
+                        # 3. Filtro de Tipo (dependiente del mes)
+                        df_mes = df_anio[df_anio['Mes'] == s_mes]
+                        tipos_list = ["TODOS"] + sorted(df_mes['Tipo'].unique())
+                        s_tipo = f3.selectbox("Tipo:", tipos_list, key="filtro_tipo_final")
 
-                    df_f = df_b[(df_b['Anio'] == s_anio) & (df_b['Mes'] == s_mes)]
-                    if s_tipo != "TODOS": 
-                        df_f = df_f[df_f['Tipo'] == s_tipo]
+                        # Filtrado final para visualización
+                        df_final = df_mes.copy()
+                        if s_tipo != "TODOS":
+                            df_final = df_final[df_final['Tipo'] == s_tipo]
 
-                    for idx, row in df_f.iterrows():
-                        with st.expander(f"📄 {row['Oficio']} | {row['Destinatario']}"):
-                            c_i, c_a = st.columns([4, 1])
-                            c_i.write(f"**Folio:** {row['Folio']} | **Firmante:** {row['Firmante']}")
-                            # Botón para CARGAR de nuevo al editor (opcional pero útil)
-                            if c_i.button("📝 Editar este oficio", key=f"ed_{idx}"):
-                                st.info("Copiando datos al editor... suba al inicio.")
-                                # Aquí podrías setear los session_states para editar, pero por ahora solo es visual
-                            
-                            if c_a.button("🗑️", key=f"del_{idx}"):
-                                del st.session_state.boveda_permanente[idx]
-                                with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
-                                    json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
-                                st.rerun()
+                        # Listado de expedientes
+                        for idx, row in df_final.iterrows():
+                            with st.expander(f"📄 {row['Oficio']} | {row['Destinatario']}"):
+                                ci, ca = st.columns([4, 1])
+                                ci.write(f"**Folio Pangea:** {row.get('Folio', 'N/A')} | **Firmado:** {row.get('Firmante', 'N/A')}")
+                                
+                                # Botón eliminar con llave única
+                                if ca.button("🗑️", key=f"btn_del_{idx}"):
+                                    del st.session_state.boveda_permanente[idx]
+                                    with open(PATH_OFICIOS, "w", encoding="utf-8") as f:
+                                        json.dump(st.session_state.boveda_permanente, f, ensure_ascii=False, indent=4)
+                                    st.success("Registro eliminado.")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                    except Exception as e:
+                        st.info("🔄 Sincronizando nuevos registros...")
                 else:
-                    st.warning("⚠️ El formato de los datos guardados es antiguo. Guarde un nuevo oficio para actualizar.")
+                    st.warning("📂 Bóveda detectada, pero los registros aún no tienen formato de búsqueda. Guarde un oficio para actualizar.")
             else:
-                st.info("📂 Bóveda vacía. Guarde su primer oficio para activar los filtros.")
+                st.info("📭 La bóveda está vacía. Comience guardando un oficio en la sección de arriba.")
