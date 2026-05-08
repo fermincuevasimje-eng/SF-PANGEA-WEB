@@ -1094,6 +1094,7 @@ else:
                     pdf.ln(25); pdf.set_font("Arial", 'B', 11); pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
                     pdf.ln(20); pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
                     pdf.cell(0, 5, txt=firm.upper(), ln=True, align='C')
+                    pdf.cell(0, 5, txt=cargo_firm.upper(), ln=True, align='C')
                     pdf.set_y(-30); pdf.set_font("Arial", '', 8); pdf.cell(0, 5, txt=f"C.c.p. {ccp}", ln=True)
                     
                     pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
