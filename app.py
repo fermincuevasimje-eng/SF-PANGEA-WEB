@@ -1042,7 +1042,8 @@ else:
                     st.markdown("**📝 Mensaje**")
                     v_cuerpo = data_previa.get("cuerpo", plantillas_maestras[tipo_p])
                     cuerpo_txt = st.text_area("Cuerpo:", value=v_cuerpo, height=150)
-                    firm = st.text_input("Firma:", value=data_previa.get("firma", "ING. DIRECTOR DE ALUMBRADO PÚBLICO"))
+                    firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"))
+                    cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"))
                     ccp = st.text_input("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."))
 
                 h_membrete = st.toggle("🛰️ Modo Hoja Membretada", value=False)
