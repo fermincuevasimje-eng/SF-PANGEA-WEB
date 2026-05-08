@@ -1059,7 +1059,7 @@ else:
                     <div style="text-align: right; font-weight: bold;">Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}<br>Oficio: {n_oficio}</div><br>
                     <div style="text-align: left; font-weight: bold;">{dest.upper()}<br>{cargo.upper()}</div><br>
                     <div style="text-align: justify;"> {c_final} </div><br><br>
-                    <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b></div>
+                    <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br><b>{cargo_firm.upper()}</b></div>
                     <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px;">C.c.p. {ccp}</div>
                 </div>
                 """, unsafe_allow_html=True)
