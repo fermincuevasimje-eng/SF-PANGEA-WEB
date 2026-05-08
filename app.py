@@ -1069,7 +1069,11 @@ else:
 
                 if b_save.button("💾 GUARDAR/ACTUALIZAR", use_container_width=True):
                     id_r = n_oficio.replace("/", "-")
-                    st.session_state.db_oficios[id_r] = {"num": n_oficio, "fecha": str(f_oficio), "dest": dest, "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, "firma": firm, "ccp": ccp}
+                    st.session_state.db_oficios[id_r] = {
+                        "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
+                        "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
+                        "firma": firm, "cargo_f": cargo_firm, "ccp": ccp
+                    }
                     with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
                         json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
                     st.success("✅ Bóveda Actualizada."); time.sleep(1); st.rerun()
