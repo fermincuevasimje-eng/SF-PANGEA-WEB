@@ -941,75 +941,153 @@ else:
                     # (Aquí va tu lógica de importación original completa...)
                     st.info("Procesando importación...")
 
-        # --- 🚀 NUEVA PESTAÑA: GENERADOR DE OFICIOS (SOLUCIÓN ANTIBLOQUEO) ---
+        # --- 📄 PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN PROFESIONAL GRP) ---
         with tab_o:
-            st.subheader("📄 Generador de Correspondencia Oficial")
-            
-            # Intentamos importar; si no está, la app no se muere
-            try:
-                from fpdf import FPDF
-                libreria_lista = True
-            except ImportError:
-                libreria_lista = False
-                st.warning("⚠️ El motor de PDF no está instalado en este servidor.")
-                st.info("Para activar las descargas, añade 'fpdf' a tu archivo requirements.txt en GitHub.")
+            st.subheader("📄 Correspondencia Oficial y Control de Archivo")
+            PATH_OFICIOS_DB = "boveda_oficios.json"
 
-            if "plantillas_oficios" not in st.session_state:
-                st.session_state.plantillas_oficios = {
-                    "EXITOSA": "Se informa que la petición [FOLIO] fue atendida exitosamente.",
-                    "SERVICIO": "La luminaria del reporte [FOLIO] ya se encuentra en servicio.",
-                    "PARCIAL": "Atención parcial para [FOLIO]; pendiente por falta de material.",
-                    "BAJADA": "Se autoriza la bajada de luz solicitada en [FOLIO].",
-                    "NEGATIVA": "Petición [FOLIO] rechazada por improcedencia técnica."
-                }
-
-            col_form, col_view = st.columns([1, 1])
-            
-            with col_form:
-                op_tipo = st.selectbox("Tipo de Oficio:", ["Atención Exitosa", "Ya en Servicio", "Programado/Parcial", "Bajadas de Luz", "Atención Negativa"])
-                mapa_op = {"Atención Exitosa":"EXITOSA", "Ya en Servicio":"SERVICIO", "Programado/Parcial":"PARCIAL", "Bajadas de Luz":"BAJADA", "Atención Negativa":"NEGATIVA"}
-                
-                c1, c2 = st.columns(2)
-                num_of = c1.text_input("No. Oficio:", value="DAP/001/2026")
-                fecha_of = c2.date_input("Fecha:", value=None)
-                
-                dest = st.text_input("Destinatario:", placeholder="Nombre del Ciudadano")
-                cargo = st.text_input("Cargo:", placeholder="Presente")
-                folio_doc = st.text_input("Folio de Referencia:")
-                
-                with st.expander("📝 Editar contenido del mensaje"):
-                    txt_base = st.text_area("Texto base:", value=st.session_state.plantillas_oficios[mapa_op[op_tipo]], height=100)
-                    st.session_state.plantillas_oficios[mapa_op[op_tipo]] = txt_base
-
-            with col_view:
-                st.markdown("""<style>.paper { background: white; color: black; padding: 30px; border: 1px solid #ccc; font-family: sans-serif; min-height: 400px; }</style>""", unsafe_allow_html=True)
-                
-                cuerpo_limpio = st.session_state.plantillas_oficios[mapa_op[op_tipo]].replace("[FOLIO]", folio_doc if folio_doc else "_______")
-                cuerpo_vista = st.session_state.plantillas_oficios[mapa_op[op_tipo]].replace("[FOLIO]", f"**{folio_doc}**" if folio_doc else "_______")
-                
-                st.markdown(f"""<div class="paper">
-                    <div style="text-align: right;">Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y') if fecha_of else '____'}<br><b>Oficio: {num_of}</b></div>
-                    <br><br><b>{dest.upper() if dest else 'A QUIEN CORRESPONDA'}</b><br>{cargo.upper() if cargo else 'PRESENTE'}<br><br>
-                    <div style="text-align: justify;">{cuerpo_vista}</div>
-                    <br><br><br><div style="text-align: center;"><b>ATENTAMENTE</b><br><br><br>__________________________<br>DIRECCIÓN DE ALUMBRADO PÚBLICO</div>
-                </div>""", unsafe_allow_html=True)
-                
-                if libreria_lista:
-                    if st.button("🚀 GENERAR DOCUMENTO PDF", use_container_width=True):
-                        pdf = FPDF()
-                        pdf.add_page()
-                        pdf.set_font("Arial", size=12)
-                        pdf.set_font("Arial", 'B', 11)
-                        pdf.cell(0, 10, txt=f"Toluca, Méx; a {fecha_of.strftime('%d/%m/%Y') if fecha_of else '____'}", ln=True, align='R')
-                        pdf.cell(0, 10, txt=f"Oficio: {num_of}", ln=True, align='R')
-                        pdf.ln(10)
-                        pdf.set_font("Arial", 'B', 12)
-                        pdf.cell(0, 10, txt=dest.upper() if dest else "A QUIEN CORRESPONDA", ln=True, align='L')
-                        pdf.cell(0, 10, txt=cargo.upper() if cargo else "PRESENTE", ln=True, align='L')
-                        pdf.ln(10)
-                        pdf.set_font("Arial", size=12)
-                        pdf.multi_cell(0, 10, txt=cuerpo_limpio.encode('latin-1', 'replace').decode('latin-1'), align='J')
-                        pdf_stream = pdf.output(dest='S').encode('latin-1', 'replace')
-                        st.download_button(label="📥 DESCARGAR PDF", data=pdf_stream, file_name="OFICIO_DAP.pdf", mime="application/pdf", use_container_width=True)
+            # 1. MOTOR DE PERSISTENCIA (Bóveda Permanente)
+            if "db_oficios" not in st.session_state:
+                if os.path.exists(PATH_OFICIOS_DB):
+                    with open(PATH_OFICIOS_DB, "r", encoding="utf-8") as f:
+                        st.session_state.db_oficios = json.load(f)
                 else:
-                    st.error("❌ Función de descarga deshabilitada (Falta librería fpdf)")
+                    st.session_state.db_oficios = {}
+
+            # 2. INTERFAZ DE CONTROL
+            c_config, c_preview = st.columns([1, 1.1])
+
+            with c_config:
+                modo_of = st.radio("Operación:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True)
+                
+                # Carga de datos si es edición/consulta
+                data_previa = {}
+                if modo_of == "📂 Consultar Bóveda" and st.session_state.db_oficios:
+                    id_sel = st.selectbox("Seleccionar Registro:", list(st.session_state.db_oficios.keys())[::-1])
+                    data_previa = st.session_state.db_oficios[id_sel]
+                
+                with st.container(border=True):
+                    st.markdown("**📌 Datos de Identificación**")
+                    col_id1, col_id2 = st.columns(2)
+                    num_oficio = col_id1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"))
+                    fecha_oficio = col_id2.date_input("Fecha de Emisión:", value=pd.to_datetime(data_previa.get("fecha")).date() if data_previa.get("fecha") else pd.Timestamp.now().date())
+                    
+                    destinatario = st.text_input("Destinatario (Nombre Completo):", value=data_previa.get("dest", ""))
+                    cargo_dest = st.text_input("Cargo / Domicilio:", value=data_previa.get("cargo", "P R E S E N T E"))
+                    folio_ref = st.text_input("Folio de Referencia (Ticket/IMEI):", value=data_previa.get("folio", ""))
+
+                with st.container(border=True):
+                    st.markdown("**📝 Contenido del Documento**")
+                    plantilla_def = "Por medio de la presente, se hace de su conocimiento que la petición con folio [FOLIO], ha sido atendida por las brigadas de esta Dirección..."
+                    cuerpo_txt = st.text_area("Cuerpo del Oficio:", value=data_previa.get("cuerpo", plantilla_def), height=180)
+                    
+                    st.markdown("**🔏 Formalidades de Cierre**")
+                    firmante = st.text_input("Quién Firma (Nombre y Cargo):", value=data_previa.get("firma", "ING. DIRECTOR DE ALUMBRADO PÚBLICO"))
+                    ccp_txt = st.text_input("C.c.p. (Separar por comas):", value=data_previa.get("ccp", "Archivo, Minutario."))
+
+                hoja_membretada = st.toggle("🛰️ Modo Hoja Membretada (Dejar espacio superior)", value=False)
+
+            with c_preview:
+                st.markdown("### 👁️ Vista Previa Institucional")
+                
+                # Procesamiento de variables en el texto
+                cuerpo_final = cuerpo_txt.replace("[FOLIO]", f"**{folio_ref}**")
+                espaciado_superior = "100px" if hoja_membretada else "20px"
+
+                # Renderizado HTML para simulación de papel
+                st.markdown(f"""
+                <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.5; min-height: 600px;">
+                    <div style="height: {espaciado_superior};"></div>
+                    <div style="text-align: right; font-weight: bold;">
+                        Toluca de Lerdo, México; a {fecha_oficio.strftime('%d de %B de %Y')}<br>
+                        Oficio No: {num_oficio}
+                    </div>
+                    <br><br>
+                    <div style="text-align: left; font-weight: bold;">
+                        {destinatario.upper() if destinatario else 'A QUIEN CORRESPONDA'}<br>
+                        {cargo_dest.upper()}
+                    </div>
+                    <br><br>
+                    <div style="text-align: justify;">
+                        {cuerpo_final}
+                    </div>
+                    <br><br><br>
+                    <div style="text-align: center;">
+                        <b>A T E N T A M E N T E</b><br><br><br><br>
+                        __________________________________<br>
+                        <b>{firmante.upper()}</b>
+                    </div>
+                    <br><br>
+                    <div style="font-size: 10px; border-top: 1px solid #eee; pt: 5px;">
+                        C.c.p. {ccp_txt}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.divider()
+                b_save, b_pdf = st.columns(2)
+
+                if b_save.button("💾 GUARDAR EN BÓVEDA", use_container_width=True):
+                    id_registro = num_oficio.replace("/", "-")
+                    st.session_state.db_oficios[id_registro] = {
+                        "num": num_oficio, "fecha": str(fecha_oficio), "dest": destinatario,
+                        "cargo": cargo_dest, "folio": folio_ref, "cuerpo": cuerpo_txt,
+                        "firma": firmante, "ccp": ccp_txt, "anio": str(fecha_oficio.year),
+                        "mes": fecha_oficio.strftime("%m")
+                    }
+                    with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
+                        json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
+                    st.success("✅ Oficio registrado en Bóveda Permanente.")
+                    time.sleep(1)
+                    st.rerun()
+
+                if b_pdf.button("🚀 EXPORTAR PDF PROFESIONAL", use_container_width=True):
+                    try:
+                        from fpdf import FPDF
+                        class PDF(FPDF):
+                            def header(self): pass
+                            def footer(self): pass
+
+                        pdf = PDF()
+                        pdf.add_page()
+                        pdf.set_auto_page_break(auto=True, margin=15)
+                        
+                        # Espaciado Membrete
+                        if hoja_membretada: pdf.ln(40)
+                        else: pdf.ln(10)
+
+                        # Encabezado
+                        pdf.set_font("Arial", 'B', 11)
+                        pdf.cell(0, 5, txt=f"Toluca de Lerdo, México; a {fecha_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
+                        pdf.cell(0, 5, txt=f"Oficio No: {num_oficio}", ln=True, align='R')
+                        
+                        # Destinatario
+                        pdf.ln(15)
+                        pdf.set_font("Arial", 'B', 11)
+                        pdf.cell(0, 5, txt=destinatario.upper() if destinatario else "A QUIEN CORRESPONDA", ln=True)
+                        pdf.cell(0, 5, txt=cargo_dest.upper(), ln=True)
+                        
+                        # Cuerpo
+                        pdf.ln(15)
+                        pdf.set_font("Arial", '', 11)
+                        cuerpo_pdf = cuerpo_txt.replace("[FOLIO]", folio_ref)
+                        pdf.multi_cell(0, 7, txt=cuerpo_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                        
+                        # Firma
+                        pdf.ln(30)
+                        pdf.set_font("Arial", 'B', 11)
+                        pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
+                        pdf.ln(20)
+                        pdf.cell(0, 5, txt="__________________________________", ln=True, align='C')
+                        pdf.cell(0, 5, txt=firmante.upper(), ln=True, align='C')
+                        
+                        # CCP
+                        pdf.set_y(-30)
+                        pdf.set_font("Arial", '', 8)
+                        pdf.cell(0, 5, txt=f"C.c.p. {ccp_txt}", ln=True)
+                        
+                        pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
+                        st.download_button(label="📥 Descargar Oficio PDF", data=pdf_bytes, 
+                                         file_name=f"Oficio_{num_oficio.replace('/','_')}.pdf", mime="application/pdf")
+                    except Exception as e:
+                        st.error(f"Error en motor PDF: {e}")
