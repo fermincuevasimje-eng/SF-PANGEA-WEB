@@ -935,11 +935,46 @@ else:
 
         with tab_i:
             st.subheader("📥 Importación Externa")
-            raw_import = st.text_area("Pega el código Mermaid aquí:", height=300, key="area_import_sf")
+            raw_import = st.text_area("Pega el código Mermaid aquí:", height=300, key="area_import_sf", 
+                                     placeholder="graph TD\nN0((\"Inicio\")) --> N1[\"Proceso\"]")
+            
             if st.button("🚀 REDISEÑAR PROCESO", use_container_width=True):
                 if raw_import:
-                    # (Aquí va tu lógica de importación original completa...)
-                    st.info("Procesando importación...")
+                    try:
+                        nuevos_pasos = []
+                        # Limpiamos y dividimos el código por líneas
+                        lineas = [l.strip() for l in raw_import.split('\n') if l.strip()]
+                        
+                        # Buscamos definiciones de nodos: N0((Texto)), N1[Texto], N2{Texto}
+                        for linea in lineas:
+                            # 1. Detectar Inicio/Fin (( ))
+                            m_io = re.search(r'(\w+)\(\("(.+?)"\)\)', linea)
+                            if m_io:
+                                nuevos_pasos.append({"texto": m_io.group(2), "tipo": "Inicio/Fin", "is_decision": False, "conecta_a": "Siguiente", "etiqueta_flecha": ""})
+                                continue
+                            
+                            # 2. Detectar Decisiones { }
+                            m_dec = re.search(r'(\w+)\{"(.+?)"\}', linea)
+                            if m_dec:
+                                nuevos_pasos.append({"texto": m_dec.group(2) + "?", "tipo": "Decisión", "is_decision": True, "label_si": "SÍ", "dest_si": "Siguiente", "label_no": "NO", "dest_no": "Fin"})
+                                continue
+
+                            # 3. Detectar Procesos [ ]
+                            m_proc = re.search(r'(\w+)\["(.+?)"\]', linea)
+                            if m_proc:
+                                nuevos_pasos.append({"texto": m_proc.group(2), "tipo": "Proceso", "is_decision": False, "conecta_a": "Siguiente", "etiqueta_flecha": ""})
+
+                        if nuevos_pasos:
+                            st.session_state.pasos_sf4 = nuevos_pasos
+                            st.success(f"✅ Se han importado {len(nuevos_pasos)} pasos correctamente.")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ No se detectaron nodos válidos en el código. Verifica el formato (N0[\"Texto\"]).")
+                    except Exception as e:
+                        st.error(f"Error en el motor de importación: {e}")
+                else:
+                    st.warning("⚠️ El área de texto está vacía.")
 
         # --- 📄 PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN PROFESIONAL GRP V2.2 - REPARADA) ---
         with tab_o:
