@@ -941,12 +941,12 @@ else:
                     # (Aquí va tu lógica de importación original completa...)
                     st.info("Procesando importación...")
 
-        # --- 📄 PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN PROFESIONAL GRP V2) ---
+        # --- 📄 PESTAÑA: GENERADOR DE OFICIOS (VERSIÓN PROFESIONAL GRP V2.1 - SEGURIDAD REFORZADA) ---
         with tab_o:
             st.subheader("📄 Correspondencia Oficial y Control de Bóveda")
             PATH_OFICIOS_DB = "boveda_oficios.json"
 
-            # 1. MOTOR DE PERSISTENCIA Y PLANTILLAS
+            # 1. MOTOR DE PERSISTENCIA
             if "db_oficios" not in st.session_state:
                 if os.path.exists(PATH_OFICIOS_DB):
                     with open(PATH_OFICIOS_DB, "r", encoding="utf-8") as f:
@@ -954,9 +954,8 @@ else:
                 else:
                     st.session_state.db_oficios = {}
 
-            # Recuperación de las 5 plantillas originales
             plantillas_maestras = {
-                "✅ Atención Exitosa": "Por medio de la presente, se informa que la petición con folio [FOLIO] ha sido atendida exitosamente por las brigadas de esta Dirección, quedando el servicio en óptimas condiciones de operación.",
+                "✅ Atención Exitosa": "Por medio de la presente, se hace de su conocimiento que la petición con folio [FOLIO] ha sido atendida exitosamente por las brigadas de esta Dirección, quedando el servicio en óptimas condiciones de operación.",
                 "💡 Ya en Servicio": "Tras la inspección realizada por el personal técnico, se hace de su conocimiento que la luminaria correspondiente al reporte [FOLIO] ya se encuentra en servicio y funcionando correctamente.",
                 "⏳ Programado/Parcial": "Se informa que la atención al folio [FOLIO] se encuentra en estado parcial; los trabajos continuarán conforme a la disponibilidad de material especializado en el programa de mantenimiento.",
                 "🔌 Bajadas de Luz": "Se autoriza la maniobra de bajada de luz solicitada mediante el folio [FOLIO], misma que será coordinada por el personal asignado a la zona correspondiente.",
@@ -976,12 +975,13 @@ else:
                         id_sel = col_sel.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1])
                         data_previa = st.session_state.db_oficios[id_sel]
                         
-                        # BOTÓN DE ELIMINACIÓN DE BÓVEDA
-                        if col_del.button("🗑️ BORRAR", use_container_width=True, help="Eliminar permanentemente de la bóveda"):
+                        # --- DOBLE CANDADO DE SEGURIDAD ---
+                        seguro_borrado = st.checkbox("🔐 Confirmar eliminación permanente")
+                        if col_del.button("🗑️ BORRAR", use_container_width=True, disabled=not seguro_borrado, help="Primero activa el candado de seguridad"):
                             del st.session_state.db_oficios[id_sel]
                             with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
                                 json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
-                            st.warning(f"Registro {id_sel} eliminado.")
+                            st.warning(f"Registro {id_sel} eliminado con éxito.")
                             time.sleep(1)
                             st.rerun()
                     else:
@@ -1001,7 +1001,6 @@ else:
 
                 with st.container(border=True):
                     st.markdown("**📝 Contenido Personalizado**")
-                    # Lógica para cargar plantilla si es nuevo, o data guardada si es consulta
                     val_cuerpo = data_previa.get("cuerpo", plantillas_maestras[tipo_p])
                     cuerpo_txt = st.text_area("Cuerpo del Oficio:", value=val_cuerpo, height=150)
                     
