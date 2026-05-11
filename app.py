@@ -202,7 +202,7 @@ if not st.session_state.autenticado:
         if u == "SF" and p == "1827":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
             st.rerun()
-        elif u == "GuaDAP" and p == "1111":
+        elif u == "GuaDAP" and p == "2222":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
             st.rerun()
         else:
