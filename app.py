@@ -1105,11 +1105,11 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
 
-# === INICIO MÓDULO SF5 V22: CENTRO DE CONTROL Y DEPURACIÓN PRO ===
+# === INICIO MÓDULO SF5 V23: LIMPIEZA QUIRÚRGICA DE TEXTO Y GPS ===
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Pre-procesador Universal Anti-Duplicados")
         
-        files_sf5 = st.file_uploader("📂 Cargar archivos de reportes (Excel/CSV)", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v22")
+        files_sf5 = st.file_uploader("📂 Cargar archivos de reportes", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v23")
 
         if files_sf5:
             dfs = []
@@ -1120,12 +1120,27 @@ else:
             
             df_total = pd.concat(dfs, ignore_index=True)
             
-            # DETECCIÓN AGNOSTICA DE GPS
-            res_gps = df_total.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-            df_total['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
-            df_total['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
+            # --- NUEVA LÓGICA DE LIMPIEZA DE TEXTO EN COORDENADAS ---
+            def extraer_coordenadas_limpias(texto):
+                texto = str(texto).lower()
+                # Eliminamos palabras comunes que ensucian la celda
+                for basura in ["latitude:", "longitude:", "lat:", "long:", "latitud:", "longitud:", "gps:"]:
+                    texto = texto.replace(basura, "")
+                
+                # Buscamos el patrón numérico (soporta negativos y decimales)
+                match = re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', texto)
+                if match:
+                    return float(match.group(1)), float(match.group(2))
+                return None, None
+
+            # Aplicamos la limpieza a todas las columnas unificadas
+            coords_extraidas = df_total.apply(lambda r: extraer_coordenadas_limpias(" ".join(r.astype(str))), axis=1)
+            df_total['lat_aux'] = [c[0] for c in coords_extraidas]
+            df_total['lon_aux'] = [c[1] for c in coords_extraidas]
             
-            df_analisis = df_total.dropna(subset=['lat_aux']).reset_index(drop=True)
+            # Ahora sí, el dropna será real sobre datos limpios
+            df_analisis = df_total.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
+            df_sin_gps = df_total[df_total['lat_aux'].isna()].reset_index(drop=True)
 
             if not df_analisis.empty:
                 # MOTOR 3 METROS
@@ -1147,7 +1162,7 @@ else:
 
                 df_analisis['Grupo_Duplicado'] = marcador_duplicados
                 
-                # SEPARACIÓN QUIRÚRGICA
+                # SEPARACIÓN DE HOJAS
                 indices_hoja1 = []
                 grupos_ya_agregados = set()
                 for idx, row in df_analisis.iterrows():
@@ -1159,39 +1174,37 @@ else:
                 df_hoja1 = df_analisis.loc[indices_hoja1].copy()
                 df_hoja2 = df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
 
-                # --- 📊 MÉTRICAS LLAMATIVAS ---
+                # --- 📊 MÉTRICAS CORREGIDAS ---
                 st.markdown("### 📈 Resumen Operativo de Depuración")
                 c_met1, c_met2, c_met3, c_met4 = st.columns(4)
                 
                 with c_met1:
-                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #1f4e78;'><b>PUNTOS PROCESADOS</b><br><span style='font-size: 24px;'>🔍 {len(df_total)}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #1f4e78;'><b>PUNTOS PROCESADOS</b><br><span style='font-size: 24px;'>🔍 {len(df_analisis)}</span></div>", unsafe_allow_html=True)
                 
                 with c_met2:
-                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #ffa500;'><b>PUNTOS DUPLICADOS</b><br><span style='font-size: 24px;'>🚨 {len(df_hoja2)}</span></div>", unsafe_allow_html=True)
+                    # Duplicados reales (excluyendo al que se queda en hoja 1)
+                    cant_dups_eliminados = len(df_analisis) - len(df_hoja1)
+                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #ffa500;'><b>ELIMINADOS (3m)</b><br><span style='font-size: 24px;'>🚨 {cant_dups_eliminados}</span></div>", unsafe_allow_html=True)
                 
                 with c_met3:
                     st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #28a745;'><b>PUNTOS ÚNICOS</b><br><span style='font-size: 24px;'>✅ {len(df_hoja1)}</span></div>", unsafe_allow_html=True)
                 
                 with c_met4:
-                    # Cálculo de eficiencia: Evitar paradas innecesarias (aprox 5 min por parada)
-                    ahorro_min = len(df_hoja2) * 5
+                    ahorro_min = cant_dups_eliminados * 5
                     st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #dc3545;'><b>EFICIENCIA GANADA</b><br><span style='font-size: 24px;'>⏱️ ~{ahorro_min} min</span></div>", unsafe_allow_html=True)
 
-                # --- GENERACIÓN DEL PRODUCTO ---
+                # --- EXPORTACIÓN ---
                 output_sf5 = io.BytesIO()
                 with pd.ExcelWriter(output_sf5, engine='openpyxl') as writer:
-                    # Limpiamos columnas auxiliares para que Hoja 1 sea 100% compatible con Módulo 1
                     df_final_h1 = df_hoja1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'])
                     df_final_h1.to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
                     
                     ws1 = writer.sheets['PARA_MODULO_1']
                     fill_survivor = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-                    # Pintamos de amarillo solo la fila en Hoja 1 que tiene hermanos duplicados
                     for row_idx, g_id in enumerate(df_hoja1['Grupo_Duplicado'], start=2):
                         if g_id > 0:
                             for cell in ws1[row_idx]: cell.fill = fill_survivor
 
-                    # Hoja 2: Mantiene todo el rastro para auditoría
                     df_hoja2.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
                     ws2 = writer.sheets['REPORTE_DUPLICADOS']
                     colores_hex = ["FFCCCC", "CCE5FF", "E5FFCC", "FFFFCC", "F2F2F2", "FFE5CC", "FFCCFF"]
@@ -1200,14 +1213,10 @@ else:
                         for cell in ws2[row_idx]: cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
 
                 st.write("---")
-                st.download_button(
-                    label="🚀 DESCARGAR PRODUCTO TERMINADO PARA MÓDULO 1",
-                    data=output_sf5.getvalue(),
-                    file_name=f"SF_PANGEA_DEPURADO_{pd.Timestamp.now().strftime('%d_%m')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+                st.download_button(label="🚀 DESCARGAR PRODUCTO TERMINADO v23", data=output_sf5.getvalue(), file_name=f"SF_PANGEA_LIMPIO.xlsx", use_container_width=True)
                 
-                st.caption("ℹ️ Nota: La Hoja 1 contiene los datos listos para el Generador de Rutas. Las celdas amarillas indican puntos que tenían duplicados.")
+                if not df_sin_gps.empty:
+                    with st.expander(f"⚠️ Registros sin coordenadas reconocidas ({len(df_sin_gps)})"):
+                        st.dataframe(df_sin_gps.drop(columns=['lat_aux', 'lon_aux']))
             else:
-                st.error("No se detectaron coordenadas válidas.")
+                st.error("No se detectaron coordenadas. Revisa si el texto 'latitude:' está bloqueando la lectura.")
