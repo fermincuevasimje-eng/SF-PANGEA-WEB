@@ -1105,58 +1105,97 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
 
-elif st.session_state.menu == "SF5":
+# === INICIO ESTRUCTURA MÓDULO SF5 (ANTI-DUPLICADOS) ===
+    elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Comparador y Limpieza de Duplicados")
-        st.info("Este módulo analiza coordenadas GPS y elimina reportes duplicados en un radio de 3 metros.")
+        st.info("Este módulo analiza coordenadas GPS y elimina reportes duplicados en un radio de 3 metros para optimizar la operativa de las brigadas.")
 
-        up_sf5 = st.file_uploader("Cargar archivo para depuración (Excel/CSV)", type=["csv", "xlsx"], key="up_sf5")
+        up_sf5 = st.file_uploader("Cargar archivo para depuración (Excel/CSV)", type=["csv", "xlsx"], key="up_sf5_indep")
 
         if up_sf5:
             try:
-                df_raw = pd.read_excel(up_sf5, dtype=str).fillna("") if up_sf5.name.endswith('.xlsx') else pd.read_csv(up_sf5, encoding='latin-1', dtype=str).fillna("")
+                # 1. Carga de datos con detección de extensión
+                if up_sf5.name.endswith('.xlsx'):
+                    df_raw = pd.read_excel(up_sf5, dtype=str).fillna("")
+                else:
+                    df_raw = pd.read_csv(up_sf5, encoding='latin-1', dtype=str).fillna("")
                 
-                id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
+                # 2. Identificación de Folio y Extracción de GPS
+                id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_raw.columns[0])
+                
+                # Buscamos coordenadas en cualquier columna del archivo
                 res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-                df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
+                df_raw['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
+                df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
                 
-                df_con_gps = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
+                # Separación de registros para proceso quirúrgico
+                df_con_gps = df_raw.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
                 df_sin_gps = df_raw[df_raw['lat_aux'].isna()].reset_index(drop=True)
 
                 if not df_con_gps.empty:
-                    umbral = 3 / 111111.0 # 3 metros en grados aprox.
+                    # 3. Lógica de Proximidad (Umbral de 3 metros)
+                    # Aproximación: 1 grado ≈ 111,111m -> 3m ≈ 0.000027 grados
+                    umbral = 3 / 111111.0
                     coords = df_con_gps[['lat_aux', 'lon_aux']].values
                     indices_duplicados = []
                     
+                    # Comparación matricial de proximidad para identificar solapamientos
                     for i in range(len(coords)):
                         if i in indices_duplicados: continue
                         for j in range(i + 1, len(coords)):
+                            # Cálculo de distancia Euclidiana (rápida para distancias cortas)
                             if np.linalg.norm(coords[i] - coords[j]) < umbral:
                                 indices_duplicados.append(j)
 
+                    # Creación de dataframes de resultados
                     df_duplicados = df_con_gps.iloc[indices_duplicados].copy()
                     df_limpio = df_con_gps.drop(df_con_gps.index[indices_duplicados]).reset_index(drop=True)
 
-                    m_a, m_b, m_c = st.columns(3)
-                    m_a.metric("Total Procesados", len(df_raw))
-                    m_b.metric("✅ Puntos Únicos", len(df_limpio))
-                    m_c.metric("🚨 Duplicados (3m)", len(df_duplicados))
+                    # 4. Panel de Control y Métricas
+                    st.divider()
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("📦 Total Recibido", len(df_raw))
+                    m2.metric("✅ Registros Únicos", len(df_limpio))
+                    m3.metric("🚨 Duplicados (3m)", len(df_duplicados))
 
-                    col_d1, col_d2 = st.columns(2)
-                    with col_d1:
-                        st.subheader("📋 Registros Limpios")
+                    col_res1, col_res2 = st.columns(2)
+                    
+                    with col_res1:
+                        st.subheader("📋 Data Depurada")
+                        st.write("Vista previa de folios únicos listos para ruta:")
+                        # Mostramos solo columnas clave para no saturar la vista
                         st.dataframe(df_limpio[[id_col, 'lat_aux', 'lon_aux']], use_container_width=True, hide_index=True)
-                        output_limpio = io.BytesIO()
-                        with pd.ExcelWriter(output_limpio, engine='openpyxl') as writer:
-                            df_limpio.drop(columns=['lat_aux', 'lon_aux']).to_excel(writer, index=False)
-                        st.download_button("📗 Descargar Excel Limpio", output_limpio.getvalue(), f"LIMPIO_{up_sf5.name}.xlsx", use_container_width=True)
+                        
+                        # Botón de Descarga Profesional (Sin las columnas auxiliares GPS)
+                        output_final = io.BytesIO()
+                        df_descarga = df_limpio.drop(columns=['lat_aux', 'lon_aux'])
+                        with pd.ExcelWriter(output_final, engine='openpyxl') as writer:
+                            df_descarga.to_excel(writer, index=False, sheet_name='SF_PANGEA_LIMPIO')
+                        
+                        st.download_button(
+                            label="📗 DESCARGAR EXCEL DEPURADO",
+                            data=output_final.getvalue(),
+                            file_name=f"DEPURADO_{up_sf5.name}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
 
-                    with col_d2:
-                        st.subheader("🚨 Duplicados")
+                    with col_res2:
+                        st.subheader("🚨 Reporte de Colisiones")
                         if not df_duplicados.empty:
+                            st.warning(f"Se detectaron {len(df_duplicados)} folios solapados en el mismo punto.")
                             st.dataframe(df_duplicados[[id_col, 'lat_aux', 'lon_aux']], use_container_width=True, hide_index=True)
-                        else: st.write("Sin duplicados.")
+                        else:
+                            st.success("No se detectaron duplicados por proximidad.")
+                    
+                    if not df_sin_gps.empty:
+                        with st.expander(f"⚠️ Registros sin GPS ({len(df_sin_gps)})"):
+                            st.write("Estos registros no pudieron ser comparados y se omitieron del proceso de limpieza:")
+                            st.dataframe(df_sin_gps, use_container_width=True)
+
                 else:
-                    st.error("Sin coordenadas válidas.")
+                    st.error("Error: El archivo no contiene coordenadas válidas en formato (Lat, Lon).")
+
             except Exception as e:
-                st.error(f"Error en SF5: {e}")
-    # === FIN DEL MÓDULO 5 ===
+                st.error(f"Falla crítica en el análisis del Módulo 5: {e}")
+# === FIN ESTRUCTURA MÓDULO SF5 ===
