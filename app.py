@@ -1105,11 +1105,11 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
 
-# === INICIO MÓDULO SF5 V23: LIMPIEZA QUIRÚRGICA DE TEXTO Y GPS ===
+# === INICIO MÓDULO SF5 V24: LIMPIEZA TOTAL Y MÉTRICAS EXPANDIDAS ===
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Pre-procesador Universal Anti-Duplicados")
         
-        files_sf5 = st.file_uploader("📂 Cargar archivos de reportes", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v23")
+        files_sf5 = st.file_uploader("📂 Cargar archivos de reportes", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v24")
 
         if files_sf5:
             dfs = []
@@ -1120,27 +1120,35 @@ else:
             
             df_total = pd.concat(dfs, ignore_index=True)
             
-            # --- NUEVA LÓGICA DE LIMPIEZA DE TEXTO EN COORDENADAS ---
-            def extraer_coordenadas_limpias(texto):
-                texto = str(texto).lower()
-                # Eliminamos palabras comunes que ensucian la celda
-                for basura in ["latitude:", "longitude:", "lat:", "long:", "latitud:", "longitud:", "gps:"]:
-                    texto = texto.replace(basura, "")
+            # --- FUNCIÓN DE LIMPIEZA Y EXTRACCIÓN ---
+            def limpiar_y_extraer(texto):
+                original = str(texto)
+                texto_limpio = original.lower()
+                palabras_basura = ["latitude:", "longitude:", "lat:", "long:", "latitud:", "longitud:", "gps:"]
                 
-                # Buscamos el patrón numérico (soporta negativos y decimales)
-                match = re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', texto)
-                if match:
-                    return float(match.group(1)), float(match.group(2))
-                return None, None
+                # Limpiamos el texto para la visualización final
+                for basura in palabras_basura:
+                    original = re.sub(re.escape(basura), "", original, flags=re.IGNORECASE).strip()
+                
+                # Buscamos coordenadas para el motor lógico
+                match = re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', texto_limpio)
+                lat, lon = (float(match.group(1)), float(match.group(2))) if match else (None, None)
+                
+                return original, lat, lon
 
-            # Aplicamos la limpieza a todas las columnas unificadas
-            coords_extraidas = df_total.apply(lambda r: extraer_coordenadas_limpias(" ".join(r.astype(str))), axis=1)
-            df_total['lat_aux'] = [c[0] for c in coords_extraidas]
-            df_total['lon_aux'] = [c[1] for c in coords_extraidas]
+            # Procesamos fila por fila
+            resultados = df_total.apply(lambda r: limpiar_y_extraer(" ".join(r.astype(str))), axis=1)
+            # No podemos limpiar "en el aire", así que identificamos la columna que tiene el GPS para limpiarla
+            # Buscamos la columna que suele tener las coordenadas para aplicarle la limpieza de texto
+            col_gps = next((c for c in df_total.columns if any(p in str(c).lower() for p in ['gps', 'ubicacion', 'coord', 'lat'])), None)
             
-            # Ahora sí, el dropna será real sobre datos limpios
+            if col_gps:
+                df_total[col_gps] = df_total[col_gps].apply(lambda x: limpiar_y_extraer(x)[0])
+
+            df_total['lat_aux'] = [r[1] for r in resultados]
+            df_total['lon_aux'] = [r[2] for r in resultados]
+            
             df_analisis = df_total.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
-            df_sin_gps = df_total[df_total['lat_aux'].isna()].reset_index(drop=True)
 
             if not df_analisis.empty:
                 # MOTOR 3 METROS
@@ -1162,7 +1170,7 @@ else:
 
                 df_analisis['Grupo_Duplicado'] = marcador_duplicados
                 
-                # SEPARACIÓN DE HOJAS
+                # SEPARACIÓN
                 indices_hoja1 = []
                 grupos_ya_agregados = set()
                 for idx, row in df_analisis.iterrows():
@@ -1174,28 +1182,35 @@ else:
                 df_hoja1 = df_analisis.loc[indices_hoja1].copy()
                 df_hoja2 = df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
 
-                # --- 📊 MÉTRICAS CORREGIDAS ---
-                st.markdown("### 📈 Resumen Operativo de Depuración")
-                c_met1, c_met2, c_met3, c_met4 = st.columns(4)
+                # --- 📊 MÉTRICAS V24 ---
+                st.markdown("### 📈 Dashboard de Depuración SF5")
+                m_cols = st.columns(5) # Agregamos una columna más
                 
-                with c_met1:
-                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #1f4e78;'><b>PUNTOS PROCESADOS</b><br><span style='font-size: 24px;'>🔍 {len(df_analisis)}</span></div>", unsafe_allow_html=True)
-                
-                with c_met2:
-                    # Duplicados reales (excluyendo al que se queda en hoja 1)
-                    cant_dups_eliminados = len(df_analisis) - len(df_hoja1)
-                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #ffa500;'><b>ELIMINADOS (3m)</b><br><span style='font-size: 24px;'>🚨 {cant_dups_eliminados}</span></div>", unsafe_allow_html=True)
-                
-                with c_met3:
-                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #28a745;'><b>PUNTOS ÚNICOS</b><br><span style='font-size: 24px;'>✅ {len(df_hoja1)}</span></div>", unsafe_allow_html=True)
-                
-                with c_met4:
-                    ahorro_min = cant_dups_eliminados * 5
-                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #dc3545;'><b>EFICIENCIA GANADA</b><br><span style='font-size: 24px;'>⏱️ ~{ahorro_min} min</span></div>", unsafe_allow_html=True)
+                cant_procesados = len(df_analisis)
+                cant_en_conflicto = len(df_hoja2)
+                cant_eliminados = cant_procesados - len(df_hoja1)
+                cant_unicos = len(df_hoja1)
+                ahorro = cant_eliminados * 5
+
+                metricas = [
+                    ("🔍 PROCESADOS", cant_procesados, "#1f4e78"),
+                    ("🚨 EN CONFLICTO", cant_en_conflicto, "#e67e22"),
+                    ("🗑️ ELIMINADOS", cant_eliminados, "#95a5a6"),
+                    ("✅ ÚNICOS (H1)", cant_unicos, "#28a745"),
+                    ("⏱️ AHORRO EST.", f"{ahorro} min", "#dc3545")
+                ]
+
+                for col, (label, value, color) in zip(m_cols, metricas):
+                    col.markdown(f"""
+                        <div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {color};'>
+                            <b style='font-size: 12px;'>{label}</b><br><span style='font-size: 20px;'>{value}</span>
+                        </div>
+                    """, unsafe_allow_html=True)
 
                 # --- EXPORTACIÓN ---
                 output_sf5 = io.BytesIO()
                 with pd.ExcelWriter(output_sf5, engine='openpyxl') as writer:
+                    # Hoja 1: Ya viene con la columna GPS limpia de texto
                     df_final_h1 = df_hoja1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'])
                     df_final_h1.to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
                     
@@ -1213,10 +1228,6 @@ else:
                         for cell in ws2[row_idx]: cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
 
                 st.write("---")
-                st.download_button(label="🚀 DESCARGAR PRODUCTO TERMINADO v23", data=output_sf5.getvalue(), file_name=f"SF_PANGEA_LIMPIO.xlsx", use_container_width=True)
-                
-                if not df_sin_gps.empty:
-                    with st.expander(f"⚠️ Registros sin coordenadas reconocidas ({len(df_sin_gps)})"):
-                        st.dataframe(df_sin_gps.drop(columns=['lat_aux', 'lon_aux']))
+                st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v24", data=output_sf5.getvalue(), file_name=f"SF_PANGEA_LIMPIO.xlsx", use_container_width=True)
             else:
-                st.error("No se detectaron coordenadas. Revisa si el texto 'latitude:' está bloqueando la lectura.")
+                st.error("No se detectaron coordenadas.")
