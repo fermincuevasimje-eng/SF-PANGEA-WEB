@@ -225,6 +225,9 @@ else:
                 
         if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): 
                 st.session_state.menu = "SF4"
+
+        if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): 
+                st.session_state.menu = "SF5"
         st.write("---")
         if st.session_state.menu == "SF1":
             st.subheader("📊 Ajustes GdR")
@@ -1101,3 +1104,72 @@ else:
                     st.download_button(label="🚀 DESCARGAR OFICIO PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
                     st.error("❌ Función PDF no disponible.")
+
+elif st.session_state.menu == "SF5":
+        st.title("🛡️ SF5 - Comparador y Limpieza de Duplicados")
+        st.info("Este módulo analiza coordenadas GPS y elimina reportes duplicados en un radio de 3 metros.")
+
+        up_sf5 = st.file_uploader("Cargar archivo para depuración (Excel/CSV)", type=["csv", "xlsx"], key="up_sf5")
+
+        if up_sf5:
+            try:
+                # Lectura robusta
+                df_raw = pd.read_excel(up_sf5, dtype=str).fillna("") if up_sf5.name.endswith('.xlsx') else pd.read_csv(up_sf5, encoding='latin-1', dtype=str).fillna("")
+                
+                # Identificar Folio y Coordenadas
+                id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
+                res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
+                df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
+                
+                df_con_gps = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
+                df_sin_gps = df_raw[df_raw['lat_aux'].isna()].reset_index(drop=True)
+
+                if not df_con_gps.empty:
+                    # Lógica de comparación 3 metros
+                    umbral = 3 / 111111.0
+                    coords = df_con_gps[['lat_aux', 'lon_aux']].values
+                    indices_duplicados = []
+                    
+                    # Comparación matricial de proximidad
+                    for i in range(len(coords)):
+                        if i in indices_duplicados: continue
+                        for j in range(i + 1, len(coords)):
+                            if np.linalg.norm(coords[i] - coords[j]) < umbral:
+                                indices_duplicados.append(j)
+
+                    df_duplicados = df_con_gps.iloc[indices_duplicados].copy()
+                    df_limpio = df_con_gps.drop(df_con_gps.index[indices_duplicados]).reset_index(drop=True)
+
+                    # --- INTERFAZ DE RESULTADOS ---
+                    m_a, m_b, m_c = st.columns(3)
+                    m_a.metric("Total Procesados", len(df_raw))
+                    m_b.metric("✅ Puntos Únicos", len(df_limpio))
+                    m_c.metric("🚨 Duplicados (3m)", len(df_duplicados))
+
+                    col_d1, col_d2 = st.columns(2)
+                    with col_d1:
+                        st.subheader("📋 Vista de Registros Limpios")
+                        st.dataframe(df_limpio[[id_col, 'lat_aux', 'lon_aux']], use_container_width=True, hide_index=True)
+                        
+                        # Exportar Limpios
+                        output_limpio = io.BytesIO()
+                        with pd.ExcelWriter(output_limpio, engine='openpyxl') as writer:
+                            df_limpio.drop(columns=['lat_aux', 'lon_aux']).to_excel(writer, index=False)
+                        st.download_button("📗 Descargar Excel Limpio", output_limpio.getvalue(), f"LIMPIO_{up_sf5.name}.xlsx", use_container_width=True)
+
+                    with col_d2:
+                        st.subheader("🚨 Registros Eliminados")
+                        if not df_duplicados.empty:
+                            st.dataframe(df_duplicados[[id_col, 'lat_aux', 'lon_aux']], use_container_width=True, hide_index=True)
+                        else:
+                            st.write("No se encontraron duplicados en el radio de 3m.")
+                    
+                    if not df_sin_gps.empty:
+                        with st.expander("⚠️ Registros sin coordenadas (omitidos)"):
+                            st.dataframe(df_sin_gps, use_container_width=True)
+
+                else:
+                    st.error("El archivo no contiene coordenadas válidas para comparar.")
+
+            except Exception as e:
+                st.error(f"Error en SF5: {e}")
