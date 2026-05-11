@@ -1105,24 +1105,22 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
 
-# === INICIO MÓDULO SF5 V21: PROCESADOR CON RASTREO Y PERSISTENCIA ===
+# === INICIO MÓDULO SF5 V22: CENTRO DE CONTROL Y DEPURACIÓN PRO ===
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Pre-procesador Universal Anti-Duplicados")
-        st.info("Carga archivos: Se conservará un registro de cada grupo de duplicados en la Hoja 1 y se marcará su origen.")
-
-        files_sf5 = st.file_uploader("Arrastra aquí tus archivos (Excel/CSV)", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v21")
+        
+        files_sf5 = st.file_uploader("📂 Cargar archivos de reportes (Excel/CSV)", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v22")
 
         if files_sf5:
             dfs = []
             for f in files_sf5:
                 df_f = pd.read_excel(f, dtype=str).fillna("") if f.name.endswith('.xlsx') else pd.read_csv(f, encoding='latin-1', dtype=str).fillna("")
-                # AGREGAMOS ORIGEN
                 df_f['ARCHIVO_ORIGEN'] = f.name
                 dfs.append(df_f)
             
             df_total = pd.concat(dfs, ignore_index=True)
             
-            # DETECCIÓN DE GPS
+            # DETECCIÓN AGNOSTICA DE GPS
             res_gps = df_total.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
             df_total['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
             df_total['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
@@ -1130,7 +1128,7 @@ else:
             df_analisis = df_total.dropna(subset=['lat_aux']).reset_index(drop=True)
 
             if not df_analisis.empty:
-                # MOTOR 3 METROS (0.000027 grados aprox)
+                # MOTOR 3 METROS
                 umbral = 3 / 111111.0
                 coords = df_analisis[['lat_aux', 'lon_aux']].values
                 marcador_duplicados = [0] * len(df_analisis) 
@@ -1149,44 +1147,67 @@ else:
 
                 df_analisis['Grupo_Duplicado'] = marcador_duplicados
                 
-                # SEPARACIÓN DE DATOS
-                # Hoja 1: Únicos + 1 representante de cada grupo de duplicados
+                # SEPARACIÓN QUIRÚRGICA
                 indices_hoja1 = []
                 grupos_ya_agregados = set()
-                
                 for idx, row in df_analisis.iterrows():
                     g_id = row['Grupo_Duplicado']
-                    if g_id == 0:
+                    if g_id == 0 or g_id not in grupos_ya_agregados:
                         indices_hoja1.append(idx)
-                    elif g_id not in grupos_ya_agregados:
-                        indices_hoja1.append(idx)
-                        grupos_ya_agregados.add(g_id)
+                        if g_id > 0: grupos_ya_agregados.add(g_id)
                 
                 df_hoja1 = df_analisis.loc[indices_hoja1].copy()
-                # Hoja 2: Todos los que tienen colisión (incluyendo el representante)
                 df_hoja2 = df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
+
+                # --- 📊 MÉTRICAS LLAMATIVAS ---
+                st.markdown("### 📈 Resumen Operativo de Depuración")
+                c_met1, c_met2, c_met3, c_met4 = st.columns(4)
                 
+                with c_met1:
+                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #1f4e78;'><b>PUNTOS PROCESADOS</b><br><span style='font-size: 24px;'>🔍 {len(df_total)}</span></div>", unsafe_allow_html=True)
+                
+                with c_met2:
+                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #ffa500;'><b>PUNTOS DUPLICADOS</b><br><span style='font-size: 24px;'>🚨 {len(df_hoja2)}</span></div>", unsafe_allow_html=True)
+                
+                with c_met3:
+                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #28a745;'><b>PUNTOS ÚNICOS</b><br><span style='font-size: 24px;'>✅ {len(df_hoja1)}</span></div>", unsafe_allow_html=True)
+                
+                with c_met4:
+                    # Cálculo de eficiencia: Evitar paradas innecesarias (aprox 5 min por parada)
+                    ahorro_min = len(df_hoja2) * 5
+                    st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid #dc3545;'><b>EFICIENCIA GANADA</b><br><span style='font-size: 24px;'>⏱️ ~{ahorro_min} min</span></div>", unsafe_allow_html=True)
+
+                # --- GENERACIÓN DEL PRODUCTO ---
                 output_sf5 = io.BytesIO()
                 with pd.ExcelWriter(output_sf5, engine='openpyxl') as writer:
-                    # PROCESAR HOJA 1
-                    df_hoja1.drop(columns=['lat_aux', 'lon_aux']).to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
+                    # Limpiamos columnas auxiliares para que Hoja 1 sea 100% compatible con Módulo 1
+                    df_final_h1 = df_hoja1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'])
+                    df_final_h1.to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
+                    
                     ws1 = writer.sheets['PARA_MODULO_1']
-                    # Pintar de amarillo los que tienen duplicados pero se quedaron en Hoja 1
                     fill_survivor = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+                    # Pintamos de amarillo solo la fila en Hoja 1 que tiene hermanos duplicados
                     for row_idx, g_id in enumerate(df_hoja1['Grupo_Duplicado'], start=2):
                         if g_id > 0:
                             for cell in ws1[row_idx]: cell.fill = fill_survivor
 
-                    # PROCESAR HOJA 2
-                    df_hoja2.drop(columns=['lat_aux', 'lon_aux']).to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
+                    # Hoja 2: Mantiene todo el rastro para auditoría
+                    df_hoja2.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
                     ws2 = writer.sheets['REPORTE_DUPLICADOS']
                     colores_hex = ["FFCCCC", "CCE5FF", "E5FFCC", "FFFFCC", "F2F2F2", "FFE5CC", "FFCCFF"]
                     for row_idx, g_id in enumerate(df_hoja2['Grupo_Duplicado'], start=2):
                         fill_color = colores_hex[g_id % len(colores_hex)]
                         for cell in ws2[row_idx]: cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
 
-                st.success(f"✅ Procesado: {len(df_total)} filas | {len(df_hoja1)} en Hoja 1.")
-                st.download_button("📥 DESCARGAR PRODUCTO SF5 v21", output_sf5.getvalue(), "PRODUCTO_SF5_PREMIUM.xlsx", use_container_width=True)
+                st.write("---")
+                st.download_button(
+                    label="🚀 DESCARGAR PRODUCTO TERMINADO PARA MÓDULO 1",
+                    data=output_sf5.getvalue(),
+                    file_name=f"SF_PANGEA_DEPURADO_{pd.Timestamp.now().strftime('%d_%m')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+                
+                st.caption("ℹ️ Nota: La Hoja 1 contiene los datos listos para el Generador de Rutas. Las celdas amarillas indican puntos que tenían duplicados.")
             else:
-                st.error("No se detectaron coordenadas.")
-# === FIN MÓDULO SF5 V21 ===
+                st.error("No se detectaron coordenadas válidas.")
