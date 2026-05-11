@@ -1105,97 +1105,91 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
 
-# === INICIO ESTRUCTURA MÓDULO SF5 (ANTI-DUPLICADOS) ===
+# === INICIO MÓDULO SF5 V20: PRE-PROCESADOR UNIVERSAL MULTI-ARCHIVO ===
     elif st.session_state.menu == "SF5":
-        st.title("🛡️ SF5 - Comparador y Limpieza de Duplicados")
-        st.info("Este módulo analiza coordenadas GPS y elimina reportes duplicados en un radio de 3 metros para optimizar la operativa de las brigadas.")
+        st.title("🛡️ SF5 - Pre-procesador Universal Anti-Duplicados")
+        st.info("Carga uno o más archivos. El sistema detectará automáticamente las coordenadas y generará un reporte de limpieza listo para el Módulo 1.")
 
-        up_sf5 = st.file_uploader("Cargar archivo para depuración (Excel/CSV)", type=["csv", "xlsx"], key="up_sf5_indep")
+        # 1. CARGA MULTI-ARCHIVO
+        files_sf5 = st.file_uploader("Arrastra aquí tus archivos (Excel/CSV)", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5")
 
-        if up_sf5:
-            try:
-                # 1. Carga de datos con detección de extensión
-                if up_sf5.name.endswith('.xlsx'):
-                    df_raw = pd.read_excel(up_sf5, dtype=str).fillna("")
-                else:
-                    df_raw = pd.read_csv(up_sf5, encoding='latin-1', dtype=str).fillna("")
+        if files_sf5:
+            dfs = []
+            for f in files_sf5:
+                df_f = pd.read_excel(f, dtype=str).fillna("") if f.name.endswith('.xlsx') else pd.read_csv(f, encoding='latin-1', dtype=str).fillna("")
+                dfs.append(df_f)
+            
+            # Consolidamos todos los archivos en uno solo para comparar
+            df_total = pd.concat(dfs, ignore_index=True)
+            
+            # 2. DETECCIÓN AGNOSTICA DE COORDENADAS
+            # Buscamos en todas las celdas el patrón de coordenadas
+            res_gps = df_total.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
+            df_total['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
+            df_total['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
+            
+            df_analisis = df_total.dropna(subset=['lat_aux']).reset_index(drop=True)
+
+            if not df_analisis.empty:
+                # 3. MOTOR DE COMPARACIÓN (3 METROS)
+                umbral = 3 / 111111.0
+                coords = df_analisis[['lat_aux', 'lon_aux']].values
+                marcador_duplicados = [0] * len(df_analisis) # 0=único, >0 ID de grupo de color
                 
-                # 2. Identificación de Folio y Extracción de GPS
-                id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_raw.columns[0])
+                color_id = 1
+                for i in range(len(coords)):
+                    if marcador_duplicados[i] != 0: continue
+                    encontrado_duplicado = False
+                    for j in range(i + 1, len(coords)):
+                        if np.linalg.norm(coords[i] - coords[j]) < umbral:
+                            marcador_duplicados[j] = color_id
+                            encontrado_duplicado = True
+                    if encontrado_duplicado:
+                        marcador_duplicados[i] = color_id
+                        color_id += 1
+
+                df_analisis['Grupo_Duplicado'] = marcador_duplicados
                 
-                # Buscamos coordenadas en cualquier columna del archivo
-                res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-                df_raw['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
-                df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
+                # 4. GENERACIÓN DEL PRODUCTO FINAL (EXCEL MULTI-HOJA)
+                df_unicos = df_analisis[df_analisis['Grupo_Duplicado'] == 0].drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'])
+                # Para los duplicados, nos quedamos con el primero de cada grupo como 'único' y el resto va al reporte
+                # Pero según tu instrucción: Hoja 1 solo ÚNICOS reales, Hoja 2 comparativa de colores.
                 
-                # Separación de registros para proceso quirúrgico
-                df_con_gps = df_raw.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
-                df_sin_gps = df_raw[df_raw['lat_aux'].isna()].reset_index(drop=True)
-
-                if not df_con_gps.empty:
-                    # 3. Lógica de Proximidad (Umbral de 3 metros)
-                    # Aproximación: 1 grado ≈ 111,111m -> 3m ≈ 0.000027 grados
-                    umbral = 3 / 111111.0
-                    coords = df_con_gps[['lat_aux', 'lon_aux']].values
-                    indices_duplicados = []
+                output_sf5 = io.BytesIO()
+                with pd.ExcelWriter(output_sf5, engine='openpyxl') as writer:
+                    # Hoja 1: Listos para Módulo 1 (Solo los que no tienen colisión)
+                    df_unicos.to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
                     
-                    # Comparación matricial de proximidad para identificar solapamientos
-                    for i in range(len(coords)):
-                        if i in indices_duplicados: continue
-                        for j in range(i + 1, len(coords)):
-                            # Cálculo de distancia Euclidiana (rápida para distancias cortas)
-                            if np.linalg.norm(coords[i] - coords[j]) < umbral:
-                                indices_duplicados.append(j)
-
-                    # Creación de dataframes de resultados
-                    df_duplicados = df_con_gps.iloc[indices_duplicados].copy()
-                    df_limpio = df_con_gps.drop(df_con_gps.index[indices_duplicados]).reset_index(drop=True)
-
-                    # 4. Panel de Control y Métricas
-                    st.divider()
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("📦 Total Recibido", len(df_raw))
-                    m2.metric("✅ Registros Únicos", len(df_limpio))
-                    m3.metric("🚨 Duplicados (3m)", len(df_duplicados))
-
-                    col_res1, col_res2 = st.columns(2)
+                    # Hoja 2: Reporte de Colisiones con Colores
+                    df_reporte = df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
+                    df_reporte.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
                     
-                    with col_res1:
-                        st.subheader("📋 Data Depurada")
-                        st.write("Vista previa de folios únicos listos para ruta:")
-                        # Mostramos solo columnas clave para no saturar la vista
-                        st.dataframe(df_limpio[[id_col, 'lat_aux', 'lon_aux']], use_container_width=True, hide_index=True)
-                        
-                        # Botón de Descarga Profesional (Sin las columnas auxiliares GPS)
-                        output_final = io.BytesIO()
-                        df_descarga = df_limpio.drop(columns=['lat_aux', 'lon_aux'])
-                        with pd.ExcelWriter(output_final, engine='openpyxl') as writer:
-                            df_descarga.to_excel(writer, index=False, sheet_name='SF_PANGEA_LIMPIO')
-                        
-                        st.download_button(
-                            label="📗 DESCARGAR EXCEL DEPURADO",
-                            data=output_final.getvalue(),
-                            file_name=f"DEPURADO_{up_sf5.name}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
-
-                    with col_res2:
-                        st.subheader("🚨 Reporte de Colisiones")
-                        if not df_duplicados.empty:
-                            st.warning(f"Se detectaron {len(df_duplicados)} folios solapados en el mismo punto.")
-                            st.dataframe(df_duplicados[[id_col, 'lat_aux', 'lon_aux']], use_container_width=True, hide_index=True)
-                        else:
-                            st.success("No se detectaron duplicados por proximidad.")
+                    # Aplicar colores (Lógica Senior)
+                    ws = writer.sheets['REPORTE_DUPLICADOS']
+                    colores_hex = ["FFCCCC", "CCE5FF", "E5FFCC", "FFFFCC", "F2F2F2", "FFE5CC", "FFCCFF"]
                     
-                    if not df_sin_gps.empty:
-                        with st.expander(f"⚠️ Registros sin GPS ({len(df_sin_gps)})"):
-                            st.write("Estos registros no pudieron ser comparados y se omitieron del proceso de limpieza:")
-                            st.dataframe(df_sin_gps, use_container_width=True)
+                    for row_idx, g_id in enumerate(df_reporte['Grupo_Duplicado'], start=2):
+                        if g_id > 0:
+                            fill_color = colores_hex[g_id % len(colores_hex)]
+                            for cell in ws[row_idx]:
+                                cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
 
-                else:
-                    st.error("Error: El archivo no contiene coordenadas válidas en formato (Lat, Lon).")
-
-            except Exception as e:
-                st.error(f"Falla crítica en el análisis del Módulo 5: {e}")
-# === FIN ESTRUCTURA MÓDULO SF5 ===
+                # 5. INTERFAZ DE DESCARGA
+                st.success(f"✅ Análisis completado. Se procesaron {len(df_total)} registros.")
+                col_m1, col_m2 = st.columns(2)
+                col_m1.metric("📦 Únicos (Limpios)", len(df_unicos))
+                col_m2.metric("🚨 En Conflicto", len(df_reporte))
+                
+                st.download_button(
+                    label="📥 DESCARGAR PRODUCTO SF5 (Multi-Hoja)",
+                    data=output_sf5.getvalue(),
+                    file_name="PRODUCTO_SF5_LISTO.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+                
+                with st.expander("👁️ Ver registros en conflicto (Mismo color = mismo punto)"):
+                    st.dataframe(df_reporte.style.apply(lambda x: [f'background-color: #f0f0f0' if x.Grupo_Duplicado > 0 else '' for i in x], axis=1))
+            else:
+                st.error("No se detectaron coordenadas en ninguno de los archivos cargados.")
+# === FIN MÓDULO SF5 V20 ===
