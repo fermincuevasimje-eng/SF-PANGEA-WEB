@@ -1105,25 +1105,24 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
 
-# === INICIO MÓDULO SF5 V20: PRE-PROCESADOR UNIVERSAL MULTI-ARCHIVO ===
+# === INICIO MÓDULO SF5 V21: PROCESADOR CON RASTREO Y PERSISTENCIA ===
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Pre-procesador Universal Anti-Duplicados")
-        st.info("Carga uno o más archivos. El sistema detectará automáticamente las coordenadas y generará un reporte de limpieza listo para el Módulo 1.")
+        st.info("Carga archivos: Se conservará un registro de cada grupo de duplicados en la Hoja 1 y se marcará su origen.")
 
-        # 1. CARGA MULTI-ARCHIVO
-        files_sf5 = st.file_uploader("Arrastra aquí tus archivos (Excel/CSV)", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5")
+        files_sf5 = st.file_uploader("Arrastra aquí tus archivos (Excel/CSV)", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v21")
 
         if files_sf5:
             dfs = []
             for f in files_sf5:
                 df_f = pd.read_excel(f, dtype=str).fillna("") if f.name.endswith('.xlsx') else pd.read_csv(f, encoding='latin-1', dtype=str).fillna("")
+                # AGREGAMOS ORIGEN
+                df_f['ARCHIVO_ORIGEN'] = f.name
                 dfs.append(df_f)
             
-            # Consolidamos todos los archivos en uno solo para comparar
             df_total = pd.concat(dfs, ignore_index=True)
             
-            # 2. DETECCIÓN AGNOSTICA DE COORDENADAS
-            # Buscamos en todas las celdas el patrón de coordenadas
+            # DETECCIÓN DE GPS
             res_gps = df_total.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
             df_total['lat_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None)
             df_total['lon_aux'] = res_gps.apply(lambda x: float(x.group(2)) if x else None)
@@ -1131,65 +1130,63 @@ else:
             df_analisis = df_total.dropna(subset=['lat_aux']).reset_index(drop=True)
 
             if not df_analisis.empty:
-                # 3. MOTOR DE COMPARACIÓN (3 METROS)
+                # MOTOR 3 METROS (0.000027 grados aprox)
                 umbral = 3 / 111111.0
                 coords = df_analisis[['lat_aux', 'lon_aux']].values
-                marcador_duplicados = [0] * len(df_analisis) # 0=único, >0 ID de grupo de color
+                marcador_duplicados = [0] * len(df_analisis) 
                 
                 color_id = 1
                 for i in range(len(coords)):
                     if marcador_duplicados[i] != 0: continue
-                    encontrado_duplicado = False
+                    encontrado = False
                     for j in range(i + 1, len(coords)):
                         if np.linalg.norm(coords[i] - coords[j]) < umbral:
                             marcador_duplicados[j] = color_id
-                            encontrado_duplicado = True
-                    if encontrado_duplicado:
+                            encontrado = True
+                    if encontrado:
                         marcador_duplicados[i] = color_id
                         color_id += 1
 
                 df_analisis['Grupo_Duplicado'] = marcador_duplicados
                 
-                # 4. GENERACIÓN DEL PRODUCTO FINAL (EXCEL MULTI-HOJA)
-                df_unicos = df_analisis[df_analisis['Grupo_Duplicado'] == 0].drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'])
-                # Para los duplicados, nos quedamos con el primero de cada grupo como 'único' y el resto va al reporte
-                # Pero según tu instrucción: Hoja 1 solo ÚNICOS reales, Hoja 2 comparativa de colores.
+                # SEPARACIÓN DE DATOS
+                # Hoja 1: Únicos + 1 representante de cada grupo de duplicados
+                indices_hoja1 = []
+                grupos_ya_agregados = set()
+                
+                for idx, row in df_analisis.iterrows():
+                    g_id = row['Grupo_Duplicado']
+                    if g_id == 0:
+                        indices_hoja1.append(idx)
+                    elif g_id not in grupos_ya_agregados:
+                        indices_hoja1.append(idx)
+                        grupos_ya_agregados.add(g_id)
+                
+                df_hoja1 = df_analisis.loc[indices_hoja1].copy()
+                # Hoja 2: Todos los que tienen colisión (incluyendo el representante)
+                df_hoja2 = df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
                 
                 output_sf5 = io.BytesIO()
                 with pd.ExcelWriter(output_sf5, engine='openpyxl') as writer:
-                    # Hoja 1: Listos para Módulo 1 (Solo los que no tienen colisión)
-                    df_unicos.to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
-                    
-                    # Hoja 2: Reporte de Colisiones con Colores
-                    df_reporte = df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
-                    df_reporte.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
-                    
-                    # Aplicar colores (Lógica Senior)
-                    ws = writer.sheets['REPORTE_DUPLICADOS']
-                    colores_hex = ["FFCCCC", "CCE5FF", "E5FFCC", "FFFFCC", "F2F2F2", "FFE5CC", "FFCCFF"]
-                    
-                    for row_idx, g_id in enumerate(df_reporte['Grupo_Duplicado'], start=2):
+                    # PROCESAR HOJA 1
+                    df_hoja1.drop(columns=['lat_aux', 'lon_aux']).to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
+                    ws1 = writer.sheets['PARA_MODULO_1']
+                    # Pintar de amarillo los que tienen duplicados pero se quedaron en Hoja 1
+                    fill_survivor = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+                    for row_idx, g_id in enumerate(df_hoja1['Grupo_Duplicado'], start=2):
                         if g_id > 0:
-                            fill_color = colores_hex[g_id % len(colores_hex)]
-                            for cell in ws[row_idx]:
-                                cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+                            for cell in ws1[row_idx]: cell.fill = fill_survivor
 
-                # 5. INTERFAZ DE DESCARGA
-                st.success(f"✅ Análisis completado. Se procesaron {len(df_total)} registros.")
-                col_m1, col_m2 = st.columns(2)
-                col_m1.metric("📦 Únicos (Limpios)", len(df_unicos))
-                col_m2.metric("🚨 En Conflicto", len(df_reporte))
-                
-                st.download_button(
-                    label="📥 DESCARGAR PRODUCTO SF5 (Multi-Hoja)",
-                    data=output_sf5.getvalue(),
-                    file_name="PRODUCTO_SF5_LISTO.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-                
-                with st.expander("👁️ Ver registros en conflicto (Mismo color = mismo punto)"):
-                    st.dataframe(df_reporte.style.apply(lambda x: [f'background-color: #f0f0f0' if x.Grupo_Duplicado > 0 else '' for i in x], axis=1))
+                    # PROCESAR HOJA 2
+                    df_hoja2.drop(columns=['lat_aux', 'lon_aux']).to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
+                    ws2 = writer.sheets['REPORTE_DUPLICADOS']
+                    colores_hex = ["FFCCCC", "CCE5FF", "E5FFCC", "FFFFCC", "F2F2F2", "FFE5CC", "FFCCFF"]
+                    for row_idx, g_id in enumerate(df_hoja2['Grupo_Duplicado'], start=2):
+                        fill_color = colores_hex[g_id % len(colores_hex)]
+                        for cell in ws2[row_idx]: cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+
+                st.success(f"✅ Procesado: {len(df_total)} filas | {len(df_hoja1)} en Hoja 1.")
+                st.download_button("📥 DESCARGAR PRODUCTO SF5 v21", output_sf5.getvalue(), "PRODUCTO_SF5_PREMIUM.xlsx", use_container_width=True)
             else:
-                st.error("No se detectaron coordenadas en ninguno de los archivos cargados.")
-# === FIN MÓDULO SF5 V20 ===
+                st.error("No se detectaron coordenadas.")
+# === FIN MÓDULO SF5 V21 ===
