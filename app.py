@@ -561,7 +561,7 @@ else:
             else:
                 # --- SISTEMA DE ENTRADA HÍBRIDO (VINCULACIÓN SF5 -> SF1) ---
                 df_raw = None
-                nombre_archivo_base = "pangea_ruta" # Valor por defecto
+                nombre_archivo_base = "pangea_ruta"
 
                 if st.session_state.data_depurada_sf5 is not None:
                     st.info("📦 Datos recibidos de SF5 (Anti-Duplicados)")
@@ -574,15 +574,18 @@ else:
                     up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
                     if up:
                         df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
-                        nombre_archivo_base = up.name.split('.')[0] # Quitamos la extensión (.xlsx)
+                        nombre_archivo_base = up.name.split('.')[0]
 
                 if df_raw is not None:
-                    try:
-                        # Usamos nombre_archivo_base para los nombres de descarga abajo
-                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
+                    # Buscamos folio y GPS
+                    id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
+                    
+                    # Si ya trae lat_aux de SF5, no la volvemos a buscar
+                    if 'lat_aux' not in df_raw.columns:
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
-                        df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
+                    
+                    df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
 
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
@@ -680,7 +683,7 @@ else:
                                     elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
 
-                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
+                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{nombre_archivo_base}.xlsx", use_container_width=True)
                             
                             # CSV CORREGIDO
                             csv_buffer = io.StringIO()
@@ -692,7 +695,7 @@ else:
                             csv_buffer.write(f"Total Cable:,{total_cable} m\n")
                             csv_buffer.write(f"Distancia Total:,{round(dist_real_km,2)} km\n")
                             csv_buffer.write(f"Tiempo Estimado:,{tiempo_abreviado}\n")
-                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
+                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{nombre_archivo_base}.csv", use_container_width=True)
 
                             # --- KML MAESTRO PLANO ---
                             kml = simplekml.Kml()
@@ -730,7 +733,7 @@ else:
                                 ls.style.linestyle.width = 4
                                 ls.style.linestyle.color = 'ff00ffff'
                             
-                            c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
+                            c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{nombre_archivo_base}.kml", use_container_width=True)
                             c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
@@ -738,7 +741,7 @@ else:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
                                     info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": nombre_archivo_base, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
