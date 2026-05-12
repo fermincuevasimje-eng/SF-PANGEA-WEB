@@ -577,6 +577,9 @@ else:
 
                 if proceder:
                     try:
+                        # --- SOLUCIÓN AL ERROR 'UP' IS NOT DEFINED ---
+                        nombre_reporte = up.name if up is not None else "DATOS_DEPURADOS_SF5"
+                        
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                         
                         # MOTOR V26: Detecta coordenadas incluso con texto "latitude:"
