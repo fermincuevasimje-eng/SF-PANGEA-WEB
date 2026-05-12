@@ -560,9 +560,12 @@ else:
                 st.warning("⚠️ Modo Consulta activo.")
             else:
                 # --- SISTEMA DE ENTRADA HÍBRIDO (VINCULACIÓN SF5 -> SF1) ---
+                df_raw = None
+                nombre_archivo_base = "pangea_ruta" # Valor por defecto
+
                 if st.session_state.data_depurada_sf5 is not None:
-                    st.info("📦 Usando datos depurados provenientes de SF5")
-                    if st.button("❌ Cancelar y subir archivo nuevo"):
+                    st.info("📦 Datos recibidos de SF5 (Anti-Duplicados)")
+                    if st.button("❌ Limpiar y subir otro archivo"):
                         st.session_state.data_depurada_sf5 = None
                         st.rerun()
                     df_raw = st.session_state.data_depurada_sf5.copy()
@@ -571,9 +574,7 @@ else:
                     up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
                     if up:
                         df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
-                        nombre_archivo_base = up.name
-                    else:
-                        df_raw = None
+                        nombre_archivo_base = up.name.split('.')[0] # Quitamos la extensión (.xlsx)
 
                 if df_raw is not None:
                     try:
