@@ -170,7 +170,6 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
 if "menu" not in st.session_state:
     st.session_state.menu = "Inicio"
-    if "data_depurada_sf5" not in st.session_state: st.session_state.data_depurada_sf5 = None
 # Estados para el módulo SF2
 if "lista_bajas" not in st.session_state:
     st.session_state.lista_bajas = {} # {folio: comentario}
@@ -559,35 +558,16 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                # --- SISTEMA DE ENTRADA HÍBRIDO (VINCULACIÓN SF5 -> SF1) ---
-                df_raw = None
-                nombre_archivo_base = "pangea_ruta"
-
-                if st.session_state.data_depurada_sf5 is not None:
-                    st.info("📦 Datos recibidos de SF5 (Anti-Duplicados)")
-                    if st.button("❌ Limpiar y subir otro archivo"):
-                        st.session_state.data_depurada_sf5 = None
-                        st.rerun()
-                    df_raw = st.session_state.data_depurada_sf5.copy()
-                    nombre_archivo_base = "DEPURADO_SF5"
-                else:
-                    up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
-                    if up:
+                up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
+                if up:
+                    try:
                         df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
-                        nombre_archivo_base = up.name.split('.')[0]
-
-                if df_raw is not None:
-                    # Identificar columna de ID/Folio
-                    id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
-                    
-                    # Extraer GPS solo si no vienen ya de SF5
-                    if 'lat_aux' not in df_raw.columns:
+                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
-                    
-                    df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
+                        df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
 
-                    if not df_v.empty:
+                        if not df_v.empty:
                             pts = df_v.to_dict('records')
                             
                             # --- MOTOR DE OPTIMIZACIÓN V3 (ATRACCIÓN A BASE) ---
@@ -683,7 +663,7 @@ else:
                                     elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
 
-                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{nombre_archivo_base}.xlsx", use_container_width=True)
+                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up.name}.xlsx", use_container_width=True)
                             
                             # CSV CORREGIDO
                             csv_buffer = io.StringIO()
@@ -695,7 +675,7 @@ else:
                             csv_buffer.write(f"Total Cable:,{total_cable} m\n")
                             csv_buffer.write(f"Distancia Total:,{round(dist_real_km,2)} km\n")
                             csv_buffer.write(f"Tiempo Estimado:,{tiempo_abreviado}\n")
-                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{nombre_archivo_base}.csv", use_container_width=True)
+                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
                             # --- KML MAESTRO PLANO ---
                             kml = simplekml.Kml()
@@ -733,21 +713,20 @@ else:
                                 ls.style.linestyle.width = 4
                                 ls.style.linestyle.color = 'ff00ffff'
                             
-                            c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{nombre_archivo_base}.kml", use_container_width=True)
+                            c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up.name}.kml", use_container_width=True)
                             c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
+
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
-                                                            try:
-                                                                conn = st.connection("gsheets", type=GSheetsConnection)
-                                                                hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                                                info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
-                                                                n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": nombre_archivo_base, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
-                                                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                                                st.balloons(); st.success("¡Bitácora actualizada!")
-                                                            except Exception as e:
-                                                                st.error(f"Error GSheets: {e}")
-                            
-                                                except Exception as e:
-                                                    st.error(f"Error procesando archivo: {e}") 
+                                try:
+                                    conn = st.connection("gsheets", type=GSheetsConnection)
+                                    hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up.name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
+                                    st.balloons(); st.success("¡Bitácora actualizada!")
+                                except Exception as e: st.error(f"Error GSheets: {e}")
+
+                    except Exception as e: st.error(f"Error procesando archivo: {e}")
 
         with tab2: # BITÁCORA
             try:
@@ -1258,15 +1237,4 @@ else:
                 st.write("---")
                 st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
             else:
-                st.error("Error crítico: No se reconoce el formato GPS en los registros.")
-
-            # --- BOTÓN DE VINCULACIÓN DIRECTA (FUERA DEL ELSE PARA QUE SIEMPRE SALGA) ---
-            if not df_hoja1.empty:
-                st.markdown("---")
-                if st.button("🛰️ ENVIAR ÚNICOS DIRECTO A GENERADOR DE RUTAS", use_container_width=True):
-                    # Pasamos la Hoja 1 (Únicos) al estado global
-                    st.session_state.data_depurada_sf5 = df_hoja1.copy()
-                    st.session_state.menu = "SF1"
-                    st.toast("Cargando datos en el Generador de Rutas...", icon="🚀")
-                    time.sleep(1)
-                    st.rerun()
+                st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
