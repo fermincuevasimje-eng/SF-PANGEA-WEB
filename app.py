@@ -745,9 +745,9 @@ else:
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e:
                                     st.error(f"Error GSheets: {e}")
-
-                    except Exception as e:
-                        st.error(f"Error procesando archivo: {e}")  
+                            
+                            except Exception as e:
+                            st.error(f"Error procesando archivo: {e}")  
 
         with tab2: # BITÁCORA
             try:
