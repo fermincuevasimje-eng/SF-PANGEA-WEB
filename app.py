@@ -170,6 +170,9 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
 if "menu" not in st.session_state:
     st.session_state.menu = "Inicio"
+    # Puente de datos SF5 -> SF1
+if "data_depurada_sf5" not in st.session_state:
+    st.session_state.data_depurada_sf5 = None
 # Estados para el módulo SF2
 if "lista_bajas" not in st.session_state:
     st.session_state.lista_bajas = {} # {folio: comentario}
@@ -558,10 +561,32 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
-                if up:
-                    try:
+                # Lógica de entrada dual: Archivo Nuevo o Datos de SF5
+                if st.session_state.data_depurada_sf5 is not None:
+                    st.success("✅ Usando datos depurados del Módulo 5")
+                    if st.button("🗑️ Descartar y subir nuevo archivo"):
+                        st.session_state.data_depurada_sf5 = None
+                        st.rerun()
+                    df_raw = st.session_state.data_depurada_sf5.copy()
+                    proceder = True
+                else:
+                    up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
+                    proceder = up is not None
+                    if proceder:
                         df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
+
+                if proceder:
+                    try:
+                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
+                        
+                        # MOTOR V26: Detecta coordenadas incluso con texto "latitude:"
+                        def motor_gps_v26(fila_texto):
+                            numeros = re.findall(r'-?\d+\.\d{4,}', str(fila_texto))
+                            return (float(numeros[0]), float(numeros[1])) if len(numeros) >= 2 else (None, None)
+
+                        res_gps = df_raw.apply(lambda r: motor_gps_v26(" ".join(r.astype(str))), axis=1)
+                        df_raw['lat_aux'], df_raw['lon_aux'] = [r[0] for r in res_gps], [r[1] for r in res_gps]
+                        df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
@@ -1236,5 +1261,10 @@ else:
 
                 st.write("---")
                 st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
+                if st.button("🛰️ ENVIAR DIRECTO A GENERADOR DE RUTAS", use_container_width=True):
+                    # Guardamos los únicos (Hoja 1) en la memoria global
+                    st.session_state.data_depurada_sf5 = df_hoja1.copy()
+                    st.session_state.menu = "SF1"
+                    st.rerun()
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
