@@ -170,9 +170,6 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
 if "menu" not in st.session_state:
     st.session_state.menu = "Inicio"
-    # Puente de datos SF5 -> SF1
-if "data_depurada_sf5" not in st.session_state:
-    st.session_state.data_depurada_sf5 = None
 # Estados para el módulo SF2
 if "lista_bajas" not in st.session_state:
     st.session_state.lista_bajas = {} # {folio: comentario}
@@ -205,7 +202,7 @@ if not st.session_state.autenticado:
         if u == "SF" and p == "1827":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
             st.rerun()
-        elif u == "GuaDAP" and p == "2222":
+        elif u == "GuaDAP" and p == "1111":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
             st.rerun()
         else:
@@ -561,35 +558,10 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                # Lógica de entrada dual: Archivo Nuevo o Datos de SF5
-                if st.session_state.data_depurada_sf5 is not None:
-                    st.success("✅ Usando datos depurados del Módulo 5")
-                    if st.button("🗑️ Descartar y subir nuevo archivo"):
-                        st.session_state.data_depurada_sf5 = None
-                        st.rerun()
-                    df_raw = st.session_state.data_depurada_sf5.copy()
-                    proceder = True
-                else:
-                    up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
-                    proceder = up is not None
-                    if proceder:
-                        df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
-
-                if proceder:
+                up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
+                if up:
                     try:
-                        # --- SOLUCIÓN AL ERROR 'UP' IS NOT DEFINED ---
-                        nombre_reporte = up.name if up is not None else "DATOS_DEPURADOS_SF5"
-                        
-                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
-                        
-                        # MOTOR V26: Detecta coordenadas incluso con texto "latitude:"
-                        def motor_gps_v26(fila_texto):
-                            numeros = re.findall(r'-?\d+\.\d{4,}', str(fila_texto))
-                            return (float(numeros[0]), float(numeros[1])) if len(numeros) >= 2 else (None, None)
-
-                        res_gps = df_raw.apply(lambda r: motor_gps_v26(" ".join(r.astype(str))), axis=1)
-                        df_raw['lat_aux'], df_raw['lon_aux'] = [r[0] for r in res_gps], [r[1] for r in res_gps]
-                        df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
+                        df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
@@ -705,49 +677,26 @@ else:
                             csv_buffer.write(f"Tiempo Estimado:,{tiempo_abreviado}\n")
                             c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO DEFENSIVO V26.2 (RESTAURADO) ---
+                            # --- KML MAESTRO PLANO ---
                             kml = simplekml.Kml()
-                            
-                            # 1. Blindaje del Trazo Vial
-                            if geo_trazo is not None:
-                                try:
-                                    ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                    ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
-                                    ls.coords = ls_coords
-                                    ls.style.linestyle.width = 6
-                                    ls.style.linestyle.color = 'ff0000ff'
-                                except Exception:
-                                    geo_trazo = None
-
-                            if geo_trazo is None:
-                                ls = kml.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
-                                ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
-                                ls.style.linestyle.width = 4
-                                ls.style.linestyle.color = 'ff00ffff'
-
-                            # 2. Generación de Placemarks con Tabla de Datos Completa
                             for p in ordenados:
                                 pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                
-                                # Construcción del Globo de Información (CDATA)
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
                                 h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
-                                
-                                # Mapeo automático de columnas originales del Excel
                                 for col in cols_orig:
                                     val = str(p.get(col, '')).strip()
-                                    if val and val.lower() != 'nan': 
-                                        h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                                
+                                    if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
                                 h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                
-                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN TOTAL DE RUTA</b></td></tr>"
+                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
                                 h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
-                                h += f"<tr><td><b>Distancia:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                                h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
+                                h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{total_postes}</td></tr>"
+                                h += f"<tr><td><b>Total Cable Ruta:</b></td><td>{total_cable} m</td></tr>"
+                                h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
                                 h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
@@ -1287,10 +1236,5 @@ else:
 
                 st.write("---")
                 st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
-                if st.button("🛰️ ENVIAR DIRECTO A GENERADOR DE RUTAS", use_container_width=True):
-                    # Guardamos los únicos (Hoja 1) en la memoria global
-                    st.session_state.data_depurada_sf5 = df_hoja1.copy()
-                    st.session_state.menu = "SF1"
-                    st.rerun()
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
