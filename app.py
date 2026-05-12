@@ -736,18 +736,18 @@ else:
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{nombre_archivo_base}.kml", use_container_width=True)
                             c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
                             if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
-                                try:
-                                    conn = st.connection("gsheets", type=GSheetsConnection)
-                                    hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": nombre_archivo_base, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
-                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                    st.balloons(); st.success("¡Bitácora actualizada!")
-                                except Exception as e:
-                                    st.error(f"Error GSheets: {e}")
+                                                            try:
+                                                                conn = st.connection("gsheets", type=GSheetsConnection)
+                                                                hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                                                info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
+                                                                n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": nombre_archivo_base, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
+                                                                st.balloons(); st.success("¡Bitácora actualizada!")
+                                                            except Exception as e:
+                                                                st.error(f"Error GSheets: {e}")
                             
-                            except Exception as e:
-                            st.error(f"Error procesando archivo: {e}")  
+                                                except Exception as e:
+                                                    st.error(f"Error procesando archivo: {e}") 
 
         with tab2: # BITÁCORA
             try:
