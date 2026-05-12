@@ -170,6 +170,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
 if "menu" not in st.session_state:
     st.session_state.menu = "Inicio"
+    if "data_depurada_sf5" not in st.session_state: st.session_state.data_depurada_sf5 = None
 # Estados para el módulo SF2
 if "lista_bajas" not in st.session_state:
     st.session_state.lista_bajas = {} # {folio: comentario}
@@ -558,10 +559,25 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
-                if up:
-                    try:
+                # --- SISTEMA DE ENTRADA HÍBRIDO (VINCULACIÓN SF5 -> SF1) ---
+                if st.session_state.data_depurada_sf5 is not None:
+                    st.info("📦 Usando datos depurados provenientes de SF5")
+                    if st.button("❌ Cancelar y subir archivo nuevo"):
+                        st.session_state.data_depurada_sf5 = None
+                        st.rerun()
+                    df_raw = st.session_state.data_depurada_sf5.copy()
+                    nombre_archivo_base = "DEPURADO_SF5"
+                else:
+                    up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
+                    if up:
                         df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
+                        nombre_archivo_base = up.name
+                    else:
+                        df_raw = None
+
+                if df_raw is not None:
+                    try:
+                        # Usamos nombre_archivo_base para los nombres de descarga abajo
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
@@ -1238,3 +1254,12 @@ else:
                 st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
+                # --- BOTÓN DE VINCULACIÓN DIRECTA A SF1 ---
+                st.markdown("---")
+                if st.button("🛰️ ENVIAR ÚNICOS DIRECTO A GENERADOR DE RUTAS", use_container_width=True):
+                    # Pasamos la Hoja 1 (Únicos) al estado global
+                    st.session_state.data_depurada_sf5 = df_hoja1.copy()
+                    st.session_state.menu = "SF1"
+                    st.toast("Cargando datos en el Generador de Rutas...", icon="🚀")
+                    time.sleep(1)
+                    st.rerun()
