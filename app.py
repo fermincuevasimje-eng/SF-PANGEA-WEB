@@ -577,17 +577,17 @@ else:
                         nombre_archivo_base = up.name.split('.')[0]
 
                 if df_raw is not None:
-                    # Buscamos folio y GPS
+                    # Identificar columna de ID/Folio
                     id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                     
-                    # Si ya trae lat_aux de SF5, no la volvemos a buscar
+                    # Extraer GPS solo si no vienen ya de SF5
                     if 'lat_aux' not in df_raw.columns:
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
                     
                     df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
 
-                        if not df_v.empty:
+                    if not df_v.empty:
                             pts = df_v.to_dict('records')
                             
                             # --- MOTOR DE OPTIMIZACIÓN V3 (ATRACCIÓN A BASE) ---
