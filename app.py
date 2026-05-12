@@ -1253,9 +1253,10 @@ else:
                 st.write("---")
                 st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
             else:
-                st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
-                
-                # --- BOTÓN DE VINCULACIÓN DIRECTA A SF1 ---
+                st.error("Error crítico: No se reconoce el formato GPS en los registros.")
+
+            # --- BOTÓN DE VINCULACIÓN DIRECTA (FUERA DEL ELSE PARA QUE SIEMPRE SALGA) ---
+            if not df_hoja1.empty:
                 st.markdown("---")
                 if st.button("🛰️ ENVIAR ÚNICOS DIRECTO A GENERADOR DE RUTAS", use_container_width=True):
                     # Pasamos la Hoja 1 (Únicos) al estado global
