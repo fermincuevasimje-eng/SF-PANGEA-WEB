@@ -705,10 +705,10 @@ else:
                             csv_buffer.write(f"Tiempo Estimado:,{tiempo_abreviado}\n")
                             c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO DEFENSIVO V26.2 (RESTAURADO COMPLETO) ---
+                            # --- KML MAESTRO DEFENSIVO V26.2 (RESTAURADO) ---
                             kml = simplekml.Kml()
                             
-                            # 1. Blindaje del Trazo Vial (vía OSRM o Directo)
+                            # 1. Blindaje del Trazo Vial
                             if geo_trazo is not None:
                                 try:
                                     ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
@@ -725,7 +725,7 @@ else:
                                 ls.style.linestyle.width = 4
                                 ls.style.linestyle.color = 'ff00ffff'
 
-                            # 2. Generación de Placemarks con Tabla de Datos Senior
+                            # 2. Generación de Placemarks con Tabla de Datos Completa
                             for p in ordenados:
                                 pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 
@@ -733,7 +733,7 @@ else:
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
                                 h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
                                 
-                                # Insertar todas las columnas originales automáticamente
+                                # Mapeo automático de columnas originales del Excel
                                 for col in cols_orig:
                                     val = str(p.get(col, '')).strip()
                                     if val and val.lower() != 'nan': 
