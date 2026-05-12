@@ -748,7 +748,7 @@ else:
                                                                 st.error(f"Error GSheets: {e}")
                             
                                                 except Exception as e:
-                                                    st.error(f"Error procesando archivo: {e}")   
+                                                    st.error(f"Error procesando archivo: {e}")      
 
         with tab2: # BITÁCORA
             try:
