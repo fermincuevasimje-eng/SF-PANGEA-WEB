@@ -703,48 +703,48 @@ else:
                             c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up.name}.csv", use_container_width=True)
 
                             # --- KML MAESTRO CON BLINDAJE ANTI-ERROR (v26.1) ---
-                            kml = simplekml.Kml()
-                            
-                            # Primero el trazo vial (Si geo_trazo existe y es válido)
-                            if geo_trazo is not None:
-                                try:
-                                    ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                    ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
-                                    ls.coords = ls_coords
-                                    ls.style.linestyle.width = 6
-                                    ls.style.linestyle.color = 'ff0000ff'
-                                except Exception:
-                                    geo_trazo = None # Fallo en conversión, pasamos a modo directo
+                            kml = simplekml.Kml()
+                            
+                            # 1. Trazo vial (Si geo_trazo existe y es válido)
+                            if geo_trazo is not None:
+                                try:
+                                    ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                    ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
+                                    ls.coords = ls_coords
+                                    ls.style.linestyle.width = 6
+                                    ls.style.linestyle.color = 'ff0000ff'
+                                except Exception:
+                                    geo_trazo = None # Fallo en conversión, pasamos a modo directo
 
-                            if geo_trazo is None:
-                                # Respaldo: Líneas rectas entre puntos
-                                ls = kml.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
-                                ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
-                                ls.style.linestyle.width = 4
-                                ls.style.linestyle.color = 'ff00ffff'
+                            if geo_trazo is None:
+                                # Respaldo: Líneas rectas entre puntos
+                                ls = kml.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
+                                ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
+                                ls.style.linestyle.width = 4
+                                ls.style.linestyle.color = 'ff00ffff'
 
-                            # Ahora los puntos (Placemarks)
-                            for p in ordenados:
-                                pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
-                                h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
-                                for col in cols_orig:
-                                    val = str(p.get(col, '')).strip()
-                                    if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
-                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
-                                h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
-                                h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{total_postes}</td></tr>"
-                                h += f"<tr><td><b>Total Cable Ruta:</b></td><td>{total_cable} m</td></tr>"
-                                h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
-                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
-                                h += "</table>]]>"
-                                pnt.description = h
+                            # 2. Placemarks (Puntos de la ruta)
+                            for p in ordenados:
+                                pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                                h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
+                                h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
+                                for col in cols_orig:
+                                    val = str(p.get(col, '')).strip()
+                                    if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
+                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
+                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
+                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
+                                h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
+                                h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{total_postes}</td></tr>"
+                                h += f"<tr><td><b>Total Cable Ruta:</b></td><td>{total_cable} m</td></tr>"
+                                h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
+                                h += "</table>]]>"
+                                pnt.description = h
 
                             if geo_trazo:
                                 ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
