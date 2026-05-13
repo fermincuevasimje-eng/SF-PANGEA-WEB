@@ -558,8 +558,24 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
+                # Verificamos si hay datos transferidos desde el Módulo 5
+                datos_vienen_de_sf5 = "df_transferido" in st.session_state and st.session_state.df_transferido is not None
+                
+                if datos_vienen_de_sf5:
+                    st.info(f"📦 Usando datos procesados de: {st.session_state.nombre_archivo_transferido}")
+                    if st.button("❌ Cancelar y subir otro archivo"):
+                        st.session_state.df_transferido = None
+                        st.rerun()
+                    up = True # Simulamos el trigger para activar la lógica siguiente
+                else:
+                    up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
+
                 if up:
+                    try:
+                        if datos_vienen_de_sf5:
+                            df_raw = st.session_state.df_transferido.copy()
+                        else:
+                            df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
                     try:
                         df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
@@ -1236,5 +1252,12 @@ else:
 
                 st.write("---")
                 st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
+
+                # --- BOTÓN DE TRASPASO DIRECTO AL MÓDULO 1 ---
+                if st.button("➡️ ENVIAR DATOS LIMPIOS AL GENERADOR DE RUTAS (SF1)", use_container_width=True, type="primary"):
+                    st.session_state.df_transferido = df_hoja1.copy()
+                    st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
+                    st.session_state.menu = "SF1"
+                    st.rerun()
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
