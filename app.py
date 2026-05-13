@@ -1266,7 +1266,6 @@ else:
                     st.rerun()
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
-
 elif st.session_state.menu == "SF6":
         st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
         
