@@ -1126,7 +1126,7 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
 
-# === INICIO MÓDULO SF5 V25: MOTOR TOTAL AGNOSTICO (13/13) ===
+# === INICIO MÓDULO SF5 V25 CORREGIDO (MOTOR AGNOSTICO) ===
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Pre-procesador Universal Anti-Duplicados")
         
@@ -1135,7 +1135,6 @@ else:
         if files_sf5:
             dfs = []
             for f in files_sf5:
-                # Lectura flexible de archivos
                 if f.name.endswith('.xlsx'):
                     df_f = pd.read_excel(f, dtype=str).fillna("")
                 else:
@@ -1145,35 +1144,24 @@ else:
             
             df_total = pd.concat(dfs, ignore_index=True)
             
-            # --- MOTOR DE BÚSQUEDA ULTRA-TOLERANTE (v25) ---
             def motor_gps_v25(fila_texto):
                 texto = str(fila_texto).lower()
-                # 1. Extraemos todos los números que parezcan coordenadas (decimales largos)
-                # Buscamos números que tengan al menos 4 decimales
                 numeros = re.findall(r'-?\d+\.\d{4,}', texto)
-                
-                # 2. Si encontramos al menos 2 números, los tomamos como Lat y Lon
                 if len(numeros) >= 2:
                     lat, lon = float(numeros[0]), float(numeros[1])
-                    # Limpiamos el texto original para el producto final (eliminando palabras basura)
                     limpio = str(fila_texto)
                     for basura in ["latitude:", "longitude:", "lat:", "long:", "latitud:", "longitud:", "gps:"]:
                         limpio = re.sub(re.escape(basura), "", limpio, flags=re.IGNORECASE)
                     return limpio.strip(), lat, lon
                 return str(fila_texto), None, None
 
-            # Aplicamos el motor a la fila completa para no perder nada
             resultados = df_total.apply(lambda r: motor_gps_v25(" ".join(r.astype(str))), axis=1)
-            
-            # Identificamos la columna de GPS para limpiarla visualmente en la Hoja 1
             col_gps = next((c for c in df_total.columns if any(p in str(c).lower() for p in ['gps', 'ubicacion', 'coord', 'lat'])), df_total.columns[0])
             
-            # Actualizamos df_total con los valores limpios y las coordenadas auxiliares
             df_total[col_gps] = [r[0] for r in resultados]
             df_total['lat_aux'] = [r[1] for r in resultados]
             df_total['lon_aux'] = [r[2] for r in resultados]
             
-            # Filtramos solo los que realmente NO tienen nada de GPS (debería ser 0 en tu caso)
             df_analisis = df_total.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
 
             if not df_analisis.empty:
@@ -1196,7 +1184,6 @@ else:
 
                 df_analisis['Grupo_Duplicado'] = marcador_duplicados
                 
-                # SEPARACIÓN DE HOJAS
                 indices_hoja1 = []
                 grupos_ya_agregados = set()
                 for idx, row in df_analisis.iterrows():
@@ -1208,52 +1195,27 @@ else:
                 df_hoja1 = df_analisis.loc[indices_hoja1].copy()
                 df_hoja2 = df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
 
-                # --- 📊 DASHBOARD DE MÉTRICAS (SENTIDO COMÚN) ---
                 st.markdown("### 📈 Dashboard de Depuración SF5")
                 m_cols = st.columns(5)
+                cant_procesados, cant_en_conflicto = len(df_analisis), len(df_hoja2)
+                cant_eliminados, cant_unicos = cant_procesados - len(df_hoja1), len(df_hoja1)
                 
-                cant_procesados = len(df_analisis)
-                cant_en_conflicto = len(df_hoja2)
-                cant_eliminados = cant_procesados - len(df_hoja1)
-                cant_unicos = len(df_hoja1)
-                ahorro = cant_eliminados * 5
-
                 metricas = [
                     ("🔍 PROCESADOS", cant_procesados, "#1f4e78"),
                     ("🚨 EN CONFLICTO", cant_en_conflicto, "#e67e22"),
                     ("🗑️ ELIMINADOS", cant_eliminados, "#95a5a6"),
                     ("✅ ÚNICOS (H1)", cant_unicos, "#28a745"),
-                    ("⏱️ AHORRO EST.", f"{ahorro} min", "#dc3545")
+                    ("⏱️ AHORRO EST.", f"{cant_eliminados * 5} min", "#dc3545")
                 ]
 
                 for col, (label, value, color) in zip(m_cols, metricas):
-                    col.markdown(f"""
-                        <div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {color};'>
-                            <b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{value}</span>
-                        </div>
-                    """, unsafe_allow_html=True)
+                    col.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {color};'><b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{value}</span></div>", unsafe_allow_html=True)
 
-                # --- GENERACIÓN DEL PRODUCTO FINAL ---
                 output_sf5 = io.BytesIO()
                 with pd.ExcelWriter(output_sf5, engine='openpyxl') as writer:
-                    # Hoja 1 Limpia para Módulo 1
                     df_h1_final = df_hoja1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'])
                     df_h1_final.to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
-                    
-                    # Pintado de supervivientes
-                    ws1 = writer.sheets['PARA_MODULO_1']
-                    fill_survivor = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-                    for row_idx, g_id in enumerate(df_hoja1['Grupo_Duplicado'], start=2):
-                        if g_id > 0:
-                            for cell in ws1[row_idx]: cell.fill = fill_survivor
-
-                    # Hoja 2 de rastro
                     df_hoja2.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
-                    ws2 = writer.sheets['REPORTE_DUPLICADOS']
-                    colores_hex = ["FFCCCC", "CCE5FF", "E5FFCC", "FFFFCC", "F2F2F2", "FFE5CC", "FFCCFF"]
-                    for row_idx, g_id in enumerate(df_hoja2['Grupo_Duplicado'], start=2):
-                        fill_color = colores_hex[g_id % len(colores_hex)]
-                        for cell in ws2[row_idx]: cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
 
                 st.write("---")
                 st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
@@ -1263,65 +1225,61 @@ else:
                     st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
                     st.session_state.menu = "SF1"
                     st.rerun()
-            if st.button("➡️ ENVIAR DATOS LIMPIOS AL GENERADOR DE RUTAS (SF1)", use_container_width=True, type="primary"):
-                    st.session_state.df_transferido = df_hoja1.copy()
-                    st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
-                    st.session_state.menu = "SF1"
-                    st.rerun()
             else:
-                st.error("Error crítico: No se reconoce el formato GPS en los registros.")
+                st.error("No se detectaron coordenadas válidas en los archivos.")
 
-        # --- AQUÍ INICIA EL SF6 CORRECTAMENTE INDENTADO ---
-        elif st.session_state.menu == "SF6":
-            st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
+    # === MÓDULO SF6: ALMACÉN E INVENTARIO (INDENTACIÓN CORREGIDA) ===
+    elif st.session_state.menu == "SF6":
+        st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
+        
+        if "db_inventario" not in st.session_state:
+            st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
+        if "vales_historial" not in st.session_state:
+            st.session_state.vales_historial = []
+
+        tab_stock, tab_vales, tab_analisis = st.tabs(["📊 Existencias", "🚚 Salidas/Vales", "📈 Historial"])
+
+        with tab_stock:
+            st.subheader("🚨 Control de Stock Crítico")
+            m1, m2, m3 = st.columns(3)
+            df_inv = st.session_state.db_inventario
+            criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
             
-            if "db_inventario" not in st.session_state:
-                st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
-            if "vales_historial" not in st.session_state:
-                st.session_state.vales_historial = []
+            m1.metric("📦 Items", len(df_inv))
+            m2.metric("⚠️ Críticos", criticos, delta=-criticos, delta_color="inverse")
+            m3.metric("💰 Valor Total", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
 
-            tab_stock, tab_vales, tab_analisis = st.tabs(["📊 Existencias", "🚚 Salidas/Vales", "📈 Historial"])
+            def highlight_stock(row):
+                return ['background-color: #ffcccc' if row.Stock <= row.Min else '' for _ in row]
+            st.dataframe(df_inv.style.apply(highlight_stock, axis=1), use_container_width=True, hide_index=True)
 
-            with tab_stock:
-                st.subheader("🚨 Control de Stock Crítico")
-                m1, m2, m3 = st.columns(3)
-                df_inv = st.session_state.db_inventario
-                criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
+        with tab_vales:
+            st.subheader("🚚 Generar Vale de Salida")
+            with st.form("sf6_form_salida"):
+                c1, c2, c3 = st.columns([1, 2, 1])
+                # Las brigadas se toman de los requerimientos de la Dirección de Alumbrado Público
+                b_nom = c1.selectbox("Brigada:", [f"Brigada {i}" for i in range(1, 18)])
+                m_nom = c2.selectbox("Material:", df_inv['Material'].tolist())
+                cant = c3.number_input("Cantidad:", min_value=1, step=1)
                 
-                m1.metric("📦 Items", len(df_inv))
-                m2.metric("⚠️ Críticos", criticos, delta=-criticos, delta_color="inverse")
-                m3.metric("💰 Valor Total", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
+                if st.form_submit_button("🚀 REGISTRAR SALIDA", use_container_width=True):
+                    idx = df_inv[df_inv['Material'] == m_nom].index[0]
+                    if df_inv.at[idx, 'Stock'] >= cant:
+                        st.session_state.db_inventario.at[idx, 'Stock'] -= cant
+                        st.session_state.vales_historial.append({
+                            "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
+                            "Brigada": b_nom, "Material": m_nom, "Cantidad": cant,
+                            "Costo": cant * df_inv.at[idx, 'Costo']
+                        })
+                        st.toast(f"Vale registrado para {b_nom}", icon="✅")
+                        time.sleep(0.5)
+                        st.rerun()
+                    else:
+                        st.error("⚠️ No hay suficiente material.")
 
-                def highlight_stock(row):
-                    return ['background-color: #ffcccc' if row.Stock <= row.Min else '' for _ in row]
-                st.dataframe(df_inv.style.apply(highlight_stock, axis=1), use_container_width=True, hide_index=True)
-
-            with tab_vales:
-                st.subheader("🚚 Generar Vale de Salida")
-                with st.form("sf6_form_salida"):
-                    c1, c2, c3 = st.columns([1, 2, 1])
-                    b_nom = c1.selectbox("Brigada:", [f"Brigada {i}" for i in range(1, 18)])
-                    m_nom = c2.selectbox("Material:", df_inv['Material'].tolist())
-                    cant = c3.number_input("Cantidad:", min_value=1, step=1)
-                    
-                    if st.form_submit_button("🚀 REGISTRAR SALIDA", use_container_width=True):
-                        idx = df_inv[df_inv['Material'] == m_nom].index[0]
-                        if df_inv.at[idx, 'Stock'] >= cant:
-                            st.session_state.db_inventario.at[idx, 'Stock'] -= cant
-                            st.session_state.vales_historial.append({
-                                "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
-                                "Brigada": b_nom, "Material": m_nom, "Cantidad": cant,
-                                "Costo": cant * df_inv.at[idx, 'Costo']
-                            })
-                            st.toast(f"Vale registrado para {b_nom}", icon="✅")
-                            time.sleep(0.5)
-                            st.rerun()
-                        else:
-                            st.error("⚠️ No hay suficiente material.")
-
-            with tab_analisis:
-                st.subheader("📋 Movimientos")
-                if st.session_state.vales_historial:
-                    st.dataframe(pd.DataFrame(st.session_state.vales_historial), use_container_width=True, hide_index=True)
-                else:
-                    st.info("Sin registros.")
+        with tab_analisis:
+            st.subheader("📋 Movimientos")
+            if st.session_state.vales_historial:
+                st.dataframe(pd.DataFrame(st.session_state.vales_historial), use_container_width=True, hide_index=True)
+            else:
+                st.info("Sin registros.")
