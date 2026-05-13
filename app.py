@@ -1263,8 +1263,13 @@ else:
                     st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
                     st.session_state.menu = "SF1"
                     st.rerun()
+            if st.button("➡️ ENVIAR DATOS LIMPIOS AL GENERADOR DE RUTAS (SF1)", use_container_width=True, type="primary"):
+                    st.session_state.df_transferido = df_hoja1.copy()
+                    st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
+                    st.session_state.menu = "SF1"
+                    st.rerun()
             else:
-                st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
+                st.error("Error crítico: No se reconoce el formato GPS en los registros.")
 
         # --- AQUÍ INICIA EL SF6 CORRECTAMENTE INDENTADO ---
         elif st.session_state.menu == "SF6":
