@@ -1258,7 +1258,6 @@ else:
                 st.write("---")
                 st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
 
-                # --- BOTÓN DE TRASPASO DIRECTO AL MÓDULO 1 ---
                 if st.button("➡️ ENVIAR DATOS LIMPIOS AL GENERADOR DE RUTAS (SF1)", use_container_width=True, type="primary"):
                     st.session_state.df_transferido = df_hoja1.copy()
                     st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
@@ -1267,7 +1266,7 @@ else:
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
 
-        # === INICIO MÓDULO SF6: ALMACÉN E INVENTARIO ===
+        # === INICIO MÓDULO SF6 (DENTRO DEL BLOQUE DE AUTENTICACIÓN) ===
         elif st.session_state.menu == "SF6":
             st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
             
@@ -1279,10 +1278,8 @@ else:
             tab_stock, tab_vales, tab_analisis = st.tabs(["📊 Existencias", "🚚 Salidas/Vales", "📈 Historial"])
 
             with tab_stock:
-                st.subheader("🚨 Control de Stock")
+                st.subheader("🚨 Control de Stock Crítico")
                 m1, m2, m3 = st.columns(3)
-                
-                # Cálculo de críticos
                 df_inv = st.session_state.db_inventario
                 criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
                 
@@ -1290,11 +1287,9 @@ else:
                 m2.metric("⚠️ Críticos", criticos, delta=-criticos, delta_color="inverse")
                 m3.metric("💰 Valor Total", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
 
-                # Aplicar color de semáforo
-                def highlighting_rows(row):
+                def highlight_stock(row):
                     return ['background-color: #ffcccc' if row.Stock <= row.Min else '' for _ in row]
-
-                st.dataframe(df_inv.style.apply(highlighting_rows, axis=1), use_container_width=True, hide_index=True)
+                st.dataframe(df_inv.style.apply(highlight_stock, axis=1), use_container_width=True, hide_index=True)
 
             with tab_vales:
                 st.subheader("🚚 Generar Vale de Salida")
@@ -1317,11 +1312,11 @@ else:
                             time.sleep(0.5)
                             st.rerun()
                         else:
-                            st.error("⚠️ No hay suficiente material en stock.")
+                            st.error("⚠️ No hay suficiente material.")
 
             with tab_analisis:
-                st.subheader("📋 Movimientos Recientes")
+                st.subheader("📋 Movimientos")
                 if st.session_state.vales_historial:
                     st.dataframe(pd.DataFrame(st.session_state.vales_historial), use_container_width=True, hide_index=True)
                 else:
-                    st.info("No hay salidas registradas aún.")
+                    st.info("Sin registros.")
