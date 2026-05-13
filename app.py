@@ -103,6 +103,14 @@ CATALOGO_MAESTRO = {
 # MAPA INVERSO PARA FUNCIONAMIENTO ÓPTIMO
 MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lista}
 
+# --- 1.6 INVENTARIO MAESTRO (SF6) ---
+STOCK_INICIAL = [
+    {"ID": "LUM-01", "Material": "Luminaria LED 100W", "Stock": 150, "Min": 20, "Costo": 2500, "Unidad": "Pza"},
+    {"ID": "FOT-02", "Material": "Fotocelda Universal", "Stock": 300, "Min": 50, "Costo": 180, "Unidad": "Pza"},
+    {"ID": "CAB-03", "Material": "Cable Aluminio Neutra 2+1", "Stock": 5000, "Min": 500, "Costo": 45, "Unidad": "m"},
+    {"ID": "BRA-04", "Material": "Brazo Galvanizado 1.5m", "Stock": 80, "Min": 15, "Costo": 650, "Unidad": "Pza"}
+]
+
 # --- 2. MOTOR LÓGICO MEJORADO ---
 def get_real_route(coords_list):
     """Obtiene el trazo vial real desde OSRM con manejo de errores Senior."""
@@ -228,6 +236,9 @@ else:
 
         if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): 
                 st.session_state.menu = "SF5"
+
+        if st.button("📦 SF6-Almacén e Inventario", use_container_width=True): 
+                st.session_state.menu = "SF6"
         st.write("---")
         if st.session_state.menu == "SF1":
             st.subheader("📊 Ajustes GdR")
@@ -1255,3 +1266,74 @@ else:
                     st.rerun()
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
+
+elif st.session_state.menu == "SF6":
+        st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
+        
+        # Inicializar base de datos de inventario en sesión si no existe
+        if "db_inventario" not in st.session_state:
+            st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
+        if "vales_historial" not in st.session_state:
+            st.session_state.vales_historial = []
+
+        tab_stock, tab_vales, tab_analisis = st.tabs(["📊 Dashboard de Existencias", "🚚 Salida de Material (Vales)", "📈 Análisis de Consumo"])
+
+        with tab_stock:
+            st.subheader("🚨 Estado del Almacén")
+            # --- MÉTRICAS DE SEMÁFORO ---
+            m1, m2, m3, m4 = st.columns(4)
+            
+            def get_color_stock(row):
+                if row['Stock'] <= row['Min']: return 'background-color: #ffcccc' # Rojo
+                if row['Stock'] <= row['Min'] * 1.5: return 'background-color: #fff3cd' # Amarillo
+                return ''
+
+            # Visualización de Tarjetas (Ejemplo dinámico)
+            total_items = len(st.session_state.db_inventario)
+            criticos = len(st.session_state.db_inventario[st.session_state.db_inventario['Stock'] <= st.session_state.db_inventario['Min']])
+            
+            m1.metric("📦 Items Totales", total_items)
+            m2.metric("⚠️ Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
+            m3.metric("💰 Valor Inventario", f"${(st.session_state.db_inventario['Stock'] * st.session_state.db_inventario['Costo']).sum():,.2f}")
+            m4.info("Semáforo: Rojo = Reabastecer ya")
+
+            st.dataframe(st.session_state.db_inventario.style.apply(lambda x: [get_color_stock(row) for row in st.session_state.db_inventario.itertuples()], axis=None), use_container_width=True, hide_index=True)
+
+        with tab_vales:
+            st.subheader("📋 Generar Vale de Salida para Brigada")
+            with st.form("form_vales"):
+                c_b, c_m, c_q = st.columns([1, 2, 1])
+                brigada_sel = c_b.selectbox("Brigada:", [f"Brigada {i}" for i in range(1, 18)])
+                mat_sel = c_m.selectbox("Material a retirar:", st.session_state.db_inventario['Material'].tolist())
+                cant_retira = c_q.number_input("Cantidad:", min_value=1, step=1)
+                
+                btn_vale = st.form_submit_button("🚀 Procesar Salida y Actualizar Stock", use_container_width=True)
+                
+                if btn_vale:
+                    # Lógica de descuento de Stock
+                    idx = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == mat_sel].index[0]
+                    stock_actual = st.session_state.db_inventario.at[idx, 'Stock']
+                    
+                    if stock_actual >= cant_retira:
+                        st.session_state.db_inventario.at[idx, 'Stock'] = stock_actual - cant_retira
+                        # Registrar en historial
+                        st.session_state.vales_historial.append({
+                            "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
+                            "Brigada": brigada_sel,
+                            "Material": mat_sel,
+                            "Cantidad": cant_retira,
+                            "Costo_Aprox": cant_retira * st.session_state.db_inventario.at[idx, 'Costo']
+                        })
+                        st.success(f"Vale registrado: {cant_retira} {mat_sel} entregados a {brigada_sel}")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ Stock insuficiente para esta solicitud.")
+
+        with tab_analisis:
+            st.subheader("📊 Resumen de Salidas")
+            if st.session_state.vales_historial:
+                df_h = pd.DataFrame(st.session_state.vales_historial)
+                st.table(df_h)
+            else:
+                st.info("No hay movimientos registrados hoy.")
