@@ -1228,58 +1228,113 @@ else:
             else:
                 st.error("No se detectaron coordenadas válidas en los archivos.")
 
-    # === MÓDULO SF6: ALMACÉN E INVENTARIO (INDENTACIÓN CORREGIDA) ===
+    # === MÓDULO SF6: ALMACÉN E INVENTARIO V21 (GESTIÓN INTEGRAL) ===
     elif st.session_state.menu == "SF6":
-        st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
+        st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
         
+        # 1. INICIALIZACIÓN DE ESTADOS
         if "db_inventario" not in st.session_state:
             st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
         if "vales_historial" not in st.session_state:
             st.session_state.vales_historial = []
+        if "carrito_vale" not in st.session_state:
+            st.session_state.carrito_vale = []
 
-        tab_stock, tab_vales, tab_analisis = st.tabs(["📊 Existencias", "🚚 Salidas/Vales", "📈 Historial"])
+        tab_existencias, tab_vales, tab_entradas = st.tabs([
+            "📊 Inventario y Resumen", 
+            "🚚 Generar Vale de Salida", 
+            "📥 Entrada de Material"
+        ])
 
-        with tab_stock:
-            st.subheader("🚨 Control de Stock Crítico")
-            m1, m2, m3 = st.columns(3)
+        # --- PESTAÑA 1: EXISTENCIAS Y RESUMEN EJECUTIVO ---
+        with tab_existencias:
+            st.subheader("🚨 Estado Actual del Inventario")
             df_inv = st.session_state.db_inventario
-            criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
             
-            m1.metric("📦 Items", len(df_inv))
-            m2.metric("⚠️ Críticos", criticos, delta=-criticos, delta_color="inverse")
-            m3.metric("💰 Valor Total", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
+            # Métricas rápidas
+            m1, m2, m3 = st.columns(3)
+            criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
+            m1.metric("📦 Items Totales", len(df_inv))
+            m2.metric("⚠️ En Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
+            m3.metric("💰 Valor en Almacén", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
 
-            def highlight_stock(row):
-                return ['background-color: #ffcccc' if row.Stock <= row.Min else '' for _ in row]
-            st.dataframe(df_inv.style.apply(highlight_stock, axis=1), use_container_width=True, hide_index=True)
+            # Tabla con formato condicional
+            st.dataframe(df_inv.style.apply(lambda r: ['background-color: #ffcccc' if r.Stock <= r.Min else '' for _ in r], axis=1), 
+                         use_container_width=True, hide_index=True)
 
+            # Botón de Resumen Ejecutivo (Excel con Formato)
+            if st.button("📄 GENERAR RESUMEN EJECUTIVO (EXCEL)", use_container_width=True):
+                output_resumen = io.BytesIO()
+                with pd.ExcelWriter(output_resumen, engine='openpyxl') as writer:
+                    df_inv.to_excel(writer, index=False, sheet_name='Inventario_Alumbrado')
+                st.download_button("📥 Descargar Resumen", output_resumen.getvalue(), "Resumen_Inventario.xlsx", use_container_width=True)
+
+        # --- PESTAÑA 2: VALES MULTI-ÍTEM (EL CARRITO) ---
         with tab_vales:
-            st.subheader("🚚 Generar Vale de Salida")
-            with st.form("sf6_form_salida"):
+            st.subheader("🚚 Creación de Vale de Salida")
+            
+            with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 2, 1])
-                # Las brigadas se toman de los requerimientos de la Dirección de Alumbrado Público
-                b_nom = c1.selectbox("Brigada:", [f"Brigada {i}" for i in range(1, 18)])
-                m_nom = c2.selectbox("Material:", df_inv['Material'].tolist())
-                cant = c3.number_input("Cantidad:", min_value=1, step=1)
+                brigada_sel = c1.selectbox("Brigada Destino:", [f"Brigada {i}" for i in range(1, 18)], key="b_vale")
+                mat_sel = c2.selectbox("Seleccionar Material:", df_inv['Material'].tolist(), key="m_vale")
+                cant_sel = c3.number_input("Cantidad:", min_value=1, step=1, key="c_vale")
                 
-                if st.form_submit_button("🚀 REGISTRAR SALIDA", use_container_width=True):
-                    idx = df_inv[df_inv['Material'] == m_nom].index[0]
-                    if df_inv.at[idx, 'Stock'] >= cant:
-                        st.session_state.db_inventario.at[idx, 'Stock'] -= cant
-                        st.session_state.vales_historial.append({
-                            "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
-                            "Brigada": b_nom, "Material": m_nom, "Cantidad": cant,
-                            "Costo": cant * df_inv.at[idx, 'Costo']
+                if st.button("➕ Añadir al Carrito", use_container_width=True):
+                    stock_actual = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
+                    if stock_actual >= cant_sel:
+                        st.session_state.carrito_vale.append({
+                            "Material": mat_sel,
+                            "Cantidad": cant_sel,
+                            "Costo_Unit": df_inv.loc[df_inv['Material'] == mat_sel, 'Costo'].values[0]
                         })
-                        st.toast(f"Vale registrado para {b_nom}", icon="✅")
-                        time.sleep(0.5)
-                        st.rerun()
+                        st.toast(f"{mat_sel} añadido")
                     else:
-                        st.error("⚠️ No hay suficiente material.")
+                        st.error(f"Stock insuficiente. Solo quedan {stock_actual}")
 
-        with tab_analisis:
-            st.subheader("📋 Movimientos")
-            if st.session_state.vales_historial:
-                st.dataframe(pd.DataFrame(st.session_state.vales_historial), use_container_width=True, hide_index=True)
-            else:
-                st.info("Sin registros.")
+            # Mostrar Carrito Actual
+            if st.session_state.carrito_vale:
+                df_carrito = pd.DataFrame(st.session_state.carrito_vale)
+                st.table(df_carrito)
+                
+                col_c1, col_c2 = st.columns(2)
+                if col_c1.button("🗑️ Vaciar Carrito", use_container_width=True):
+                    st.session_state.carrito_vale = []
+                    st.rerun()
+                
+                if col_c2.button("💾 REGISTRAR VALE Y DESCONTAR", type="primary", use_container_width=True):
+                    # Proceso de Descuento
+                    for item in st.session_state.carrito_vale:
+                        idx = df_inv[df_inv['Material'] == item['Material']].index[0]
+                        st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
+                    
+                    # Guardar en Historial
+                    folio_v = f"V-{random.randint(1000, 9999)}"
+                    st.session_state.vales_historial.append({
+                        "Folio": folio_v,
+                        "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
+                        "Brigada": brigada_sel,
+                        "Items": st.session_state.carrito_vale.copy()
+                    })
+                    
+                    st.success(f"Vale {folio_v} registrado con éxito.")
+                    st.session_state.carrito_vale = []
+                    # Aquí llamarías a la función de PDF (opcional incluir fpdf)
+                    st.rerun()
+
+        # --- PESTAÑA 3: ACTUALIZAR INVENTARIO (ENTRADAS) ---
+        with tab_entradas:
+            st.subheader("📥 Registro de Entrada de Material")
+            with st.form("form_entradas"):
+                st.write("Use este formulario para aumentar el stock por compras o devoluciones.")
+                c_mat = st.selectbox("Material que ingresa:", df_inv['Material'].tolist())
+                c_cant = st.number_input("Cantidad que entra:", min_value=1, step=1)
+                c_costo = st.number_input("Costo Unitario Actualizado (Opcional):", min_value=0.0)
+                
+                if st.form_submit_button("✅ ACTUALIZAR STOCK"):
+                    idx = df_inv[df_inv['Material'] == c_mat].index[0]
+                    st.session_state.db_inventario.at[idx, 'Stock'] += c_cant
+                    if c_costo > 0:
+                        st.session_state.db_inventario.at[idx, 'Costo'] = c_costo
+                    st.success(f"Stock de {c_mat} actualizado.")
+                    time.sleep(1)
+                    st.rerun()
