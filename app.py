@@ -643,15 +643,27 @@ else:
                             st.success(f"✅ Ruta optimizada con éxito.")
                             c1, c2, c3, c4 = st.columns(4)
 
-                            # --- EXCEL PRO DINÁMICO (MANTENIDO) ---
+                            # --- EXCEL PRO DINÁMICO (REPARADO CON TODAS LAS FILAS DE TOTALES) ---
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                                 df_export.to_excel(writer, index=False, sheet_name='Ruta')
                                 ws = writer.sheets['Ruta']
                                 last_row = len(ordenados) + 1
                                 res_row = last_row + 2
+                                # Encabezado del Resumen
                                 ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
+                                # Filas de Totales
+                                ws.cell(row=res_row+1, column=1, value="Total Puntos:"); ws.cell(row=res_row+1, column=2, value=len(ordenados))
                                 ws.cell(row=res_row+2, column=1, value="Total Luminarias:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(C2:C{last_row})")
+                                ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(D2:D{last_row})")
+                                ws.cell(row=res_row+4, column=1, value="Total Cable:"); ws.cell(row=res_row+4, column=2, value=f"=SUM(E2:E{last_row})")
+                                ws.cell(row=res_row+5, column=1, value="Distancia:"); ws.cell(row=res_row+5, column=2, value=f"{round(dist_real_km,2)} km")
+                                # Fórmula de Tiempo
+                                f_calc = f"ROUND(((B{res_row+2}+B{res_row+3})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
+                                ws.cell(row=res_row+6, column=1, value="Tiempo Estimado:")
+                                ws.cell(row=res_row+6, column=2, value=f'=INT({f_calc}/60) & " h " & MOD({f_calc},60) & " m"')
+                                
+                                # Coloreado de Filas
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
                                 for r in range(2, last_row + 1):
                                     if int(df_f.iloc[r-2]['Cant_Postes']) > 0:
@@ -664,9 +676,17 @@ else:
                             # --- CSV ---
                             csv_buffer = io.StringIO()
                             df_export.to_csv(csv_buffer, index=False)
+                            # Resumen en CSV
+                            csv_buffer.write(f"\n--- RESUMEN OPERATIVO DINÁMICO ---\n")
+                            csv_buffer.write(f"Total Puntos:,{len(ordenados)}\n")
+                            csv_buffer.write(f"Total Luminarias:,{total_lums}\n")
+                            csv_buffer.write(f"Total Postes:,{total_postes}\n")
+                            csv_buffer.write(f"Total Cable:,{total_cable} m\n")
+                            csv_buffer.write(f"Distancia Total:,{round(dist_real_km,2)} km\n")
+                            csv_buffer.write(f"Tiempo Estimado:,{tiempo_abreviado}\n")
                             c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up_name}.csv", use_container_width=True)
 
-                            # --- KML MAESTRO CON TABLA HTML (TU CÓDIGO ORIGINAL RECUPERADO) ---
+                            # --- KML MAESTRO (REPARADO: TABLA HTML COMPLETA Y DESGLOSE) ---
                             kml = simplekml.Kml()
                             for p in ordenados:
                                 pnt = kml.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
@@ -675,17 +695,32 @@ else:
                                 for col in cols_orig:
                                     val = str(p.get(col, '')).strip()
                                     if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOCE OPERATIVO</b></td></tr>"
+                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOSE OPERATIVO</b></td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
-                                h += f"<tr><td><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
+                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>RESUMEN OPERATIVO DINÁMICO</b></td></tr>"
+                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ordenados)}</td></tr>"
+                                h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{total_lums}</td></tr>"
+                                h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{total_postes}</td></tr>"
+                                h += f"<tr><td><b>Total Cable Ruta:</b></td><td>{total_cable} m</td></tr>"
+                                h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{tiempo_abreviado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
 
                             if geo_trazo:
-                                ls = kml.newlinestring(name="TRAYECTO VIAL")
-                                ls.coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls = kml.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
+                                ls.coords = ls_coords
                                 ls.style.linestyle.width = 6
                                 ls.style.linestyle.color = 'ff0000ff'
+                            else:
+                                ls = kml.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
+                                ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
+                                ls.style.linestyle.width = 4
+                                ls.style.linestyle.color = 'ff00ffff'
 
                             c3.download_button("🗺️ KML Maestro", kml.kml(), file_name=f"SF_{up_name}.kml", use_container_width=True)
                             c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
@@ -695,7 +730,7 @@ else:
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Dist: {round(dist_real_km,2)}km"
+                                    info_j = f"Pts: {len(ordenados)}, Lums: {total_lums}, Cab: {total_cable}m, Dist: {round(dist_real_km,2)}km, T: {tiempo_abreviado}"
                                     n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": up_name, "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
