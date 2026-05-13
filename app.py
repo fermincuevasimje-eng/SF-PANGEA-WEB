@@ -1266,7 +1266,7 @@ else:
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
 
-        # === INICIO MÓDULO SF6 (DENTRO DEL BLOQUE DE AUTENTICACIÓN) ===
+        # --- AQUÍ INICIA EL SF6 CORRECTAMENTE INDENTADO ---
         elif st.session_state.menu == "SF6":
             st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
             
