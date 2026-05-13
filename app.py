@@ -1266,73 +1266,62 @@ else:
                     st.rerun()
             else:
                 st.error("Error crítico: No se reconoce el formato GPS en los 13 registros.")
-elif st.session_state.menu == "SF6":
-        st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
-        
-        # Inicializar base de datos de inventario en sesión si no existe
-        if "db_inventario" not in st.session_state:
-            st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
-        if "vales_historial" not in st.session_state:
-            st.session_state.vales_historial = []
 
-        tab_stock, tab_vales, tab_analisis = st.tabs(["📊 Dashboard de Existencias", "🚚 Salida de Material (Vales)", "📈 Análisis de Consumo"])
-
-        with tab_stock:
-            st.subheader("🚨 Estado del Almacén")
-            # --- MÉTRICAS DE SEMÁFORO ---
-            m1, m2, m3, m4 = st.columns(4)
+        # === INICIO MÓDULO SF6: ALMACÉN E INVENTARIO ===
+        elif st.session_state.menu == "SF6":
+            st.title("📦 SF6 - Inventario Operativo y Stock Crítico")
             
-            def get_color_stock(row):
-                if row['Stock'] <= row['Min']: return 'background-color: #ffcccc' # Rojo
-                if row['Stock'] <= row['Min'] * 1.5: return 'background-color: #fff3cd' # Amarillo
-                return ''
+            if "db_inventario" not in st.session_state:
+                st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
+            if "vales_historial" not in st.session_state:
+                st.session_state.vales_historial = []
 
-            # Visualización de Tarjetas (Ejemplo dinámico)
-            total_items = len(st.session_state.db_inventario)
-            criticos = len(st.session_state.db_inventario[st.session_state.db_inventario['Stock'] <= st.session_state.db_inventario['Min']])
-            
-            m1.metric("📦 Items Totales", total_items)
-            m2.metric("⚠️ Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
-            m3.metric("💰 Valor Inventario", f"${(st.session_state.db_inventario['Stock'] * st.session_state.db_inventario['Costo']).sum():,.2f}")
-            m4.info("Semáforo: Rojo = Reabastecer ya")
+            tab_stock, tab_vales, tab_analisis = st.tabs(["📊 Existencias", "🚚 Salidas/Vales", "📈 Historial"])
 
-            st.dataframe(st.session_state.db_inventario.style.apply(lambda x: [get_color_stock(row) for row in st.session_state.db_inventario.itertuples()], axis=None), use_container_width=True, hide_index=True)
-
-        with tab_vales:
-            st.subheader("📋 Generar Vale de Salida para Brigada")
-            with st.form("form_vales"):
-                c_b, c_m, c_q = st.columns([1, 2, 1])
-                brigada_sel = c_b.selectbox("Brigada:", [f"Brigada {i}" for i in range(1, 18)])
-                mat_sel = c_m.selectbox("Material a retirar:", st.session_state.db_inventario['Material'].tolist())
-                cant_retira = c_q.number_input("Cantidad:", min_value=1, step=1)
+            with tab_stock:
+                st.subheader("🚨 Control de Stock")
+                m1, m2, m3 = st.columns(3)
                 
-                btn_vale = st.form_submit_button("🚀 Procesar Salida y Actualizar Stock", use_container_width=True)
+                # Cálculo de críticos
+                df_inv = st.session_state.db_inventario
+                criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
                 
-                if btn_vale:
-                    # Lógica de descuento de Stock
-                    idx = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == mat_sel].index[0]
-                    stock_actual = st.session_state.db_inventario.at[idx, 'Stock']
+                m1.metric("📦 Items", len(df_inv))
+                m2.metric("⚠️ Críticos", criticos, delta=-criticos, delta_color="inverse")
+                m3.metric("💰 Valor Total", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
+
+                # Aplicar color de semáforo
+                def highlighting_rows(row):
+                    return ['background-color: #ffcccc' if row.Stock <= row.Min else '' for _ in row]
+
+                st.dataframe(df_inv.style.apply(highlighting_rows, axis=1), use_container_width=True, hide_index=True)
+
+            with tab_vales:
+                st.subheader("🚚 Generar Vale de Salida")
+                with st.form("sf6_form_salida"):
+                    c1, c2, c3 = st.columns([1, 2, 1])
+                    b_nom = c1.selectbox("Brigada:", [f"Brigada {i}" for i in range(1, 18)])
+                    m_nom = c2.selectbox("Material:", df_inv['Material'].tolist())
+                    cant = c3.number_input("Cantidad:", min_value=1, step=1)
                     
-                    if stock_actual >= cant_retira:
-                        st.session_state.db_inventario.at[idx, 'Stock'] = stock_actual - cant_retira
-                        # Registrar en historial
-                        st.session_state.vales_historial.append({
-                            "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
-                            "Brigada": brigada_sel,
-                            "Material": mat_sel,
-                            "Cantidad": cant_retira,
-                            "Costo_Aprox": cant_retira * st.session_state.db_inventario.at[idx, 'Costo']
-                        })
-                        st.success(f"Vale registrado: {cant_retira} {mat_sel} entregados a {brigada_sel}")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("❌ Stock insuficiente para esta solicitud.")
+                    if st.form_submit_button("🚀 REGISTRAR SALIDA", use_container_width=True):
+                        idx = df_inv[df_inv['Material'] == m_nom].index[0]
+                        if df_inv.at[idx, 'Stock'] >= cant:
+                            st.session_state.db_inventario.at[idx, 'Stock'] -= cant
+                            st.session_state.vales_historial.append({
+                                "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
+                                "Brigada": b_nom, "Material": m_nom, "Cantidad": cant,
+                                "Costo": cant * df_inv.at[idx, 'Costo']
+                            })
+                            st.toast(f"Vale registrado para {b_nom}", icon="✅")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error("⚠️ No hay suficiente material en stock.")
 
-        with tab_analisis:
-            st.subheader("📊 Resumen de Salidas")
-            if st.session_state.vales_historial:
-                df_h = pd.DataFrame(st.session_state.vales_historial)
-                st.table(df_h)
-            else:
-                st.info("No hay movimientos registrados hoy.")
+            with tab_analisis:
+                st.subheader("📋 Movimientos Recientes")
+                if st.session_state.vales_historial:
+                    st.dataframe(pd.DataFrame(st.session_state.vales_historial), use_container_width=True, hide_index=True)
+                else:
+                    st.info("No hay salidas registradas aún.")
