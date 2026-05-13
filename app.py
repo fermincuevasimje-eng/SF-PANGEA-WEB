@@ -1228,11 +1228,14 @@ else:
             else:
                 st.error("No se detectaron coordenadas válidas en los archivos.")
 
-    # === MÓDULO SF6: ALMACÉN E INVENTARIO V21 (GESTIÓN INTEGRAL) ===
+    # === MÓDULO SF6: ALMACÉN E INVENTARIO V21.2 (CON LEYENDA INSTITUCIONAL) ===
     elif st.session_state.menu == "SF6":
         st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
         
-        # 1. INICIALIZACIÓN DE ESTADOS
+        # CONFIGURACIÓN DE SEGURIDAD Y LEYENDA
+        PIN_ALMACEN = "DAP-2026"
+        LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento y se genera en la Dirección de Alumbrado Público"
+
         if "db_inventario" not in st.session_state:
             st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
         if "vales_historial" not in st.session_state:
@@ -1240,101 +1243,125 @@ else:
         if "carrito_vale" not in st.session_state:
             st.session_state.carrito_vale = []
 
-        tab_existencias, tab_vales, tab_entradas = st.tabs([
-            "📊 Inventario y Resumen", 
-            "🚚 Generar Vale de Salida", 
-            "📥 Entrada de Material"
-        ])
+        tab_inv, tab_vales, tab_admin = st.tabs(["📊 Existencias", "🚚 Salida (Vale)", "⚙️ Gestión Almacén"])
 
-        # --- PESTAÑA 1: EXISTENCIAS Y RESUMEN EJECUTIVO ---
-        with tab_existencias:
-            st.subheader("🚨 Estado Actual del Inventario")
+        # --- TAB 1: EXISTENCIAS ---
+        with tab_inv:
             df_inv = st.session_state.db_inventario
-            
-            # Métricas rápidas
-            m1, m2, m3 = st.columns(3)
-            criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
-            m1.metric("📦 Items Totales", len(df_inv))
-            m2.metric("⚠️ En Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
-            m3.metric("💰 Valor en Almacén", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
-
-            # Tabla con formato condicional
+            st.subheader("🚨 Stock Crítico y Resumen")
             st.dataframe(df_inv.style.apply(lambda r: ['background-color: #ffcccc' if r.Stock <= r.Min else '' for _ in r], axis=1), 
                          use_container_width=True, hide_index=True)
 
-            # Botón de Resumen Ejecutivo (Excel con Formato)
-            if st.button("📄 GENERAR RESUMEN EJECUTIVO (EXCEL)", use_container_width=True):
-                output_resumen = io.BytesIO()
-                with pd.ExcelWriter(output_resumen, engine='openpyxl') as writer:
-                    df_inv.to_excel(writer, index=False, sheet_name='Inventario_Alumbrado')
-                st.download_button("📥 Descargar Resumen", output_resumen.getvalue(), "Resumen_Inventario.xlsx", use_container_width=True)
-
-        # --- PESTAÑA 2: VALES MULTI-ÍTEM (EL CARRITO) ---
+        # --- TAB 2: VALE MULTI-ÍTEM CON PDF Y LEYENDA ---
         with tab_vales:
-            st.subheader("🚚 Creación de Vale de Salida")
+            st.subheader("🧾 Generador de Vale de Salida")
             
             with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 2, 1])
-                brigada_sel = c1.selectbox("Brigada Destino:", [f"Brigada {i}" for i in range(1, 18)], key="b_vale")
-                mat_sel = c2.selectbox("Seleccionar Material:", df_inv['Material'].tolist(), key="m_vale")
-                cant_sel = c3.number_input("Cantidad:", min_value=1, step=1, key="c_vale")
+                # Las brigadas se basan en el catálogo de la Dirección de Alumbrado Público
+                bri_sel = c1.selectbox("Brigada Destino:", [f"Brigada {i}" for i in range(1, 18)])
+                mat_sel = c2.selectbox("Material:", df_inv['Material'].tolist())
+                can_sel = c3.number_input("Cantidad:", min_value=1, step=1)
                 
-                if st.button("➕ Añadir al Carrito", use_container_width=True):
-                    stock_actual = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
-                    if stock_actual >= cant_sel:
+                if st.button("➕ Agregar al Vale"):
+                    stock_real = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
+                    if stock_real >= can_sel:
                         st.session_state.carrito_vale.append({
-                            "Material": mat_sel,
-                            "Cantidad": cant_sel,
-                            "Costo_Unit": df_inv.loc[df_inv['Material'] == mat_sel, 'Costo'].values[0]
+                            "Material": mat_sel, 
+                            "Cantidad": can_sel, 
+                            "Unidad": df_inv.loc[df_inv['Material'] == mat_sel, 'Unidad'].values[0]
                         })
-                        st.toast(f"{mat_sel} añadido")
+                        st.toast(f"{mat_sel} agregado al vale.")
                     else:
-                        st.error(f"Stock insuficiente. Solo quedan {stock_actual}")
+                        st.error(f"⚠️ Stock insuficiente. Solo hay {stock_real} unidades.")
 
-            # Mostrar Carrito Actual
             if st.session_state.carrito_vale:
-                df_carrito = pd.DataFrame(st.session_state.carrito_vale)
-                st.table(df_carrito)
+                st.write("---")
+                st.markdown("**Materiales a entregar:**")
+                df_car = pd.DataFrame(st.session_state.carrito_vale)
+                st.table(df_car)
                 
-                col_c1, col_c2 = st.columns(2)
-                if col_c1.button("🗑️ Vaciar Carrito", use_container_width=True):
+                pass_vale = st.text_input("🔑 Clave de Autorización para Salida:", type="password", help="Ingrese la clave para validar la entrega.")
+                
+                col_v1, col_v2 = st.columns(2)
+                if col_v1.button("🗑️ Cancelar Vale"):
                     st.session_state.carrito_vale = []
                     st.rerun()
                 
-                if col_c2.button("💾 REGISTRAR VALE Y DESCONTAR", type="primary", use_container_width=True):
-                    # Proceso de Descuento
-                    for item in st.session_state.carrito_vale:
-                        idx = df_inv[df_inv['Material'] == item['Material']].index[0]
-                        st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
-                    
-                    # Guardar en Historial
-                    folio_v = f"V-{random.randint(1000, 9999)}"
-                    st.session_state.vales_historial.append({
-                        "Folio": folio_v,
-                        "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
-                        "Brigada": brigada_sel,
-                        "Items": st.session_state.carrito_vale.copy()
-                    })
-                    
-                    st.success(f"Vale {folio_v} registrado con éxito.")
-                    st.session_state.carrito_vale = []
-                    # Aquí llamarías a la función de PDF (opcional incluir fpdf)
-                    st.rerun()
+                if col_v2.button("💾 PROCESAR Y GENERAR PDF", type="primary"):
+                    if pass_vale == PIN_ALMACEN:
+                        # 1. Actualización de Inventario
+                        for item in st.session_state.carrito_vale:
+                            idx = df_inv[df_inv['Material'] == item['Material']].index[0]
+                            st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
+                        
+                        # 2. Generación de PDF Formal
+                        from fpdf import FPDF
+                        pdf = FPDF()
+                        pdf.add_page()
+                        
+                        # Encabezado
+                        pdf.set_font("Arial", 'B', 14)
+                        pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
+                        pdf.set_font("Arial", 'B', 12)
+                        pdf.cell(0, 10, "DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
+                        pdf.cell(0, 10, "VALE DE SALIDA DE MATERIAL", ln=True, align='C')
+                        pdf.ln(5)
+                        
+                        # Datos de control
+                        pdf.set_font("Arial", '', 10)
+                        fecha_v = pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')
+                        pdf.cell(0, 10, f"Fecha y Hora: {fecha_v} | Brigada: {bri_sel}", ln=True)
+                        pdf.ln(5)
+                        
+                        # Tabla de materiales
+                        pdf.set_fill_color(230, 230, 230)
+                        pdf.set_font("Arial", 'B', 10)
+                        pdf.cell(100, 8, "Descripción del Material", 1, 0, 'C', True)
+                        pdf.cell(30, 8, "Cantidad", 1, 0, 'C', True)
+                        pdf.cell(30, 8, "Unidad", 1, 1, 'C', True)
+                        
+                        pdf.set_font("Arial", '', 10)
+                        for it in st.session_state.carrito_vale:
+                            pdf.cell(100, 8, str(it['Material']), 1)
+                            pdf.cell(30, 8, str(it['Cantidad']), 1, 0, 'C')
+                            pdf.cell(30, 8, str(it['Unidad']), 1, 1, 'C')
+                        
+                        # Leyenda Institucional
+                        pdf.ln(10)
+                        pdf.set_font("Arial", 'I', 9)
+                        pdf.multi_cell(0, 5, LEYENDA_OFICIAL, align='C')
+                        
+                        # Firmas
+                        pdf.ln(25)
+                        pdf.set_font("Arial", 'B', 10)
+                        pdf.cell(90, 5, "__________________________", 0, 0, 'C')
+                        pdf.cell(90, 5, "__________________________", 0, 1, 'C')
+                        pdf.cell(90, 5, "Entrega Almacén", 0, 0, 'C')
+                        pdf.cell(90, 5, "Recibe Brigada", 0, 1, 'C')
+                        
+                        # Descarga
+                        pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
+                        st.download_button(f"📥 DESCARGAR VALE {bri_sel}", pdf_bytes, f"Vale_{bri_sel}_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf", "application/pdf", use_container_width=True)
+                        
+                        st.session_state.carrito_vale = []
+                        st.success("Operación exitosa: Inventario actualizado y documento listo.")
+                    else:
+                        st.error("❌ Clave de seguridad incorrecta. No se puede procesar el vale.")
 
-        # --- PESTAÑA 3: ACTUALIZAR INVENTARIO (ENTRADAS) ---
-        with tab_entradas:
-            st.subheader("📥 Registro de Entrada de Material")
-            with st.form("form_entradas"):
-                st.write("Use este formulario para aumentar el stock por compras o devoluciones.")
-                c_mat = st.selectbox("Material que ingresa:", df_inv['Material'].tolist())
-                c_cant = st.number_input("Cantidad que entra:", min_value=1, step=1)
-                c_costo = st.number_input("Costo Unitario Actualizado (Opcional):", min_value=0.0)
+        # --- TAB 3: GESTIÓN DE ENTRADAS ---
+        with tab_admin:
+            st.subheader("⚙️ Actualización de Stock (Entradas)")
+            with st.form("registro_entradas"):
+                st.write("Aumente el stock disponible tras compras o devoluciones.")
+                mat_in = st.selectbox("Seleccione Material:", df_inv['Material'].tolist())
+                can_in = st.number_input("Cantidad a ingresar:", min_value=1, step=1)
+                pass_admin = st.text_input("🔑 Clave de Almacenista:", type="password")
                 
-                if st.form_submit_button("✅ ACTUALIZAR STOCK"):
-                    idx = df_inv[df_inv['Material'] == c_mat].index[0]
-                    st.session_state.db_inventario.at[idx, 'Stock'] += c_cant
-                    if c_costo > 0:
-                        st.session_state.db_inventario.at[idx, 'Costo'] = c_costo
-                    st.success(f"Stock de {c_mat} actualizado.")
-                    time.sleep(1)
-                    st.rerun()
+                if st.form_submit_button("📥 ACTUALIZAR INVENTARIO"):
+                    if pass_admin == PIN_ALMACEN:
+                        idx = df_inv[df_inv['Material'] == mat_in].index[0]
+                        st.session_state.db_inventario.at[idx, 'Stock'] += can_in
+                        st.success(f"Stock actualizado: Se agregaron {can_in} unidades a {mat_in}.")
+                    else:
+                        st.error("❌ Clave de seguridad incorrecta.")
