@@ -580,7 +580,6 @@ else:
                             up_name = up.name
 
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
-                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
                         df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
                         df_v = df_raw.dropna(subset=['lat_aux']).reset_index(drop=True)
@@ -601,16 +600,8 @@ else:
 
                             while pts:
                                 rest_coords = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
-                                
-                                # 1. Distancia del último punto a los restantes
                                 dist_al_ultimo = cdist([last_coord], rest_coords)[0]
-                                
-                                # 2. Distancia de los restantes a la BASE
                                 dist_a_base = cdist(coords_base, rest_coords)[0]
-                                
-                                # PENALIZACIÓN: Multiplicamos la distancia entre puntos por 
-                                # un factor de cercanía a la base. Esto rompe los bucles.
-                                # Buscamos minimizar (Distancia_Vecino + Distancia_a_Base * 0.2)
                                 puntuacion_ruta = dist_al_ultimo + (dist_a_base * 0.2)
                                 
                                 idx_proximo = np.argmin(puntuacion_ruta)
@@ -681,7 +672,7 @@ else:
                                     elif int(df_f.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
 
-                           c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up_name}.xlsx", use_container_width=True)
+                            c1.download_button("📗 Excel Pro Dinámico", buf_xlsx.getvalue(), file_name=f"SF_{up_name}.xlsx", use_container_width=True)
                             
                             # CSV CORREGIDO
                             csv_buffer = io.StringIO()
@@ -694,7 +685,6 @@ else:
                             csv_buffer.write(f"Distancia Total:,{round(dist_real_km,2)} km\n")
                             csv_buffer.write(f"Tiempo Estimado:,{tiempo_abreviado}\n")
                             c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_{up_name}.csv", use_container_width=True)
-
                             # --- KML MAESTRO PLANO ---
                             kml = simplekml.Kml()
                             for p in ordenados:
