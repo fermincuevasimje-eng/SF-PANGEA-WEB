@@ -1349,128 +1349,157 @@ else:
             else:
                 st.error("No se detectaron coordenadas válidas en los archivos.")
 
-    # === MÓDULO SF6: ALMACÉN E INVENTARIO V22.5 (REPLICANDO FORMATO FÍSICO) ===
+    # === MÓDULO SF6: ALMACÉN E INVENTARIO V21.3 (FUNCIONALIDAD COMPLETA) ===
     elif st.session_state.menu == "SF6":
-        st.title("📦 SF6 - Gestión de Almacén (Réplica de Vale Oficial)")
+        st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
         
-        PATH_INV_DB = "boveda_inventario.json"
-        PATH_KARDEX_DB = "boveda_kardex.json"
+        # CONFIGURACIÓN
         PIN_ALMACEN = "DAP-2026"
+        LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento y se genera en la Dirección de Alumbrado Público"
 
-        # 1. AMPLIACIÓN DEL STOCK INICIAL (Basado en tu PDF)
-        STOCK_OFICIAL = [
-            {"ID": "LUM-01", "Material": "LUMINARIAS", "Stock": 100, "Min": 10, "Costo": 2500, "Unidad": "PZA"},
-            {"ID": "FOT-02", "Material": "FOTOCONTROL", "Stock": 200, "Min": 20, "Costo": 180, "Unidad": "PZA"},
-            {"ID": "CAB-03", "Material": "CABLE 2+1 ALUMINIO", "Stock": 1000, "Min": 100, "Costo": 45, "Unidad": "METROS"},
-            {"ID": "CAB-04", "Material": "CABLE 1+1 SEGURIDAD", "Stock": 1000, "Min": 100, "Costo": 40, "Unidad": "METROS"},
-            {"ID": "CAB-05", "Material": "CABLE POT", "Stock": 500, "Min": 50, "Costo": 30, "Unidad": "METROS"},
-            {"ID": "CAB-06", "Material": "CABLE THW", "Stock": 500, "Min": 50, "Costo": 35, "Unidad": "METROS"},
-            {"ID": "BOQ-07", "Material": "BOQUET", "Stock": 150, "Min": 15, "Costo": 50, "Unidad": "PZA"},
-            {"ID": "BAL-08", "Material": "BALASTRO", "Stock": 80, "Min": 10, "Costo": 450, "Unidad": "PZA"},
-            {"ID": "LAM-09", "Material": "LAMPARA", "Stock": 300, "Min": 30, "Costo": 120, "Unidad": "PZA"},
-            {"ID": "CIN-10", "Material": "CINTA DE AISLAR", "Stock": 100, "Min": 10, "Costo": 25, "Unidad": "PZA"},
-            {"ID": "MEN-11", "Material": "MENSULA", "Stock": 50, "Min": 5, "Costo": 200, "Unidad": "PZA"},
-            {"ID": "HEB-12", "Material": "HEBILLAS", "Stock": 500, "Min": 50, "Costo": 15, "Unidad": "PZA"},
-            {"ID": "FLE-13", "Material": "FLEJE", "Stock": 1000, "Min": 100, "Costo": 10, "Unidad": "METROS"},
-            {"ID": "BAS-14", "Material": "BASE PARA FOTOCELDA", "Stock": 100, "Min": 10, "Costo": 85, "Unidad": "PZA"},
-            {"ID": "CON-15", "Material": "CONTACTOR", "Stock": 30, "Min": 5, "Costo": 1200, "Unidad": "PZA"}
-        ]
-
+        # INICIALIZACIÓN DE ESTADOS
         if "db_inventario" not in st.session_state:
-            if os.path.exists(PATH_INV_DB):
-                with open(PATH_INV_DB, "r", encoding="utf-8") as f:
-                    st.session_state.db_inventario = pd.DataFrame(json.load(f))
-            else:
-                st.session_state.db_inventario = pd.DataFrame(STOCK_OFICIAL)
+            st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
+        if "vales_historial" not in st.session_state:
+            st.session_state.vales_historial = []
+        if "carrito_vale" not in st.session_state:
+            st.session_state.carrito_vale = []
+        if "admin_auth" not in st.session_state:
+            st.session_state.admin_auth = False
 
-        if "db_kardex" not in st.session_state:
-            st.session_state.db_kardex = json.load(open(PATH_KARDEX_DB, "r")) if os.path.exists(PATH_KARDEX_DB) else []
+        tab_inv, tab_vales, tab_admin = st.tabs(["📊 Existencias y Resumen", "🚚 Salida (Vale)", "⚙️ Gestión Almacén"])
 
-        if "carrito_vale" not in st.session_state: st.session_state.carrito_vale = []
+        # --- TAB 1: EXISTENCIAS Y RESUMEN EJECUTIVO ---
+        with tab_inv:
+            df_inv = st.session_state.db_inventario
+            st.subheader("🚨 Dashboard de Inventario")
+            
+            # Métricas Restauradas
+            m1, m2, m3 = st.columns(3)
+            criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
+            m1.metric("📦 Items Totales", len(df_inv))
+            m2.metric("⚠️ Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
+            m3.metric("💰 Valor Almacén", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
 
-        tab_inv, tab_vale_pro, tab_kardex = st.tabs(["📊 Existencias", "🧾 Generar Vale Oficial", "📑 Kárdex"])
+            st.dataframe(df_inv.style.apply(lambda r: ['background-color: #ffcccc' if r.Stock <= r.Min else '' for _ in r], axis=1), 
+                         use_container_width=True, hide_index=True)
+            
+            # Botón Resumen Ejecutivo
+            if st.button("📄 GENERAR RESUMEN EJECUTIVO (EXCEL)", use_container_width=True):
+                output_res = io.BytesIO()
+                with pd.ExcelWriter(output_res, engine='openpyxl') as writer:
+                    df_inv.to_excel(writer, index=False, sheet_name='Estado_Almacen')
+                st.download_button("📥 Descargar Reporte de Stock", output_res.getvalue(), f"Resumen_Almacen_{pd.Timestamp.now().strftime('%d_%m_%Y')}.xlsx", use_container_width=True)
 
-        with tab_vale_pro:
-            st.subheader("📝 Nuevo Vale de Material")
-            col_h1, col_h2 = st.columns(2)
-            fol_vale = f"FOLIO-{len(st.session_state.db_kardex) + 1:04d}"
-            col_h1.info(f"**Folio:** {fol_vale}")
-            fecha_v = col_h2.date_input("Fecha del Vale:")
-
-            with st.expander("👤 Datos de Control", expanded=True):
-                c_c1, c_c2 = st.columns(2)
-                v_solicita = c_c1.text_input("Solicita (Nombre y Firma):")
-                v_entrega = c_c2.text_input("Entrega (Almacén):")
-                v_autoriza = st.text_input("Autoriza (Director/Jefe):")
+        # --- TAB 2: VALE MULTI-ÍTEM CON FOLIO CONSECUTIVO ---
+        with tab_vales:
+            st.subheader("🧾 Generador de Vale de Salida")
+            
+            # Cálculo de Folio Consecutivo
+            prox_folio_num = len(st.session_state.vales_historial) + 1
+            folio_actual = f"DAP-{prox_folio_num}"
+            st.info(f"Próximo Folio a Generar: **{folio_actual}**")
 
             with st.container(border=True):
-                st.markdown("**📦 Selección de Materiales**")
-                v_c1, v_c2, v_c3, v_c4 = st.columns([2, 1, 1, 1])
-                m_sel = v_c1.selectbox("Material:", st.session_state.db_inventario['Material'].tolist())
-                c_sel = v_c2.number_input("Cantidad:", min_value=1, step=1)
-                estado_sel = v_c3.selectbox("Estado:", ["NUEVO", "RECUPERADO"])
-                regresa_sel = v_c4.number_input("Regresa (Cant):", min_value=0, step=1)
-
-                if st.button("➕ Agregar al Listado"):
-                    st.session_state.carrito_vale.append({
-                        "Material": m_sel, "Cantidad": c_sel, "Estado": estado_sel, "Regresa": regresa_sel
-                    })
-                    st.rerun()
+                c1, c2, c3 = st.columns([1, 2, 1])
+                bri_sel = c1.selectbox("Brigada Destino:", [f"Brigada {i}" for i in range(1, 18)])
+                mat_sel = c2.selectbox("Material:", df_inv['Material'].tolist())
+                can_sel = c3.number_input("Cantidad:", min_value=1, step=1)
+                
+                if st.button("➕ Agregar al Vale"):
+                    stock_real = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
+                    if stock_real >= can_sel:
+                        st.session_state.carrito_vale.append({
+                            "Material": mat_sel, 
+                            "Cantidad": can_sel, 
+                            "Unidad": df_inv.loc[df_inv['Material'] == mat_sel, 'Unidad'].values[0]
+                        })
+                        st.toast(f"{mat_sel} agregado.")
+                    else:
+                        st.error(f"⚠️ Stock insuficiente ({stock_real} disponibles).")
 
             if st.session_state.carrito_vale:
-                st.table(pd.DataFrame(st.session_state.carrito_vale))
+                st.write("---")
+                st.markdown("**Pre-visualización del Vale:**")
                 
-                if st.button("💾 GENERAR VALE PDF Y REGISTRAR", type="primary", use_container_width=True):
-                    # Lógica de descuento y guardado
+                # Tabla con opción de eliminar material individualmente
+                for i, it in enumerate(st.session_state.carrito_vale):
+                    col_item, col_del = st.columns([4, 1])
+                    col_item.write(f"• {it['Material']} - {it['Cantidad']} {it['Unidad']}")
+                    if col_del.button("🗑️", key=f"del_it_{i}"):
+                        st.session_state.carrito_vale.pop(i)
+                        st.rerun()
+                
+                col_v1, col_v2 = st.columns(2)
+                if col_v1.button("❌ Cancelar Todo", use_container_width=True):
+                    st.session_state.carrito_vale = []
+                    st.rerun()
+                
+                if col_v2.button("💾 REGISTRAR Y GENERAR PDF", type="primary", use_container_width=True):
+                    # 1. Descuento de Stock
                     for item in st.session_state.carrito_vale:
-                        idx = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == item['Material']].index[0]
+                        idx = df_inv[df_inv['Material'] == item['Material']].index[0]
                         st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
-                        st.session_state.db_kardex.append({
-                            "fecha": str(fecha_v), "folio": fol_vale, "material": item['Material'], 
-                            "cant": item['Cantidad'], "estado": item['Estado'], "solicita": v_solicita
-                        })
                     
-                    # Generación de PDF (Simulando tu formato físico)
+                    # 2. Guardar en Historial (para el consecutivo)
+                    st.session_state.vales_historial.append({"Folio": folio_actual, "Brigada": bri_sel})
+
+                    # 3. PDF Formal
                     from fpdf import FPDF
                     pdf = FPDF()
                     pdf.add_page()
+                    pdf.set_font("Arial", 'B', 14)
+                    pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
                     pdf.set_font("Arial", 'B', 12)
-                    pdf.cell(0, 8, "VALE INTERNO DE MATERIAL - ALMACÉN DE ALUMBRADO PÚBLICO", ln=True, align='C')
-                    pdf.ln(5)
-                    pdf.set_font("Arial", '', 10)
-                    pdf.cell(0, 5, f"FOLIO: {fol_vale} | FECHA: {fecha_v}", ln=True, align='R')
-                    pdf.ln(5)
-                    
-                    # Tabla estilo PDF Físico
-                    pdf.set_fill_color(200, 200, 200)
-                    pdf.cell(80, 7, "DESCRIPCIÓN DEL MATERIAL", 1, 0, 'C', True)
-                    pdf.cell(30, 7, "ESTADO", 1, 0, 'C', True)
-                    pdf.cell(40, 7, "CANT. ENTREGADA", 1, 0, 'C', True)
-                    pdf.cell(40, 7, "CANT. REGRESA", 1, 1, 'C', True)
-                    
-                    for i in st.session_state.carrito_vale:
-                        pdf.cell(80, 7, i['Material'], 1)
-                        pdf.cell(30, 7, i['Estado'], 1, 0, 'C')
-                        pdf.cell(40, 7, str(i['Cantidad']), 1, 0, 'C')
-                        pdf.cell(40, 7, str(i['Regresa']), 1, 1, 'C')
-
-                    pdf.ln(20)
-                    # Bloque de firmas
-                    pdf.cell(60, 5, "AUTORIZÓ", 0, 0, 'C')
-                    pdf.cell(60, 5, "SOLICITÓ", 0, 0, 'C')
-                    pdf.cell(60, 5, "ENTREGÓ ALMACÉN", 0, 1, 'C')
+                    pdf.cell(0, 10, "DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
+                    pdf.cell(0, 10, f"VALE DE SALIDA: {folio_actual}", ln=True, align='C')
                     pdf.ln(10)
-                    pdf.cell(60, 5, "________________", 0, 0, 'C')
-                    pdf.cell(60, 5, "________________", 0, 0, 'C')
-                    pdf.cell(60, 5, "________________", 0, 1, 'C')
-                    pdf.set_font("Arial", 'B', 8)
-                    pdf.cell(60, 5, v_autoriza.upper(), 0, 0, 'C')
-                    pdf.cell(60, 5, v_solicita.upper(), 0, 0, 'C')
-                    pdf.cell(60, 5, v_entrega.upper(), 0, 1, 'C')
+                    pdf.set_font("Arial", '', 10)
+                    pdf.cell(0, 10, f"Fecha: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')} | Brigada: {bri_sel}", ln=True)
                     
-                    pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
-                    st.download_button("📥 DESCARGAR VALE OFICIAL PDF", pdf_out, f"Vale_{fol_vale}.pdf", "application/pdf", use_container_width=True)
+                    # Tabla de materiales
+                    pdf.set_fill_color(230, 230, 230)
+                    pdf.cell(100, 8, "Material", 1, 0, 'C', True)
+                    pdf.cell(30, 8, "Cantidad", 1, 1, 'C', True)
+                    for it in st.session_state.carrito_vale:
+                        pdf.cell(100, 8, str(it['Material']), 1)
+                        pdf.cell(30, 8, str(it['Cantidad']), 1, 1, 'C')
+                    
+                    pdf.ln(10)
+                    pdf.set_font("Arial", 'I', 9)
+                    pdf.multi_cell(0, 5, LEYENDA_OFICIAL, align='C')
+                    
+                    pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
+                    st.download_button(f"📥 DESCARGAR {folio_actual}", pdf_bytes, f"Vale_{folio_actual}.pdf", "application/pdf", use_container_width=True)
                     
                     st.session_state.carrito_vale = []
-                    # (Aquí iría la función de persistir_almacen definida en la respuesta anterior)
-                    st.success("Vale registrado y PDF listo.")
+                    st.success(f"Vale {folio_actual} procesado.")
+
+        # --- TAB 3: ADMIN (CANDADO DE SEGURIDAD) ---
+        with tab_admin:
+            st.subheader("⚙️ Gestión de Almacén")
+            
+            if not st.session_state.admin_auth:
+                st.warning("Se requiere autorización para modificar el inventario.")
+                pass_in = st.text_input("🔑 Ingrese Clave de Acceso:", type="password")
+                if st.button("🔓 Desbloquear Gestión"):
+                    if pass_in == PIN_ALMACEN:
+                        st.session_state.admin_auth = True
+                        st.rerun()
+                    else:
+                        st.error("Clave incorrecta.")
+            else:
+                st.success("✅ Modo Administrador Activo")
+                if st.button("🔒 Cerrar Sesión de Gestión", type="secondary"):
+                    st.session_state.admin_auth = False
+                    st.rerun()
+                
+                st.divider()
+                with st.form("entrada_stock"):
+                    st.write("📥 **Registrar Entrada de Material**")
+                    m_in = st.selectbox("Material:", df_inv['Material'].tolist())
+                    c_in = st.number_input("Cantidad:", min_value=1, step=1)
+                    if st.form_submit_button("✅ ACTUALIZAR STOCK"):
+                        idx = df_inv[df_inv['Material'] == m_in].index[0]
+                        st.session_state.db_inventario.at[idx, 'Stock'] += c_in
+                        st.success(f"Stock de {m_in} actualizado.")
