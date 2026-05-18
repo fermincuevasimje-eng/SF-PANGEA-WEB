@@ -510,7 +510,7 @@ else:
                         with col_cal_in:
                             date_picker = st.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
                         with col_man_in:
-                            date_manual = st.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
+                            date_manual = st.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AA", key=f"dt_m_{st.session_state.input_key}")
                         
                         st.markdown("---")
                         
@@ -522,22 +522,22 @@ else:
                         if submitted:
                             f_final = in_f_val.strip()
                             
-                            # Decisión del origen de la fecha
+                            # Decisión del origen de la fecha (Usamos formato de 2 dígitos para el año para ahorrar espacio útil)
                             if date_manual.strip():
                                 fecha_final_texto = date_manual.strip()
                             else:
-                                fecha_final_texto = date_picker.strftime("%d/%m/%Y")
+                                fecha_final_texto = date_picker.strftime("%d/%m/%y")
                             
-                            # OPTIMIZACIÓN EXCEL: Guardamos valores limpios sin etiquetas pesadas para no agotar los 30 caracteres
-                            ot_part = in_ot_val.strip()
+                            # ESTRUCTURA PREMIUM: Añadimos la etiqueta O.T. solicitada manteniendo la compresión de espacio
+                            ot_part = f"O.T. {in_ot_val.strip()}" if in_ot_val.strip() else ""
                             fecha_part = fecha_final_texto
                             libre_part = in_libre_val.strip()
                             
-                            # Consolidamos usando un separador compacto buscando que quepa todo el texto libre
+                            # Consolidamos usando el separador compacto para la lista y el Excel
                             componentes = [c for c in [ot_part, fecha_part, libre_part] if c]
                             c_final = " | ".join(componentes) if componentes else "ATENDIDO"
                             
-                            # Candado de protección para el formato de celda de Excel
+                            # Candado de protección para el formato estricto de celda de Excel (Máx 30 caracteres)
                             if len(c_final) > 30:
                                 c_final = c_final[:27] + "..."
                             
