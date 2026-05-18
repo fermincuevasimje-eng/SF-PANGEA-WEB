@@ -603,7 +603,7 @@ else:
                                     "usuario": st.session_state.usuario_nombre,
                                     "total_folios": len(folios_a_buscar),
                                     "datos_captura": dict(st.session_state.lista_bajas),
-                                    "excel_base64": base64.b64encode(excel_data).decode('utf-8') # Guardamos el archivo binario puro para reconstrucción
+                                    "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
                                 # Escritura física al disco duro del servidor
                                 with open(PATH_BAJAS_DB, "w", encoding="utf-8") as f:
@@ -619,6 +619,15 @@ else:
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                     use_container_width=True
                                 )
+                            
+                            # --- MEJORA: CANDADO DE SEGURIDAD PARA LIMPIAR LISTA ACTUAL ---
+                            st.write("---")
+                            seguro_limpieza = st.checkbox("🔐 Confirmar vaciado de la lista en captura", key="seguro_limpiar_bajas")
+                            if st.button("🗑️ Limpiar Lista Actual", use_container_width=True, type="secondary", disabled=not seguro_limpieza):
+                                st.session_state.lista_bajas = {}
+                                st.toast("Lista de captura vaciada", icon="🗑️")
+                                time.sleep(0.5)
+                                st.rerun()
                         else:
                             st.info("Esperando captura de folios en la sección izquierda...")
 
@@ -636,33 +645,46 @@ else:
                                     "Folios": v["total_folios"]
                                 })
                             df_boveda_vista = pd.DataFrame(lista_tabla_boveda)
-                            # Mostramos los cierres más recientes al principio
                             st.dataframe(df_boveda_vista.sort_values(by="ID Registro", ascending=False), use_container_width=True, hide_index=True)
                             
                             st.markdown("---")
-                            st.write("🔍 **Recuperador de Archivos:**")
                             
-                            # Selector dinámico para escoger un archivo del pasado y reconstruirlo al instante
-                            id_recuperar = st.selectbox("Seleccione el ID de Baja que desea volver a descargar:", list(st.session_state.db_bajas_historico.keys())[::-1])
+                            # CONFIGURACIÓN DE RECUPERACIÓN Y ELIMINACIÓN (Layout dividido estilo Módulo 4)
+                            col_recup, col_eliminar = st.columns([2.5, 1.5])
                             
-                            if id_recuperar:
-                                data_hist = st.session_state.db_bajas_historico[id_recuperar]
+                            with col_recup:
+                                st.write("🔍 **Recuperador de Archivos:**")
+                                id_recuperar = st.selectbox("Seleccione el ID de Baja que desea consultar o descargar:", list(st.session_state.db_bajas_historico.keys())[::-1], key="sb_recub_bajas")
                                 
-                                # Expandible para auditar rápidamente qué folios venían dentro de ese documento sin descargarlo
-                                with st.expander(f"👁️ Ver folios incluidos en {id_recuperar}"):
-                                    df_detalles_hist = pd.DataFrame([{"Folio": k, "Respuesta 127": v} for k, v in data_hist["datos_captura"].items()])
-                                    st.dataframe(df_detalles_hist, use_container_width=True, hide_index=True)
-                                
-                                # Reconstrucción mágica del binario del Excel original guardado en el JSON
-                                excel_recuperado_bytes = base64.b64decode(data_hist["excel_base64"])
-                                
-                                st.download_button(
-                                    label=f"🔄 Volver a descargar Excel: {data_hist['archivo_origen']}",
-                                    data=excel_recuperado_bytes,
-                                    file_name=f"RECONSTRUIDO_{data_hist['archivo_origen']}",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    use_container_width=True
-                                )
+                                if id_recuperar:
+                                    data_hist = st.session_state.db_bajas_historico[id_recuperar]
+                                    
+                                    with st.expander(f"👁️ Ver folios incluidos en {id_recuperar}"):
+                                        df_detalles_hist = pd.DataFrame([{"Folio": k, "Respuesta 127": v} for k, v in data_hist["datos_captura"].items()])
+                                        st.dataframe(df_detalles_hist, use_container_width=True, hide_index=True)
+                                    
+                                    excel_recuperado_bytes = base64.b64decode(data_hist["excel_base64"])
+                                    st.download_button(
+                                        label=f"🔄 Volver a descargar Excel: {data_hist['archivo_origen']}",
+                                        data=excel_recuperado_bytes,
+                                        file_name=f"RECONSTRUIDO_{data_hist['archivo_origen']}",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        use_container_width=True
+                                    )
+                            
+                            with col_eliminar:
+                                # --- MEJORA: CANDADO DE ELIMINACIÓN DE LA BÓVEDA ---
+                                st.write("🚨 **Zona de Eliminación:**")
+                                seguro_borrado_boveda = st.checkbox("🔐 Confirmar eliminación permanente", key="check_seguro_boveda_bajas")
+                                if st.button("🗑️ BORRAR DE BÓVEDA", use_container_width=True, type="secondary", disabled=not seguro_borrado_boveda):
+                                    if id_recuperar:
+                                        del st.session_state.db_bajas_historico[id_recuperar]
+                                        # Guardamos el cambio físicamente en el servidor
+                                        with open(PATH_BAJAS_DB, "w", encoding="utf-8") as f:
+                                            json.dump(st.session_state.db_bajas_historico, f, indent=4, ensure_ascii=False)
+                                        st.warning(f"Registro {id_recuperar} eliminado permanentemente.")
+                                        time.sleep(1)
+                                        st.rerun()
                         else:
                             st.info("Aún no hay documentos guardados en la bóveda de bajas.")
             
