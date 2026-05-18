@@ -497,25 +497,56 @@ else:
                     st.subheader("⌨️ Captura de Folios")
                     
                     # Formulario para capturar el Enter
+                    # Formulario para capturar el Enter
                     with st.form("form_bajas", clear_on_submit=True):
-                        col_f_in, col_r_in = st.columns(2)
-                        with col_f_in:
-                            in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
-                        with col_r_in:
-                            in_c_val = st.text_input("Respuesta 127 (Máx 30 car.):", max_chars=30, key=f"r_{st.session_state.input_key}")
+                        # Fila 1: Folio Principal
+                        in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
+                        
+                        st.markdown("---")
+                        st.write("📊 **Detalles de la Baja:**")
+                        
+                        # Fila 2: Desglose del segundo campo en 3 columnas
+                        col_ot, col_fecha, col_libre = st.columns([1, 1.2, 1.8])
+                        
+                        with col_ot:
+                            in_ot_val = st.text_input("O.T. (Dígitos):", key=f"ot_{st.session_state.input_key}")
+                        
+                        with col_fecha:
+                            # Campo dual: Permite escribir texto libre (como "18/05/2026") o dejarlo vacío
+                            in_fecha_val = st.text_input("Fecha (Escribir o hoy):", placeholder="DD/MM/AAAA", key=f"fe_{st.session_state.input_key}")
+                            # Si se deja vacío, por defecto tomará la fecha de hoy formateada de forma automática
+                            if not in_fecha_val.strip():
+                                in_fecha_val = pd.Timestamp.now().strftime("%d/%m/%Y")
+                        
+                        with col_libre:
+                            in_libre_val = st.text_input("Texto Libre (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
                         
                         submitted = st.form_submit_button("➕ Agregar a Lista", use_container_width=True)
                         
                         if submitted:
                             f_final = in_f_val.strip()
-                            c_final = in_c_val.strip() if in_c_val.strip() else "ATENDIDO"
+                            
+                            # Consolidamos los 3 campos en la cadena de "Respuesta 127" sin perder la estructura anterior
+                            ot_part = f"OT: {in_ot_val.strip()}" if in_ot_val.strip() else ""
+                            fecha_part = f"F: {in_fecha_val.strip()}"
+                            libre_part = in_libre_val.strip()
+                            
+                            # Juntamos los componentes que contengan datos usando separadores limpios
+                            componentes = [c for c in [ot_part, fecha_part, libre_part] if c]
+                            c_final = " | ".join(componentes) if componentes else "ATENDIDO"
+                            
+                            # Limitamos la cadena final consolidada a 30 caracteres para que no desconfigure tus celdas
+                            if len(c_final) > 30:
+                                c_final = c_final[:27] + "..."
                             
                             if f_final:
                                 # --- CANDADO DE VALIDACIÓN PREMIUM ---
-                                # Se busca el folio exactamente en la columna identificada del DataFrame de referencia
                                 if f_final in df_ref[id_col_sf2].astype(str).values:
                                     st.session_state.lista_bajas[f_final] = c_final
                                     st.toast(f"Folio {f_final} validado", icon="✅")
+                                    
+                                    # CAMBIO MAESTRO PARA EL FOCO: Cambiamos la llave para reiniciar los inputs y regresar el cursor arriba
+                                    st.session_state.input_key += 1
                                     st.rerun()
                                 else:
                                     st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
