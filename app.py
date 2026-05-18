@@ -498,10 +498,10 @@ else:
                     
                     # Formulario para capturar el Enter
                     with st.form("form_bajas", clear_on_submit=True):
-                        st.write("⌨️ **Campos de Captura Secuencial:**")
+                        st.write("⌨️ **Datos de Identificación y Tiempos:**")
                         
-                        # FILA ÚNICA: Distribución de izquierda a derecha en el orden exacto solicitado
-                        col_folio, col_ot, col_cal, col_manual, col_libre = st.columns([1.5, 1.2, 1.5, 1.5, 3.0])
+                        # FILA 1: Distribución limpia de los primeros 4 campos
+                        col_folio, col_ot, col_cal, col_manual = st.columns([1.5, 1.2, 1.5, 1.5])
                         
                         with col_folio:
                             in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
@@ -516,10 +516,12 @@ else:
                         with col_manual:
                             # Campo de texto para escribir libremente o copiar y pegar fechas rápidamente
                             date_manual = st.text_input("Fecha (Escribir/Pegar):", placeholder="Ej: 18/05/2026", key=f"dt_m_{st.session_state.input_key}")
-                            
-                        with col_libre:
-                            # Campo ancho y largo al final de la fila para los 30 caracteres
-                            in_libre_val = st.text_input("Texto Libre (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
+                        
+                        st.markdown("---")
+                        st.write("📝 **Información Complementaria:**")
+                        
+                        # FILA 2: Una fila completa y holgada exclusiva para el campo largo de 30 caracteres
+                        in_libre_val = st.text_input("Texto Libre (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
                         
                         submitted = st.form_submit_button("➕ Agregar a Lista", use_container_width=True)
                         
