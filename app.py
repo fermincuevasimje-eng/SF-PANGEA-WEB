@@ -498,52 +498,46 @@ else:
                     
                     # Formulario para capturar el Enter
                     with st.form("form_bajas", clear_on_submit=True):
-                        st.write("⌨️ **Datos de Identificación y Tiempos:**")
-                        
-                        # FILA 1: Distribución limpia de los primeros 4 campos
-                        col_folio, col_ot, col_cal, col_manual = st.columns([1.5, 1.2, 1.5, 1.5])
-                        
-                        with col_folio:
+                        # NIVEL 1: Identificadores principales (Ideales para cualquier tamaño de monitor)
+                        col_f_in, col_ot_in = st.columns([1.2, 1.0])
+                        with col_f_in:
                             in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
-                            
-                        with col_ot:
-                            in_ot_val = st.text_input("O.T. (Dígitos):", key=f"ot_{st.session_state.input_key}")
-                            
-                        with col_cal:
-                            # Calendario nativo
+                        with col_ot_in:
+                            in_ot_val = st.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
+                        
+                        # NIVEL 2: Manejo de Fechas (Calendario a la izquierda, entrada manual a la derecha)
+                        col_cal_in, col_man_in = st.columns([1.1, 1.1])
+                        with col_cal_in:
                             date_picker = st.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
-                            
-                        with col_manual:
-                            # Campo de texto para escribir libremente o copiar y pegar fechas rápidamente
-                            date_manual = st.text_input("Fecha (Escribir/Pegar):", placeholder="Ej: 18/05/2026", key=f"dt_m_{st.session_state.input_key}")
+                        with col_man_in:
+                            date_manual = st.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
                         
                         st.markdown("---")
-                        st.write("📝 **Información Complementaria:**")
                         
-                        # FILA 2: Una fila completa y holgada exclusiva para el campo largo de 30 caracteres
-                        in_libre_val = st.text_input("Texto Libre (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
+                        # NIVEL 3: El campo protagónico largo para la Respuesta Libre
+                        in_libre_val = st.text_input("Respuesta Libre / Observaciones (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
                         
                         submitted = st.form_submit_button("➕ Agregar a Lista", use_container_width=True)
                         
                         if submitted:
                             f_final = in_f_val.strip()
                             
-                            # Validar si se escribió/pegó una fecha manualmente o si se toma la del calendario
+                            # Decisión del origen de la fecha
                             if date_manual.strip():
                                 fecha_final_texto = date_manual.strip()
                             else:
                                 fecha_final_texto = date_picker.strftime("%d/%m/%Y")
                             
-                            # Consolidamos los campos en la cadena de "Respuesta 127"
-                            ot_part = f"OT: {in_ot_val.strip()}" if in_ot_val.strip() else ""
-                            fecha_part = f"F: {fecha_final_texto}"
+                            # OPTIMIZACIÓN EXCEL: Guardamos valores limpios sin etiquetas pesadas para no agotar los 30 caracteres
+                            ot_part = in_ot_val.strip()
+                            fecha_part = fecha_final_texto
                             libre_part = in_libre_val.strip()
                             
-                            # Juntamos los componentes con el separador limpio
+                            # Consolidamos usando un separador compacto buscando que quepa todo el texto libre
                             componentes = [c for c in [ot_part, fecha_part, libre_part] if c]
                             c_final = " | ".join(componentes) if componentes else "ATENDIDO"
                             
-                            # Candado estricto para no desconfigurar el ancho de celda en Excel (Máx 30 caracteres)
+                            # Candado de protección para el formato de celda de Excel
                             if len(c_final) > 30:
                                 c_final = c_final[:27] + "..."
                             
@@ -553,7 +547,7 @@ else:
                                     st.session_state.lista_bajas[f_final] = c_final
                                     st.toast(f"Folio {f_final} validado", icon="✅")
                                     
-                                    # CAMBIO MAESTRO PARA EL FOCO: Limpia todos los campos y regresa el cursor al Folio automáticamente
+                                    # CAMBIO MAESTRO PARA EL FOCO: Regresa el control al primer input inmediatamente
                                     st.session_state.input_key += 1
                                     st.rerun()
                                 else:
