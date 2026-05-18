@@ -497,45 +497,52 @@ else:
                     st.subheader("⌨️ Captura de Folios")
                     
                     # Formulario para capturar el Enter
-                    # Formulario para capturar el Enter
                     with st.form("form_bajas", clear_on_submit=True):
-                        # Fila 1: Folio Principal
-                        in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
+                        # Fila 1: Optimización de espacios (Folio compacto y Texto Libre largo)
+                        col_f_input, col_l_input = st.columns([1.5, 2.5])
+                        with col_f_input:
+                            in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
+                        with col_l_input:
+                            in_libre_val = st.text_input("Texto Libre (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
                         
                         st.markdown("---")
-                        st.write("📊 **Detalles de la Baja:**")
+                        st.write("📊 **Detalles Adicionales de la Baja:**")
                         
-                        # Fila 2: Desglose del segundo campo en 3 columnas
-                        col_ot, col_fecha, col_libre = st.columns([1, 1.2, 1.8])
+                        # Fila 2: Orden de Trabajo y Fecha Dual (Calendario + Escritura Manual)
+                        col_ot, col_cal, col_manual = st.columns([1, 1.5, 1.5])
                         
                         with col_ot:
                             in_ot_val = st.text_input("O.T. (Dígitos):", key=f"ot_{st.session_state.input_key}")
                         
-                        with col_fecha:
-                            # Campo dual: Permite escribir texto libre (como "18/05/2026") o dejarlo vacío
-                            in_fecha_val = st.text_input("Fecha (Escribir o hoy):", placeholder="DD/MM/AAAA", key=f"fe_{st.session_state.input_key}")
-                            # Si se deja vacío, por defecto tomará la fecha de hoy formateada de forma automática
-                            if not in_fecha_val.strip():
-                                in_fecha_val = pd.Timestamp.now().strftime("%d/%m/%Y")
+                        with col_cal:
+                            # Calendario visual nativo
+                            date_picker = st.date_input("Seleccionar Fecha:", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
                         
-                        with col_libre:
-                            in_libre_val = st.text_input("Texto Libre (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
+                        with col_manual:
+                            # Campo de texto opcional para copiar y pegar fechas rápidamente
+                            date_manual = st.text_input("Escribir/Pegar Fecha (Opcional):", placeholder="Ej: 18/05/2026", key=f"dt_m_{st.session_state.input_key}")
                         
                         submitted = st.form_submit_button("➕ Agregar a Lista", use_container_width=True)
                         
                         if submitted:
                             f_final = in_f_val.strip()
                             
-                            # Consolidamos los 3 campos en la cadena de "Respuesta 127" sin perder la estructura anterior
+                            # Validar si el usuario escribió/pegó una fecha manualmente o si usa la del calendario
+                            if date_manual.strip():
+                                fecha_final_texto = date_manual.strip()
+                            else:
+                                fecha_final_texto = date_picker.strftime("%d/%m/%Y")
+                            
+                            # Consolidamos los campos en la cadena de "Respuesta 127"
                             ot_part = f"OT: {in_ot_val.strip()}" if in_ot_val.strip() else ""
-                            fecha_part = f"F: {in_fecha_val.strip()}"
+                            fecha_part = f"F: {fecha_final_texto}"
                             libre_part = in_libre_val.strip()
                             
-                            # Juntamos los componentes que contengan datos usando separadores limpios
+                            # Juntamos los componentes con el separador limpio
                             componentes = [c for c in [ot_part, fecha_part, libre_part] if c]
                             c_final = " | ".join(componentes) if componentes else "ATENDIDO"
                             
-                            # Limitamos la cadena final consolidada a 30 caracteres para que no desconfigure tus celdas
+                            # Candado estricto para no desconfigurar el ancho de celda (Máx 30 caracteres)
                             if len(c_final) > 30:
                                 c_final = c_final[:27] + "..."
                             
@@ -545,7 +552,7 @@ else:
                                     st.session_state.lista_bajas[f_final] = c_final
                                     st.toast(f"Folio {f_final} validado", icon="✅")
                                     
-                                    # CAMBIO MAESTRO PARA EL FOCO: Cambiamos la llave para reiniciar los inputs y regresar el cursor arriba
+                                    # CAMBIO MAESTRO PARA EL FOCO: Limpia campos y regresa cursor al folio arriba
                                     st.session_state.input_key += 1
                                     st.rerun()
                                 else:
