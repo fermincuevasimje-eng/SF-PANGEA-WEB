@@ -554,13 +554,8 @@ else:
                                     st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
                                 # --------------------------------------
     
-                    st.write("---")
-                    if st.button("🗑️ Limpiar Lista Actual"):
-                        st.session_state.lista_bajas = {}
-                        st.rerun()
-    
                 with c_lista:
-                    # Inicialización del archivo físico de la Bóveda (Persistencia total)
+                    # --- 1. GESTIÓN DE PERSISTENCIA (BÓVEDA FÍSICA) ---
                     PATH_BAJAS_DB = "boveda_bajas.json"
                     if "db_bajas_historico" not in st.session_state:
                         if os.path.exists(PATH_BAJAS_DB):
@@ -569,27 +564,34 @@ else:
                         else:
                             st.session_state.db_bajas_historico = {}
 
-                    # Pestañas para organizar el espacio
+                    # --- 2. INTERFAZ DE PESTAÑAS ---
                     tab_actual, tab_boveda = st.tabs(["📋 Captura Actual", "📂 Bóveda de Historial"])
 
                     with tab_actual:
                         st.subheader("Folios en proceso de baja")
                         if st.session_state.lista_bajas:
+                            # Visor de la lista que estás capturando en el momento
                             df_resumen_bajas = pd.DataFrame([{"Folio": k, "Respuesta 127": v} for k, v in st.session_state.lista_bajas.items()])
                             st.dataframe(df_resumen_bajas, use_container_width=True, hide_index=True)
                             
+                            # Botón principal de procesamiento
                             if st.button("📥 Generar Documento de Bajas", use_container_width=True, type="primary"):
                                 st.balloons()
+                                
+                                # Filtrado de folios contra el archivo de referencia
                                 folios_a_buscar = list(st.session_state.lista_bajas.keys())
                                 df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
+                                
+                                # Inyección de la columna Respuesta 127
                                 df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].map(st.session_state.lista_bajas)
                                 
+                                # Generación del Excel en memoria
                                 output_sf2 = io.BytesIO()
                                 with pd.ExcelWriter(output_sf2, engine='openpyxl') as writer:
                                     df_final_bajas.to_excel(writer, index=False, sheet_name='BAJAS_SF')
                                 excel_data = output_sf2.getvalue()
 
-                                # AUTO-GUARDADO EN BÓVEDA
+                                # --- PROTOCOLO DE RESPALDO EN BÓVEDA ---
                                 id_registro_baja = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
                                 st.session_state.db_bajas_historico[id_registro_baja] = {
                                     "fecha_generacion": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
@@ -599,29 +601,44 @@ else:
                                     "datos_capture": dict(st.session_state.lista_bajas),
                                     "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
+                                # Guardado físico en el servidor
                                 with open(PATH_BAJAS_DB, "w", encoding="utf-8") as f:
                                     json.dump(st.session_state.db_bajas_historico, f, indent=4, ensure_ascii=False)
 
-                                st.success(f"✅ Guardado en Bóveda: {id_registro_baja}")
-                                st.download_button(label="📗 Descargar Excel de Bajas", data=excel_data, file_name=f"BAJAS_{up_sf2.name}", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                                st.success(f"✅ ¡Documento guardado en Bóveda! ID: {id_registro_baja}")
+                                
+                                st.download_button(
+                                    label="📗 Descargar Excel de Bajas Oficial",
+                                    data=excel_data,
+                                    file_name=f"BAJAS_{up_sf2.name}",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True
+                                )
                             
-                            # CANDADO DE SEGURIDAD INTERNO
+                            # --- BOTÓN DE LIMPIEZA CON CANDADO DE SEGURIDAD ---
                             st.write("---")
-                            seguro_limpieza = st.checkbox("🔐 Confirmar vaciado de la lista en captura", key="seguro_limpiar_bajas")
+                            st.write("⚠️ **Zona de Peligro**")
+                            seguro_limpieza = st.checkbox("🔐 Confirmar vaciado de la lista actual", key="seguro_limpiar_bajas")
                             if st.button("🗑️ Limpiar Lista Actual", use_container_width=True, type="secondary", disabled=not seguro_limpieza):
                                 st.session_state.lista_bajas = {}
-                                st.toast("Lista vaciada", icon="🗑️")
+                                st.toast("Lista de captura vaciada", icon="🗑️")
                                 time.sleep(0.5)
                                 st.rerun()
                         else:
-                            st.info("Esperando captura de folios...")
+                            st.info("Esperando captura de folios en la sección izquierda...")
 
                     with tab_boveda:
-                        st.subheader("🗄️ Historial Permanente")
+                        st.subheader("🗄️ Historial Permanente de Bajas")
                         if st.session_state.db_bajas_historico:
+                            # Tabla resumen de la Bóveda
                             lista_tabla_boveda = []
                             for k, v in st.session_state.db_bajas_historico.items():
-                                lista_tabla_boveda.append({"ID Registro": k, "Fecha de Cierre": v["fecha_generacion"], "Archivo Base": v["archivo_origen"], "Usuario": v["usuario"], "Folios": v["total_folios"]})
+                                lista_tabla_boveda.append({
+                                    "ID Registro": k,
+                                    "Fecha": v["fecha_generacion"],
+                                    "Origen": v["archivo_origen"],
+                                    "Folios": v["total_folios"]
+                                })
                             df_boveda_vista = pd.DataFrame(lista_tabla_boveda)
                             st.dataframe(df_boveda_vista.sort_values(by="ID Registro", ascending=False), use_container_width=True, hide_index=True)
                             
@@ -629,29 +646,38 @@ else:
                             col_recup, col_eliminar = st.columns([2.5, 1.5])
                             
                             with col_recup:
-                                st.write("🔍 **Recuperador:**")
-                                id_recuperar = st.selectbox("ID de Baja:", list(st.session_state.db_bajas_historico.keys())[::-1], key="sb_recub_bajas")
+                                st.write("🔍 **Recuperar Documento:**")
+                                id_recuperar = st.selectbox("Seleccione ID:", list(st.session_state.db_bajas_historico.keys())[::-1], key="sb_recub_bajas")
+                                
                                 if id_recuperar:
                                     data_hist = st.session_state.db_bajas_historico[id_recuperar]
                                     with st.expander(f"👁️ Ver folios de {id_recuperar}"):
                                         df_detalles_hist = pd.DataFrame([{"Folio": k, "Respuesta 127": v} for k, v in data_hist["datos_capture"].items()])
                                         st.dataframe(df_detalles_hist, use_container_width=True, hide_index=True)
+                                    
+                                    # Reconstrucción del archivo desde Base64
                                     excel_recuperado_bytes = base64.b64decode(data_hist["excel_base64"])
-                                    st.download_button(label=f"🔄 Descargar de nuevo: {data_hist['archivo_origen']}", data=excel_recuperado_bytes, file_name=f"RECONSTRUIDO_{data_hist['archivo_origen']}", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                                    st.download_button(
+                                        label=f"🔄 Volver a descargar Excel",
+                                        data=excel_recuperado_bytes,
+                                        file_name=f"RECONSTRUIDO_{data_hist['archivo_origen']}",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        use_container_width=True
+                                    )
                             
                             with col_eliminar:
-                                st.write("🚨 **Zona de Eliminación:**")
-                                seguro_borrado_boveda = st.checkbox("🔐 Confirmar eliminación permanente", key="check_seguro_boveda_bajas")
+                                st.write("🚨 **Zona Crítica:**")
+                                seguro_borrado_boveda = st.checkbox("🔐 Confirmar borrado físico", key="check_seguro_boveda_bajas")
                                 if st.button("🗑️ BORRAR DE BÓVEDA", use_container_width=True, type="secondary", disabled=not seguro_borrado_boveda):
                                     if id_recuperar:
                                         del st.session_state.db_bajas_historico[id_recuperar]
                                         with open(PATH_BAJAS_DB, "w", encoding="utf-8") as f:
                                             json.dump(st.session_state.db_bajas_historico, f, indent=4, ensure_ascii=False)
-                                        st.warning(f"ID {id_recuperar} eliminado.")
+                                        st.warning(f"ID {id_recuperar} eliminado permanentemente.")
                                         time.sleep(1)
                                         st.rerun()
                         else:
-                            st.info("Bóveda vacía.")
+                            st.info("La bóveda está vacía.")
             
             except Exception as e:
                 st.error(f"Error en SF2: {e}")
