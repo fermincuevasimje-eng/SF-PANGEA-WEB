@@ -533,7 +533,7 @@ else:
                                     else:
                                         fecha_final_texto = date_picker.strftime("%d/%m/%Y")
                                     
-                                    # 3. Construcción de la respuesta
+                                    # 3. Construcción de la respuesta sin recortes restrictivos de longitud
                                     ot_part = f"O.T. {in_ot_val.strip()}" if in_ot_val.strip() else ""
                                     libre_part = in_libre_val.strip()
                                     
@@ -542,13 +542,9 @@ else:
                                         componentes = [c for c in [ot_part, "ATENDIDO", fecha_final_texto] if c]
                                         c_final = " | ".join(componentes)
                                     else:
-                                        # Si el usuario sí escribió observaciones, preserva todo lo capturado completo
+                                        # Si el usuario sí escribió observaciones, preserva todo lo capturado completo sin mochar nada
                                         componentes = [c for c in [ot_part, fecha_final_texto, libre_part] if c]
                                         c_final = " | ".join(componentes)
-                                    
-                                    # Candado de longitud estricta para celdas de Excel (Máx 30 caracteres)
-                                    if len(c_final) > 30:
-                                        c_final = c_final[:27] + "..."
                                     
                                     # 4. Inyección en memoria limpia
                                     st.session_state.lista_bajas[f_final] = c_final
@@ -590,7 +586,7 @@ else:
                                 folios_a_buscar = list(st.session_state.lista_bajas.keys())
                                 df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
                                 
-                                # ACOPLE DE TIRO SEGURO: Convertimos a String ambas partes para asegurar que no falle el mapeo en Excel
+                                # ACOPLE DE TIRO SEGURO: Evita errores de mapeo si el archivo tiene espacios extra en los folios
                                 mapa_limpio = {str(key).strip(): str(val) for key, val in st.session_state.lista_bajas.items()}
                                 df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].astype(str).str.strip().map(mapa_limpio)
                                 
