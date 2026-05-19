@@ -494,16 +494,15 @@ else:
                 c_input, c_lista = st.columns([1, 1])
                 
                 # =========================================================
-                # COLUMNA IZQUIERDA: CAPTURA DE DATOS (FOCO EN RÁFAGA CORREGIDO)
+                # COLUMNA IZQUIERDA: CAPTURA DE DATOS (ESTABLE Y FLUIDO)
                 # =========================================================
                 with c_input:
                     st.subheader("⌨️ Captura de Folios")
                     
-                    # El formulario cambia de ID dinámicamente con input_key para forzar reinicio limpio
+                    # Formulario con llave dinámica para limpieza inmediata en memoria
                     with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
                         col_f_in, col_ot_in = st.columns([1.2, 1.0])
                         with col_f_in:
-                            # Mantiene la clave dinámica para forzar la limpieza en cada iteración
                             in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
                         with col_ot_in:
                             in_ot_val = st.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
@@ -551,19 +550,8 @@ else:
                                     st.session_state.lista_bajas[f_final] = c_final
                                     st.toast(f"Folio {f_final} validado", icon="✅")
                                     
-                                    # GATILLO ULTRA-RÁPIDO: Incrementamos la clave para resetear inputs
+                                    # GATILLO DE REINICIO NATIVO: Limpia los campos al instante de forma segura
                                     st.session_state.input_key += 1
-                                    
-                                    # INYECCIÓN SCRIPT CORREGIDA: Apunta con mira láser al input que inicia con 'f_' (Folio / Círculo Verde)
-                                    st.components.v1.html(
-                                        """
-                                        <script>
-                                            window.parent.document.querySelector('input[id^="f_"]').focus();
-                                        </script>
-                                        """,
-                                        height=0,
-                                        width=0,
-                                    )
                                     st.rerun()
                                 else:
                                     st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
@@ -598,7 +586,7 @@ else:
                                 folios_a_buscar = list(st.session_state.lista_bajas.keys())
                                 df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
                                 
-                                # ACOPLE DE TIRO SEGURO: Evita errores de mapeo si el archivo tiene espacios extra en los folios
+                                # ACOPLE DE TIRO SEGURO: Mapeo exacto convirtiendo todo a string
                                 mapa_limpio = {str(key).strip(): str(val) for key, val in st.session_state.lista_bajas.items()}
                                 df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].astype(str).str.strip().map(mapa_limpio)
                                 
