@@ -590,13 +590,13 @@ else:
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
         tab1, tab1_multi, tab2, tab3 = st.tabs([
             "📍 Generador de Ruta Clásico (V23 Pro)", 
-            "🚚 Nuevo Motor Multi-Ruta", 
+            "🚚 Nuevo Motor Multi-Ruta (Pro)", 
             "📂 Bitácora", 
             "🗑️ Papelera"
         ])
 
         # ==========================================
-        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (V23 PRO RECUPERADO)
+        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (V23 PRO)
         # ==========================================
         with tab1:
             if st.session_state.perfil == "CONSULTA":
@@ -621,21 +621,16 @@ else:
                             df_raw = pd.read_excel(up_c, dtype=str).fillna("") if up_c.name.endswith('.xlsx') else pd.read_csv(up_c, encoding='latin-1', dtype=str).fillna("")
                             up_name = up_c.name
 
-                        # --- MOTOR DE EXTRACCIÓN BLINDADO SF PANGEA ---
                         if 'lat_aux' in df_raw.columns and 'lon_aux' in df_raw.columns and df_raw['lat_aux'].notna().any():
                             df_raw['lat_aux'] = pd.to_numeric(df_raw['lat_aux'], errors='coerce')
                             df_raw['lon_aux'] = pd.to_numeric(df_raw['lon_aux'], errors='coerce')
                         else:
-                            # Buscar columna de coordenadas de manera inteligente
                             col_coor = next((c for c in df_raw.columns if any(p in str(c).lower() for p in ['coordenadas', 'gps', 'ubicacion', 'coord'])), df_raw.columns[0])
-                            
                             def limpiar_y_extraer_coordenadas(valor):
                                 texto = str(valor).lower().replace("latitude:", "").replace("longitude:", "")
                                 numeros = re.findall(r'(-?\d+\.\d+)', texto)
-                                if len(numeros) >= 2:
-                                    return float(numeros[0]), float(numeros[1])
+                                if len(numeros) >= 2: return float(numeros[0]), float(numeros[1])
                                 return None, None
-                            
                             res_coor = df_raw[col_coor].apply(limpiar_y_extraer_coordenadas)
                             df_raw['lat_aux'] = [r[0] for r in res_coor]
                             df_raw['lon_aux'] = [r[1] for r in res_coor]
@@ -709,7 +704,6 @@ else:
                             st.write("---")
                             cc1, cc2, cc3, cc4 = st.columns(4)
                             
-                            # --- 1. GENERACIÓN EXCEL PRO DINÁMICO CORREGIDO ---
                             buf_xlsx_c = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx_c, engine='openpyxl') as writer:
                                 df_export_c.to_excel(writer, index=False, sheet_name='Ruta_Clasica_SF')
@@ -737,7 +731,6 @@ else:
 
                             cc1.download_button("📗 Excel Pro Dinámico", buf_xlsx_c.getvalue(), file_name=f"SF_CLASICA_{up_name}.xlsx", use_container_width=True)
                             
-                            # --- 2. GENERACIÓN CSV ESTÁTICO ---
                             csv_buffer = io.StringIO()
                             df_export_c.to_csv(csv_buffer, index=False)
                             csv_buffer.write(f"\n--- RESUMEN OPERATIVO DINÁMICO ---\n")
@@ -749,7 +742,6 @@ else:
                             csv_buffer.write(f"Tiempo Estimado:,{t_estimado}\n")
                             cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True)
 
-                            # --- 3. GENERACIÓN KML MAESTRO CON CDATA ---
                             kml_c = simplekml.Kml()
                             folder_c = kml_c.newfolder(name=f"🚚 Ruta Única Clásica ({len(ruta_ordenada)} Pts)")
                             
@@ -799,17 +791,17 @@ else:
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
                         else:
-                            st.error("No se pudieron procesar puntos con coordenadas válidas en Modo Clásico.")
+                            st.error("No se pudieron extraer coordenadas válidas en Modo Clásico.")
                     except Exception as e: st.error(f"Error en Motor Clásico: {e}")
 
         # ==========================================
-        # PESTAÑA 2: NUEVO MOTOR MULTI-RUTA (V24)
+        # PESTAÑA 2: NUEVO MOTOR MULTI-RUTA (PRO)
         # ==========================================
         with tab1_multi:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                max_puntos_ruta = 30  # Capacidad estándar de brigada de Toluca
+                max_puntos_ruta = 30  
                 datos_vienen_de_sf5 = "df_transferido" in st.session_state and st.session_state.df_transferido is not None
                 if datos_vienen_de_sf5:
                     st.info(f"📦 Usando datos procesados de: {st.session_state.nombre_archivo_transferido}")
@@ -829,20 +821,16 @@ else:
                             df_raw = pd.read_excel(up_m, dtype=str).fillna("") if up_m.name.endswith('.xlsx') else pd.read_csv(up_m, encoding='latin-1', dtype=str).fillna("")
                             up_name = up_m.name
 
-                        # --- MOTOR DE EXTRACCIÓN BLINDADO MULTI-RUTA ---
                         if 'lat_aux' in df_raw.columns and 'lon_aux' in df_raw.columns and df_raw['lat_aux'].notna().any():
                             df_raw['lat_aux'] = pd.to_numeric(df_raw['lat_aux'], errors='coerce')
                             df_raw['lon_aux'] = pd.to_numeric(df_raw['lon_aux'], errors='coerce')
                         else:
                             col_coor = next((c for c in df_raw.columns if any(p in str(c).lower() for p in ['coordenadas', 'gps', 'ubicacion', 'coord'])), df_raw.columns[0])
-                            
                             def limpiar_y_extraer_coordenadas(valor):
                                 texto = str(valor).lower().replace("latitude:", "").replace("longitude:", "")
                                 numeros = re.findall(r'(-?\d+\.\d+)', texto)
-                                if len(numeros) >= 2:
-                                    return float(numeros[0]), float(numeros[1])
+                                if len(numeros) >= 2: return float(numeros[0]), float(numeros[1])
                                 return None, None
-                            
                             res_coor = df_raw[col_coor].apply(limpiar_y_extraer_coordenadas)
                             df_raw['lat_aux'] = [r[0] for r in res_coor]
                             df_raw['lon_aux'] = [r[1] for r in res_coor]
@@ -885,9 +873,14 @@ else:
                             st.success(f"📦 ¡Segmentación Multi-Ruta Exitosa! Se generaron **{len(lista_rutas_finales)} rutas independientes**.")
                             
                             kml = simplekml.Kml()
-                            piezas_excel = []
+                            cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
+                            
+                            excel_rutas_desglose = []
                             resumen_global_texto = ""
+                            csv_multi_buffer = io.StringIO()
+                            
                             tot_puntos_global, tot_lums_global, tot_postes_global, tot_cable_global, tot_dist_global = 0, 0, 0, 0, 0.0
+                            metricas_por_ruta = {}
 
                             for r_info in lista_rutas_finales:
                                 r_id = r_info["id_ruta"]
@@ -897,8 +890,7 @@ else:
                                 route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in r_pts] + [BASE_COORDS]
                                 
                                 geo_trazo, dist_real_km = get_real_route(route_coords)
-                                time.sleep(0.5)
-                                
+                                time.sleep(0.3)
                                 if not dist_real_km: dist_real_km = (len(r_pts) + 1) * 1.3
                                 
                                 r_lums, r_postes, r_cable = 0, 0, 0
@@ -915,21 +907,44 @@ else:
                                     r_postes += p['Cant_Postes']
                                     r_cable += p['Cant_Cable_m']
 
+                                    # --- REPLICACIÓN DE VISTA PREMIUM CDATA EN EL KML MULTI-RUTA ---
                                     pnt = folder.newpoint(name=f"[{r_id}-#{idx_r}] {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                    pnt.description = f"Ruta: {r_id}\nTurno: {idx_r}\nLuminarias: {p['Cant_Luminarias']}"
+                                    h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
+                                    h += f"<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE ({r_id})</b></td></tr>"
+                                    for col in cols_orig:
+                                        val = str(p.get(col, '')).strip()
+                                        if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
+                                    h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOSE OPERATIVO</b></td></tr>"
+                                    h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
+                                    h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
+                                    h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
+                                    h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
+                                    h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>MÉTRICAS ESTIMADAS DE BRIGADA</b></td></tr>"
+                                    h += f"<tr><td><b>Total Puntos Ruta:</b></td><td>{len(r_pts)}</td></tr>"
+                                    h += f"<tr><td><b>Total Luminarias:</b></td><td>{r_lums}</td></tr>"
+                                    h += f"<tr><td><b>Total Postes:</b></td><td>{r_postes}</td></tr>"
+                                    h += f"<tr><td><b>Total Cable:</b></td><td>{r_cable} m</td></tr>"
+                                    h += f"<tr><td><b>Distancia Tramo:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                                    h += "</table>]]>"
+                                    pnt.description = h
 
                                 if geo_trazo:
-                                    ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
                                     ls = folder.newlinestring(name=f"Trayecto Vial {r_id}")
-                                    ls.coords = ls_coords
-                                    ls.style.linestyle.width = 5
+                                    ls.coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                    ls.style.linestyle.width = 6
+                                    ls.style.linestyle.color = 'ff00cc00' 
                                 else:
                                     ls = folder.newlinestring(name=f"Trayecto Directo {r_id}")
                                     ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
-                                    ls.style.linestyle.width = 3
+                                    ls.style.linestyle.width = 4
+                                    ls.style.linestyle.color = 'ff00ffff'
                                 
                                 min_totales = ((r_lums + r_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
-                                t_estimado_r = f"{int(min_totales // 60)}h {int(min_totales % 60)}m"
+                                t_estimado_r = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
+
+                                metricas_por_ruta[r_id] = {
+                                    "puntos": len(r_pts), "distancia": round(dist_real_km, 2), "tiempo": t_estimado_r
+                                }
 
                                 tot_puntos_global += len(r_pts)
                                 tot_lums_global += r_lums
@@ -937,13 +952,13 @@ else:
                                 tot_cable_global += r_cable
                                 tot_dist_global += dist_real_km
                                 
-                                resumen_global_texto += f"**• {r_id}:** {len(r_pts)} Pts | 💡 {r_lums} Lums | 🛣️ {round(dist_real_km,1)} km | ⏱️ {t_estimado_r}\n\n"
-                                piezas_excel.append(pd.DataFrame(r_pts))
-
-                            df_export_maestro = pd.concat(piezas_excel, ignore_index=True)
-                            cols_vits = ['Ruta_Asignada', 'No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
-                            columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada']]
-                            df_export_maestro = df_export_maestro[columnas_finales]
+                                resumen_global_texto += f"**• {r_id}:** {len(r_pts)} Pts | 💡 {r_lums} Lums | 🏗️ {r_postes} Postes | 🛣️ {round(dist_real_km,1)} km | ⏱️ {t_estimado_r}\n\n"
+                                
+                                df_temp_r = pd.DataFrame(r_pts)
+                                cols_vits = ['Ruta_Asignada', 'No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
+                                columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada']]
+                                df_temp_r = df_temp_r[columnas_finales]
+                                excel_rutas_desglose.append(df_temp_r)
 
                             st.subheader("📊 Resumen Global Consolidado")
                             mg1, mg2, mg3, mg4, mg5 = st.columns(5)
@@ -955,24 +970,71 @@ else:
 
                             st.markdown("### 📋 Desglose Técnico por Ruta")
                             st.markdown(resumen_global_texto)
-                            st.dataframe(df_export_maestro, use_container_width=True, hide_index=True)
 
-                            st.write("---")
-                            c1, c2, c3 = st.columns(3)
+                            # --- GENERACIÓN DEL EXCEL PRO MULTI-RESUMEN ---
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
-                                df_export_maestro.to_excel(writer, index=False, sheet_name='Plan_De_Rutas_SF')
-                            
-                            c1.download_button("📗 Descargar Excel Maestro", buf_xlsx.getvalue(), file_name=f"SF_MULTI_RUTA_{up_name}.xlsx", use_container_width=True)
-                            c2.download_button("🗺️ Descargar KML Multi-Ruta", kml.kml(), file_name=f"SF_MULTI_RUTA_{up_name}.kml", use_container_width=True)
-                            c3.link_button("🚀 Abrir Google My Maps", "https://www.google.com/maps/d/", use_container_width=True)
+                                df_maestro_completo = pd.concat(excel_rutas_desglose, ignore_index=True)
+                                df_maestro_completo.to_excel(writer, index=False, sheet_name='Plan_De_Rutas_SF')
+                                ws = writer.sheets['Plan_De_Rutas_SF']
+                                
+                                ws.delete_rows(2, ws.max_row)
+                                r_actual = 2
+                                fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
+                                
+                                for df_r in excel_rutas_desglose:
+                                    r_id = df_r.iloc[0]['Ruta_Asignada']
+                                    m_info = metricas_por_ruta[r_id]
+                                    inicio_bloque = r_actual
+                                    
+                                    for _, fila in df_r.iterrows():
+                                        for c_idx, valor in enumerate(fila, 1):
+                                            ws.cell(row=r_actual, column=c_idx, value=valor)
+                                        
+                                        if int(fila['Cant_Postes']) > 0:
+                                            for cell in ws[r_actual]: cell.fill = fg
+                                        elif int(fila['Cant_Cable_m']) > 0:
+                                            for cell in ws[r_actual]: cell.fill = fa
+                                        r_actual += 1
+                                    
+                                    fin_bloque = r_actual - 1
+                                    
+                                    r_actual += 1
+                                    ws.cell(row=r_actual, column=2, value=f"--- RESUMEN OPERATIVO DINÁMICO ({r_id}) ---")
+                                    ws.cell(row=r_actual+1, column=1, value="Total Puntos:"); ws.cell(row=r_actual+1, column=2, value=m_info["puntos"])
+                                    ws.cell(row=r_actual+2, column=1, value="Total Luminarias:"); ws.cell(row=r_actual+2, column=2, value=f"=SUM(D{inicio_bloque}:D{fin_bloque})")
+                                    ws.cell(row=r_actual+3, column=1, value="Total Postes:"); ws.cell(row=r_actual+3, column=2, value=f"=SUM(E{inicio_bloque}:E{fin_bloque})")
+                                    ws.cell(row=r_actual+4, column=1, value="Total Cable:"); ws.cell(row=r_actual+4, column=2, value=f"=SUM(F{inicio_bloque}:F{fin_bloque})")
+                                    ws.cell(row=r_actual+5, column=1, value="Distancia Tramo:"); ws.cell(row=r_actual+5, column=2, value=f"{m_info['distancia']} km")
+                                    ws.cell(row=r_actual+6, column=1, value="Tiempo Estimado:"); ws.cell(row=r_actual+6, column=2, value=m_info["tiempo"])
+                                    
+                                    r_actual += 9 
+
+                            st.dataframe(df_maestro_completo, use_container_width=True, hide_index=True)
+
+                            # --- GENERACIÓN DEL CSV MULTI-RUTA ESTÁTICO ---
+                            for df_r in excel_rutas_desglose:
+                                df_r.to_csv(csv_multi_buffer, index=False)
+                                r_id = df_r.iloc[0]['Ruta_Asignada']
+                                m_info = metricas_por_ruta[r_id]
+                                csv_multi_buffer.write(f"\n--- RESUMEN OPERATIVO DINÁMICO ({r_id}) ---\n")
+                                csv_multi_buffer.write(f"Total Puntos:,{m_info['puntos']}\n")
+                                csv_multi_buffer.write(f"Distancia Total:,{m_info['distancia']} km\n")
+                                csv_multi_buffer.write(f"Tiempo Estimado:,{m_info['tiempo']}\n\n")
+
+                            st.write("---")
+                            c1, c2, c3, c4 = st.columns(4)
+                            c1.download_button("📗 Excel Multi-Resumen Pro", buf_xlsx.getvalue(), file_name=f"SF_MULTI_PRO_{up_name}.xlsx", use_container_width=True)
+                            c2.download_button("📊 CSV Multi-Estático", csv_multi_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_MULTI_PRO_{up_name}.csv", use_container_width=True)
+                            c3.download_button("🗺️ KML Maestro Detallado", kml.kml(), file_name=f"SF_MULTI_PRO_{up_name}.kml", use_container_width=True)
+                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR LOTE EN BITÁCORA", use_container_width=True, key="reg_m"):
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    info_j = f"Modo: Multi-Ruta, Rutas: {len(lista_rutas_finales)}, Pts: {tot_puntos_global}, Lums: {tot_lums_global}"
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"MULTIRUTA_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    info_j = f"Modo: Multi-Ruta Pro, Rutas: {len(lista_rutas_finales)}, Pts: {tot_puntos_global}, Lums: {tot_lums_global}, Dist: {round(tot_dist_global,1)}km"
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"MULTIRUTA_PRO_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
