@@ -494,7 +494,7 @@ else:
                 c_input, c_lista = st.columns([1, 1])
                 
                 # =========================================================
-                # COLUMNA IZQUIERDA: CAPTURA DE DATOS (FOCO EN RÁFAGA)
+                # COLUMNA IZQUIERDA: CAPTURA DE DATOS (FOCO EN RÁFAGA CORREGIDO)
                 # =========================================================
                 with c_input:
                     st.subheader("⌨️ Captura de Folios")
@@ -503,7 +503,7 @@ else:
                     with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
                         col_f_in, col_ot_in = st.columns([1.2, 1.0])
                         with col_f_in:
-                            # Le asignamos un ID HTML estático 'campo_folio' mediante el truco de la key dinámica
+                            # Mantiene la clave dinámica para forzar la limpieza en cada iteración
                             in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
                         with col_ot_in:
                             in_ot_val = st.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
@@ -554,11 +554,11 @@ else:
                                     # GATILLO ULTRA-RÁPIDO: Incrementamos la clave para resetear inputs
                                     st.session_state.input_key += 1
                                     
-                                    # INYECCIÓN SCRIPT: Forzamos al navegador a buscar el primer input de texto disponible y darle focus()
+                                    # INYECCIÓN SCRIPT CORREGIDA: Apunta con mira láser al input que inicia con 'f_' (Folio / Círculo Verde)
                                     st.components.v1.html(
                                         """
                                         <script>
-                                            window.parent.document.querySelector('input[data-testid="stTextInput"]').focus();
+                                            window.parent.document.querySelector('input[id^="f_"]').focus();
                                         </script>
                                         """,
                                         height=0,
