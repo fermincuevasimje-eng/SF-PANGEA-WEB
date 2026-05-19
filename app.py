@@ -493,67 +493,78 @@ else:
                 
                 c_input, c_lista = st.columns([1, 1])
                 
+                # =========================================================
+                # COLUMNA IZQUIERDA: CAPTURA DE DATOS (FOCO REPARADO)
+                # =========================================================
                 with c_input:
                     st.subheader("⌨️ Captura de Folios")
                     
-                    # Formulario para capturar el Enter
-                    with st.form("form_bajas", clear_on_submit=True):
-                        # NIVEL 1: Identificadores principales (Ideales para cualquier tamaño de monitor)
+                    # El formulario cambia de ID dinámicamente con input_key para obligar al cursor a regresar arriba
+                    with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
                         col_f_in, col_ot_in = st.columns([1.2, 1.0])
                         with col_f_in:
                             in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
                         with col_ot_in:
                             in_ot_val = st.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
                         
-                        # NIVEL 2: Manejo de Fechas (Calendario a la izquierda, entrada manual a la derecha)
                         col_cal_in, col_man_in = st.columns([1.1, 1.1])
                         with col_cal_in:
                             date_picker = st.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
                         with col_man_in:
-                            date_manual = st.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AA", key=f"dt_m_{st.session_state.input_key}")
+                            date_manual = st.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
                         
                         st.markdown("---")
                         
-                        # NIVEL 3: El campo protagónico largo para la Respuesta Libre
                         in_libre_val = st.text_input("Respuesta Libre / Observaciones (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
                         
                         submitted = st.form_submit_button("➕ Agregar a Lista", use_container_width=True)
                         
+                        # --- MOTOR DE PROCESAMIENTO INMEDIATO ---
                         if submitted:
                             f_final = in_f_val.strip()
                             
-                            # Decisión del origen de la fecha (Usamos formato de 2 dígitos para el año para ahorrar espacio útil)
-                            if date_manual.strip():
-                                fecha_final_texto = date_manual.strip()
-                            else:
-                                fecha_final_texto = date_picker.strftime("%d/%m/%y")
-                            
-                            # ESTRUCTURA PREMIUM: Añadimos la etiqueta O.T. solicitada manteniendo la compresión de espacio
-                            ot_part = f"O.T. {in_ot_val.strip()}" if in_ot_val.strip() else ""
-                            fecha_part = fecha_final_texto
-                            libre_part = in_libre_val.strip()
-                            
-                            # Consolidamos usando el separador compacto para la lista y el Excel
-                            componentes = [c for c in [ot_part, fecha_part, libre_part] if c]
-                            c_final = " | ".join(componentes) if componentes else "ATENDIDO"
-                            
-                            # Candado de protección para el formato estricto de celda de Excel (Máx 30 caracteres)
-                            if len(c_final) > 30:
-                                c_final = c_final[:27] + "..."
-                            
                             if f_final:
-                                # --- CANDADO DE VALIDACIÓN PREMIUM ---
+                                # 1. Candado de Validación: Verificar existencia en archivo
                                 if f_final in df_ref[id_col_sf2].astype(str).values:
+                                    
+                                    # 2. Formato estricto de fecha con año a 4 dígitos para Toluca (DD/MM/AAAA)
+                                    if date_manual.strip():
+                                        fecha_final_texto = date_manual.strip()
+                                    else:
+                                        fecha_final_texto = date_picker.strftime("%d/%m/%Y")
+                                    
+                                    # 3. Construcción de la respuesta
+                                    ot_part = f"O.T. {in_ot_val.strip()}" if in_ot_val.strip() else ""
+                                    libre_part = in_libre_val.strip()
+                                    
+                                    # REGLA MAESTRA: Si va vacío, auto-genera "ATENDIDO | FECHA"
+                                    if not libre_part:
+                                        componentes = [c for c in [ot_part, "ATENDIDO", fecha_final_texto] if c]
+                                        c_final = " | ".join(componentes)
+                                    else:
+                                        # Si el usuario sí escribió observaciones, preserva todo lo capturado completo
+                                        componentes = [c for c in [ot_part, fecha_final_texto, libre_part] if c]
+                                        c_final = " | ".join(componentes)
+                                    
+                                    # Candado de longitud estricta para celdas de Excel (Máx 30 caracteres)
+                                    if len(c_final) > 30:
+                                        c_final = c_final[:27] + "..."
+                                    
+                                    # 4. Inyección en memoria limpia
                                     st.session_state.lista_bajas[f_final] = c_final
                                     st.toast(f"Folio {f_final} validado", icon="✅")
                                     
-                                    # CAMBIO MAESTRO PARA EL FOCO: Regresa el control al primer input inmediatamente
+                                    # GATILLO DEL CURSOR: Cambiamos la llave maestra para reiniciar el formulario y regresar el foco al primer campo
                                     st.session_state.input_key += 1
                                     st.rerun()
                                 else:
                                     st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
-                                # --------------------------------------
-    
+                            else:
+                                st.warning("⚠️ Por favor digite un folio antes de agregar.")
+
+                # =========================================================
+                # COLUMNA DERECHA: VISTAS, BÓVEDA Y EXCEL HISTÓRICO
+                # =========================================================
                 with c_lista:
                     # --- 1. GESTIÓN DE PERSISTENCIA (BÓVEDA FÍSICA) ---
                     PATH_BAJAS_DB = "boveda_bajas.json"
@@ -570,28 +581,22 @@ else:
                     with tab_actual:
                         st.subheader("Folios en proceso de baja")
                         if st.session_state.lista_bajas:
-                            # Visor de la lista que estás capturando en el momento
                             df_resumen_bajas = pd.DataFrame([{"Folio": k, "Respuesta 127": v} for k, v in st.session_state.lista_bajas.items()])
                             st.dataframe(df_resumen_bajas, use_container_width=True, hide_index=True)
                             
-                            # Botón principal de procesamiento
                             if st.button("📥 Generar Documento de Bajas", use_container_width=True, type="primary"):
                                 st.balloons()
                                 
-                                # Filtrado de folios contra el archivo de referencia
                                 folios_a_buscar = list(st.session_state.lista_bajas.keys())
                                 df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
-                                
-                                # Inyección de la columna Respuesta 127
                                 df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].map(st.session_state.lista_bajas)
                                 
-                                # Generación del Excel en memoria
                                 output_sf2 = io.BytesIO()
                                 with pd.ExcelWriter(output_sf2, engine='openpyxl') as writer:
                                     df_final_bajas.to_excel(writer, index=False, sheet_name='BAJAS_SF')
                                 excel_data = output_sf2.getvalue()
 
-                                # --- PROTOCOLO DE RESPALDO EN BÓVEDA ---
+                                # Protocolo de Respaldo en la Bóveda JSON
                                 id_registro_baja = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
                                 st.session_state.db_bajas_historico[id_registro_baja] = {
                                     "fecha_generacion": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
@@ -601,7 +606,6 @@ else:
                                     "datos_capture": dict(st.session_state.lista_bajas),
                                     "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
-                                # Guardado físico en el servidor
                                 with open(PATH_BAJAS_DB, "w", encoding="utf-8") as f:
                                     json.dump(st.session_state.db_bajas_historico, f, indent=4, ensure_ascii=False)
 
@@ -615,7 +619,6 @@ else:
                                     use_container_width=True
                                 )
                             
-                            # --- BOTÓN DE LIMPIEZA CON CANDADO DE SEGURIDAD ---
                             st.write("---")
                             st.write("⚠️ **Zona de Peligro**")
                             seguro_limpieza = st.checkbox("🔐 Confirmar vaciado de la lista actual", key="seguro_limpiar_bajas")
@@ -630,7 +633,6 @@ else:
                     with tab_boveda:
                         st.subheader("🗄️ Historial Permanente de Bajas")
                         if st.session_state.db_bajas_historico:
-                            # Tabla resumen de la Bóveda
                             lista_tabla_boveda = []
                             for k, v in st.session_state.db_bajas_historico.items():
                                 lista_tabla_boveda.append({
@@ -655,7 +657,6 @@ else:
                                         df_detalles_hist = pd.DataFrame([{"Folio": k, "Respuesta 127": v} for k, v in data_hist["datos_capture"].items()])
                                         st.dataframe(df_detalles_hist, use_container_width=True, hide_index=True)
                                     
-                                    # Reconstrucción del archivo desde Base64
                                     excel_recuperado_bytes = base64.b64decode(data_hist["excel_base64"])
                                     st.download_button(
                                         label=f"🔄 Volver a descargar Excel",
