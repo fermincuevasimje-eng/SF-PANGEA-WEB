@@ -596,7 +596,7 @@ else:
         ])
 
         # ==========================================
-        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (RECUPERADO V23)
+        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (V23 PRO RECUPERADO)
         # ==========================================
         with tab1:
             if st.session_state.perfil == "CONSULTA":
@@ -621,9 +621,26 @@ else:
                             df_raw = pd.read_excel(up_c, dtype=str).fillna("") if up_c.name.endswith('.xlsx') else pd.read_csv(up_c, encoding='latin-1', dtype=str).fillna("")
                             up_name = up_c.name
 
+                        # --- MOTOR DE EXTRACCIÓN BLINDADO SF PANGEA ---
+                        if 'lat_aux' in df_raw.columns and 'lon_aux' in df_raw.columns and df_raw['lat_aux'].notna().any():
+                            df_raw['lat_aux'] = pd.to_numeric(df_raw['lat_aux'], errors='coerce')
+                            df_raw['lon_aux'] = pd.to_numeric(df_raw['lon_aux'], errors='coerce')
+                        else:
+                            # Buscar columna de coordenadas de manera inteligente
+                            col_coor = next((c for c in df_raw.columns if any(p in str(c).lower() for p in ['coordenadas', 'gps', 'ubicacion', 'coord'])), df_raw.columns[0])
+                            
+                            def limpiar_y_extraer_coordenadas(valor):
+                                texto = str(valor).lower().replace("latitude:", "").replace("longitude:", "")
+                                numeros = re.findall(r'(-?\d+\.\d+)', texto)
+                                if len(numeros) >= 2:
+                                    return float(numeros[0]), float(numeros[1])
+                                return None, None
+                            
+                            res_coor = df_raw[col_coor].apply(limpiar_y_extraer_coordenadas)
+                            df_raw['lat_aux'] = [r[0] for r in res_coor]
+                            df_raw['lon_aux'] = [r[1] for r in res_coor]
+
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
-                        res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-                        df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
                         df_v = df_raw.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
 
                         if not df_v.empty:
@@ -692,7 +709,7 @@ else:
                             st.write("---")
                             cc1, cc2, cc3, cc4 = st.columns(4)
                             
-                            # --- 1. GENERACIÓN EXCEL PRO DINÁMICO (V23 CORREGIDO) ---
+                            # --- 1. GENERACIÓN EXCEL PRO DINÁMICO CORREGIDO ---
                             buf_xlsx_c = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx_c, engine='openpyxl') as writer:
                                 df_export_c.to_excel(writer, index=False, sheet_name='Ruta_Clasica_SF')
@@ -720,7 +737,7 @@ else:
 
                             cc1.download_button("📗 Excel Pro Dinámico", buf_xlsx_c.getvalue(), file_name=f"SF_CLASICA_{up_name}.xlsx", use_container_width=True)
                             
-                            # --- 2. GENERACIÓN CSV ESTÁTICO (V23) ---
+                            # --- 2. GENERACIÓN CSV ESTÁTICO ---
                             csv_buffer = io.StringIO()
                             df_export_c.to_csv(csv_buffer, index=False)
                             csv_buffer.write(f"\n--- RESUMEN OPERATIVO DINÁMICO ---\n")
@@ -732,7 +749,7 @@ else:
                             csv_buffer.write(f"Tiempo Estimado:,{t_estimado}\n")
                             cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True)
 
-                            # --- 3. GENERACIÓN KML MAESTRO CON CDATA (V23) ---
+                            # --- 3. GENERACIÓN KML MAESTRO CON CDATA ---
                             kml_c = simplekml.Kml()
                             folder_c = kml_c.newfolder(name=f"🚚 Ruta Única Clásica ({len(ruta_ordenada)} Pts)")
                             
@@ -781,7 +798,8 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
-
+                        else:
+                            st.error("No se pudieron procesar puntos con coordenadas válidas en Modo Clásico.")
                     except Exception as e: st.error(f"Error en Motor Clásico: {e}")
 
         # ==========================================
@@ -791,7 +809,7 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                max_puntos_ruta = 30  # Capacidad estándar de brigada
+                max_puntos_ruta = 30  # Capacidad estándar de brigada de Toluca
                 datos_vienen_de_sf5 = "df_transferido" in st.session_state and st.session_state.df_transferido is not None
                 if datos_vienen_de_sf5:
                     st.info(f"📦 Usando datos procesados de: {st.session_state.nombre_archivo_transferido}")
@@ -811,9 +829,25 @@ else:
                             df_raw = pd.read_excel(up_m, dtype=str).fillna("") if up_m.name.endswith('.xlsx') else pd.read_csv(up_m, encoding='latin-1', dtype=str).fillna("")
                             up_name = up_m.name
 
+                        # --- MOTOR DE EXTRACCIÓN BLINDADO MULTI-RUTA ---
+                        if 'lat_aux' in df_raw.columns and 'lon_aux' in df_raw.columns and df_raw['lat_aux'].notna().any():
+                            df_raw['lat_aux'] = pd.to_numeric(df_raw['lat_aux'], errors='coerce')
+                            df_raw['lon_aux'] = pd.to_numeric(df_raw['lon_aux'], errors='coerce')
+                        else:
+                            col_coor = next((c for c in df_raw.columns if any(p in str(c).lower() for p in ['coordenadas', 'gps', 'ubicacion', 'coord'])), df_raw.columns[0])
+                            
+                            def limpiar_y_extraer_coordenadas(valor):
+                                texto = str(valor).lower().replace("latitude:", "").replace("longitude:", "")
+                                numeros = re.findall(r'(-?\d+\.\d+)', texto)
+                                if len(numeros) >= 2:
+                                    return float(numeros[0]), float(numeros[1])
+                                return None, None
+                            
+                            res_coor = df_raw[col_coor].apply(limpiar_y_extraer_coordenadas)
+                            df_raw['lat_aux'] = [r[0] for r in res_coor]
+                            df_raw['lon_aux'] = [r[1] for r in res_coor]
+
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
-                        res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
-                        df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
                         df_v = df_raw.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
 
                         if not df_v.empty:
@@ -848,7 +882,7 @@ else:
                                 })
                                 contador_rutas += 1
 
-                            st.success(f"📦 ¡Segmentación Exitosa! Se generaron **{len(lista_rutas_finales)} rutas independientes** de máximo {max_puntos_ruta} puntos.")
+                            st.success(f"📦 ¡Segmentación Multi-Ruta Exitosa! Se generaron **{len(lista_rutas_finales)} rutas independientes**.")
                             
                             kml = simplekml.Kml()
                             piezas_excel = []
@@ -942,7 +976,8 @@ else:
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
-
+                        else:
+                            st.error("No se pudieron extraer coordenadas válidas en Modo Multi-Ruta.")
                     except Exception as e: st.error(f"Error en Motor Multi-Ruta V24: {e}")
 
         # ==========================================
