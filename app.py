@@ -757,7 +757,7 @@ else:
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                h += f"<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>--- RESUMEN OPERATIVO DINÁMICO ({r_id}) ---</b></td></tr>"
+                                h += f"<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>--- RESUMEN OPERATIVO DINÁMICO ---</b></td></tr>"
                                 h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ruta_ordenada)}</td></tr>"
                                 h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{tot_lums}</td></tr>"
                                 h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{tot_postes}</td></tr>"
@@ -919,7 +919,8 @@ else:
                                     h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                     h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                     h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                    h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>MÉTRICAS ESTIMADAS DE BRIGADA</b></td></tr>"
+                                    # ENCABEZADO CORREGIDO: Ahora jala el nombre dinámico del KML idéntico al del Excel Pro
+                                    h += f"<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>--- RESUMEN OPERATIVO DINÁMICO ({r_id}) ---</b></td></tr>"
                                     h += f"<tr><td><b>Total Puntos Ruta:</b></td><td>{len(r_pts)}</td></tr>"
                                     h += f"<tr><td><b>Total Luminarias:</b></td><td>{r_lums}</td></tr>"
                                     h += f"<tr><td><b>Total Postes:</b></td><td>{r_postes}</td></tr>"
