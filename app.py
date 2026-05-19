@@ -692,7 +692,7 @@ else:
                             st.write("---")
                             cc1, cc2, cc3, cc4 = st.columns(4)
                             
-                            # --- 1. GENERACIÓN EXCEL PRO DINÁMICO (V23) ---
+                            # --- 1. GENERACIÓN EXCEL PRO DINÁMICO (V23 CORREGIDO) ---
                             buf_xlsx_c = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx_c, engine='openpyxl') as writer:
                                 df_export_c.to_excel(writer, index=False, sheet_name='Ruta_Clasica_SF')
@@ -702,10 +702,10 @@ else:
                                 
                                 ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
                                 ws.cell(row=res_row+1, column=1, value="Total Puntos:"); ws.cell(row=res_row+1, column=2, value=len(ruta_ordenada))
-                                ws.cell(row=res_row+2, column=1, value="Total Luminarias:"); ws.cell(row=res_row+2, value=f"=SUM(D2:D{last_row})")
-                                ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, value=f"=SUM(E2:E{last_row})")
-                                ws.cell(row=res_row+4, column=1, value="Total Cable:"); ws.cell(row=res_row+4, value=f"=SUM(F2:F{last_row})")
-                                ws.cell(row=res_row+5, column=1, value="Distancia:"); ws.cell(row=res_row+5, value=f"{round(dist_real_km,2)} km")
+                                ws.cell(row=res_row+2, column=1, value="Total Luminarias:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(D2:D{last_row})")
+                                ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(E2:E{last_row})")
+                                ws.cell(row=res_row+4, column=1, value="Total Cable:"); ws.cell(row=res_row+4, column=2, value=f"=SUM(F2:F{last_row})")
+                                ws.cell(row=res_row+5, column=1, value="Distancia:"); ws.cell(row=res_row+5, column=2, value=f"{round(dist_real_km,2)} km")
                                 
                                 f_calc = f"ROUND(((B{res_row+2}+B{res_row+3})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
                                 ws.cell(row=res_row+6, column=1, value="Tiempo Estimado:")
