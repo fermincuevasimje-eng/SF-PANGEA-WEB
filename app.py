@@ -587,32 +587,154 @@ else:
                 st.error(f"Error en SF2: {e}")
     
     elif st.session_state.menu == "SF1":
-        st.title("🚀 GdR V24 - Generador de Multi-Rutas Inteligente")
-        tab1, tab2, tab3 = st.tabs(["🆕 Nueva Segmentación Masiva", "📂 Bitácora", "🗑️ Papelera"])
+        st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
+        tab1, tab1_multi, tab2, tab3 = st.tabs([
+            "📍 Generador de Ruta Clásico", 
+            "🚚 Nuevo Motor Multi-Ruta", 
+            "📂 Bitácora", 
+            "🗑️ Papelera"
+        ])
 
+        # ==========================================
+        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (V23)
+        # ==========================================
         with tab1:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
                 datos_vienen_de_sf5 = "df_transferido" in st.session_state and st.session_state.df_transferido is not None
-                
                 if datos_vienen_de_sf5:
                     st.info(f"📦 Usando datos procesados de: {st.session_state.nombre_archivo_transferido}")
-                    if st.button("❌ Cancelar y subir otro archivo"):
+                    if st.button("❌ Cancelar y subir otro archivo", key="cancel_c"):
                         st.session_state.df_transferido = None
                         st.rerun()
-                    up = True
+                    up_c = True
                 else:
-                    up = st.file_uploader("Subir Archivo (Excel/CSV)", type=["csv", "xlsx"])
+                    up_c = st.file_uploader("Subir Archivo (Excel/CSV) - Modo Clásico", type=["csv", "xlsx"], key="up_clasico")
 
-                if up:
+                if up_c:
                     try:
                         if datos_vienen_de_sf5:
                             df_raw = st.session_state.df_transferido.copy()
                             up_name = st.session_state.nombre_archivo_transferido
                         else:
-                            df_raw = pd.read_excel(up, dtype=str).fillna("") if up.name.endswith('.xlsx') else pd.read_csv(up, encoding='latin-1', dtype=str).fillna("")
-                            up_name = up.name
+                            df_raw = pd.read_excel(up_c, dtype=str).fillna("") if up_c.name.endswith('.xlsx') else pd.read_csv(up_c, encoding='latin-1', dtype=str).fillna("")
+                            up_name = up_c.name
+
+                        id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
+                        res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
+                        df_raw['lat_aux'], df_raw['lon_aux'] = res_gps.apply(lambda x: float(x.group(1)) if x else None), res_gps.apply(lambda x: float(x.group(2)) if x else None)
+                        df_v = df_raw.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
+
+                        if not df_v.empty:
+                            pts = df_v.to_dict('records')
+                            coords_base = np.array([BASE_COORDS])
+                            
+                            # Lógica Clásica: Ordenar secuencialmente por cercanía acumulada
+                            ruta_ordenada = []
+                            last_coord = BASE_COORDS
+                            while len(pts) > 0:
+                                rest_coords = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
+                                idx_proximo = np.argmin(cdist([last_coord], rest_coords)[0])
+                                p_elegido = pts.pop(idx_proximo)
+                                ruta_ordenada.append(p_elegido)
+                                last_coord = (p_elegido['lat_aux'], p_elegido['lon_aux'])
+
+                            st.success(f"📦 ¡Ruta Única Generada! Se procesaron **{len(ruta_ordenada)} puntos** en secuencia.")
+                            
+                            kml_c = simplekml.Kml()
+                            folder_c = kml_c.newfolder(name=f"🚚 Ruta Única Clásica ({len(ruta_ordenada)} Pts)")
+                            route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ruta_ordenada] + [BASE_COORDS]
+                            
+                            geo_trazo, dist_real_km = get_real_route(route_coords)
+                            if not dist_real_km: dist_real_km = (len(ruta_ordenada) + 1) * 1.3
+                            
+                            tot_lums, tot_postes, tot_cable = 0, 0, 0
+                            for idx_r, p in enumerate(ruta_ordenada, 1):
+                                p['Ruta_Asignada'] = "Ruta_Unica"
+                                p['No_Ruta'] = idx_r
+                                p['ID_Pangea_Nombre'] = p[id_col]
+                                p['Cant_Luminarias'] = extraer_carga_robusta(p, 'lum') or (1 if extraer_carga_robusta(p, 'poste')==0 and extraer_carga_robusta(p, 'cable')==0 else 0)
+                                p['Cant_Postes'] = extraer_carga_robusta(p, 'poste')
+                                p['Cant_Cable_m'] = extraer_carga_robusta(p, 'cable')
+                                p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
+                                
+                                tot_lums += p['Cant_Luminarias']
+                                tot_postes += p['Cant_Postes']
+                                tot_cable += p['Cant_Cable_m']
+
+                                pnt = folder_c.newpoint(name=f"[Ruta_Unica-#{idx_r}] {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                                pnt.description = f"Turno: {idx_r}\nLuminarias: {p['Cant_Luminarias']}"
+
+                            if geo_trazo:
+                                ls = folder_c.newlinestring(name="Trayecto Vial Único")
+                                ls.coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls.style.linestyle.width = 5
+                            
+                            min_totales = ((tot_lums + tot_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
+                            t_estimado = f"{int(min_totales // 60)}h {int(min_totales % 60)}m"
+
+                            # Mostrar métricas del modo clásico
+                            st.subheader("📊 Resumen de Ruta Única")
+                            mc1, mc2, mc3, mc4 = st.columns(4)
+                            mc1.metric("📍 Total Puntos", len(ruta_ordenada))
+                            mc2.metric("💡 Total Luminarias", tot_lums)
+                            mc3.metric("🛣️ Distancia", f"{round(dist_real_km, 1)} km")
+                            mc4.metric("⏱️ Tiempo Est.", t_estimado)
+
+                            df_export_c = pd.DataFrame(ruta_ordenada)
+                            cols_vits = ['Ruta_Asignada', 'No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
+                            columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada']]
+                            df_export_c = df_export_c[columnas_finales]
+
+                            st.dataframe(df_export_c, use_container_width=True, hide_index=True)
+
+                            st.write("---")
+                            cc1, cc2 = st.columns(2)
+                            buf_xlsx_c = io.BytesIO()
+                            with pd.ExcelWriter(buf_xlsx_c, engine='openpyxl') as writer:
+                                df_export_c.to_excel(writer, index=False, sheet_name='Ruta_Clasica_SF')
+                            
+                            cc1.download_button("📗 Descargar Excel Clásico", buf_xlsx_c.getvalue(), file_name=f"SF_RUTA_CLASICA_{up_name}.xlsx", use_container_width=True)
+                            cc2.download_button("🗺️ Descargar KML Clásico", kml_c.kml(), file_name=f"SF_RUTA_CLASICA_{up_name}.kml", use_container_width=True)
+
+                            if st.button("💾 REGISTRAR RUTA CLÁSICA EN BITÁCORA", use_container_width=True, key="reg_c"):
+                                try:
+                                    conn = st.connection("gsheets", type=GSheetsConnection)
+                                    hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    info_j = f"Modo: Clásico, Pts: {len(ruta_ordenada)}, Lums: {tot_lums}, Dist: {round(dist_real_km,1)}km"
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"CLASICA_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
+                                    st.balloons(); st.success("¡Bitácora actualizada!")
+                                except Exception as e: st.error(f"Error GSheets: {e}")
+
+                    except Exception as e: st.error(f"Error en Motor Clásico: {e}")
+
+        # ==========================================
+        # PESTAÑA 2: NUEVO MOTOR MULTI-RUTA (V24)
+        # ==========================================
+        with tab1_multi:
+            if st.session_state.perfil == "CONSULTA":
+                st.warning("⚠️ Modo Consulta activo.")
+            else:
+                datos_vienen_de_sf5 = "df_transferido" in st.session_state and st.session_state.df_transferido is not None
+                if datos_vienen_de_sf5:
+                    st.info(f"📦 Usando datos procesados de: {st.session_state.nombre_archivo_transferido}")
+                    if st.button("❌ Cancelar y subir otro archivo", key="cancel_m"):
+                        st.session_state.df_transferido = None
+                        st.rerun()
+                    up_m = True
+                else:
+                    up_m = st.file_uploader("Subir Archivo (Excel/CSV) - Modo Multi-Ruta", type=["csv", "xlsx"], key="up_multiruta")
+
+                if up_m:
+                    try:
+                        if datos_vienen_de_sf5:
+                            df_raw = st.session_state.df_transferido.copy()
+                            up_name = st.session_state.nombre_archivo_transferido
+                        else:
+                            df_raw = pd.read_excel(up_m, dtype=str).fillna("") if up_m.name.endswith('.xlsx') else pd.read_csv(up_m, encoding='latin-1', dtype=str).fillna("")
+                            up_name = up_m.name
 
                         id_col = next((c for c in df_raw.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID'])), df_raw.columns[0])
                         res_gps = df_raw.apply(lambda r: re.search(r'(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})', " ".join(r.astype(str))), axis=1)
@@ -621,14 +743,11 @@ else:
 
                         if not df_v.empty:
                             pts_restantes = df_v.to_dict('records')
-                            
-                            # --- NUEVA LÓGICA CORE MULTI-RUTA DE LA V24 ---
                             lista_rutas_finales = []
                             contador_rutas = 1
                             coords_base = np.array([BASE_COORDS])
 
                             while len(pts_restantes) > 0:
-                                # 1. Encontrar el punto más lejano a la base dentro de los que quedan
                                 rest_coords = np.array([[p['lat_aux'], p['lon_aux']] for p in pts_restantes])
                                 distancias_a_base = cdist(coords_base, rest_coords)[0]
                                 idx_mas_lejano = np.argmax(distancias_a_base)
@@ -637,7 +756,6 @@ else:
                                 ruta_actual_puntos = [punto_inicial]
                                 last_coord = (punto_inicial['lat_aux'], punto_inicial['lon_aux'])
 
-                                # 2. Llenar la ruta actual hasta el límite configurado en el slider
                                 while len(pts_restantes) > 0 and len(ruta_actual_puntos) < max_puntos_ruta:
                                     rest_coords_loop = np.array([[p['lat_aux'], p['lon_aux']] for p in pts_restantes])
                                     dist_al_ultimo = cdist([last_coord], rest_coords_loop)[0]
@@ -655,31 +773,24 @@ else:
                                 })
                                 contador_rutas += 1
 
-                            # --- RENDERIZADO Y EXPORTACIÓN MULTI-RUTA ---
                             st.success(f"📦 ¡Segmentación Exitosa! Se generaron **{len(lista_rutas_finales)} rutas independientes** de máximo {max_puntos_ruta} puntos.")
                             
                             kml = simplekml.Kml()
                             piezas_excel = []
-                            
                             resumen_global_texto = ""
                             tot_puntos_global, tot_lums_global, tot_postes_global, tot_cable_global, tot_dist_global = 0, 0, 0, 0, 0.0
 
-                            # Procesamos cada ruta de forma independiente
                             for r_info in lista_rutas_finales:
                                 r_id = r_info["id_ruta"]
                                 r_pts = r_info["puntos"]
                                 
-                                # Crear carpeta en el KML para orden visual puro
                                 folder = kml.newfolder(name=f"🚚 {r_id} ({len(r_pts)} Pts)")
-                                
                                 route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in r_pts] + [BASE_COORDS]
                                 
-                                # Consular OSRM con freno de mano para no tirar el servidor público
                                 geo_trazo, dist_real_km = get_real_route(route_coords)
-                                time.sleep(0.5) # Anti-bloqueo API
+                                time.sleep(0.5)
                                 
-                                if not dist_real_km: 
-                                    dist_real_km = (len(r_pts) + 1) * 1.3
+                                if not dist_real_km: dist_real_km = (len(r_pts) + 1) * 1.3
                                 
                                 r_lums, r_postes, r_cable = 0, 0, 0
                                 for idx_r, p in enumerate(r_pts, 1):
@@ -695,11 +806,9 @@ else:
                                     r_postes += p['Cant_Postes']
                                     r_cable += p['Cant_Cable_m']
 
-                                    # Agregar pin a la carpeta correspondiente del KML
                                     pnt = folder.newpoint(name=f"[{r_id}-#{idx_r}] {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                    pnt.description = f"Ruta: {r_id}\nTurno: {idx_r}\nLuminarias: {p['Cant_Luminarias']}\nPostes: {p['Cant_Postes']}"
+                                    pnt.description = f"Ruta: {r_id}\nTurno: {idx_r}\nLuminarias: {p['Cant_Luminarias']}"
 
-                                # Dibujar línea de trayectoria para esta ruta
                                 if geo_trazo:
                                     ls_coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
                                     ls = folder.newlinestring(name=f"Trayecto Vial {r_id}")
@@ -713,7 +822,6 @@ else:
                                 min_totales = ((r_lums + r_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
                                 t_estimado_r = f"{int(min_totales // 60)}h {int(min_totales % 60)}m"
 
-                                # Acumuladores Globales
                                 tot_puntos_global += len(r_pts)
                                 tot_lums_global += r_lums
                                 tot_postes_global += r_postes
@@ -723,14 +831,11 @@ else:
                                 resumen_global_texto += f"**• {r_id}:** {len(r_pts)} Pts | 💡 {r_lums} Lums | 🛣️ {round(dist_real_km,1)} km | ⏱️ {t_estimado_r}\n\n"
                                 piezas_excel.append(pd.DataFrame(r_pts))
 
-                            # Unificación de Datos en un solo DataFrame Maestro
                             df_export_maestro = pd.concat(piezas_excel, ignore_index=True)
                             cols_vits = ['Ruta_Asignada', 'No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
-                            cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
-                            columnas_finales = cols_vits + [c for c in cols_orig if c != id_col and c not in ['ï»¿No_Ruta', 'Maps', 'Ruta_Asignada']]
+                            columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada']]
                             df_export_maestro = df_export_maestro[columnas_finales]
 
-                            # Panel Visual Consolidado de la V24
                             st.subheader("📊 Resumen Global Consolidado")
                             mg1, mg2, mg3, mg4, mg5 = st.columns(5)
                             mg1.metric("🚚 Total Rutas", len(lista_rutas_finales))
@@ -741,13 +846,10 @@ else:
 
                             st.markdown("### 📋 Desglose Técnico por Ruta")
                             st.markdown(resumen_global_texto)
-
                             st.dataframe(df_export_maestro, use_container_width=True, hide_index=True)
 
-                            # Descargas consolidadas basura-free
                             st.write("---")
                             c1, c2, c3 = st.columns(3)
-
                             buf_xlsx = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx, engine='openpyxl') as writer:
                                 df_export_maestro.to_excel(writer, index=False, sheet_name='Plan_De_Rutas_SF')
@@ -756,18 +858,21 @@ else:
                             c2.download_button("🗺️ Descargar KML Multi-Ruta", kml.kml(), file_name=f"SF_MULTI_RUTA_{up_name}.kml", use_container_width=True)
                             c3.link_button("🚀 Abrir Google My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
-                            if st.button("💾 REGISTRAR LOTE EN BITÁCORA", use_container_width=True):
+                            if st.button("💾 REGISTRAR LOTE EN BITÁCORA", use_container_width=True, key="reg_m"):
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    info_j = f"Rutas: {len(lista_rutas_finales)}, Pts: {tot_puntos_global}, Lums: {tot_lums_global}, Dist: {round(tot_dist_global,1)}km"
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"LOTE_MULTIRUTA_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    info_j = f"Modo: Multi-Ruta, Rutas: {len(lista_rutas_finales)}, Pts: {tot_puntos_global}, Lums: {tot_lums_global}"
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"MULTIRUTA_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
                                     st.balloons(); st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
 
                     except Exception as e: st.error(f"Error en Motor Multi-Ruta V24: {e}")
 
+        # ==========================================
+        # PESTAÑA 3: BITÁCORA DE PROCESOS
+        # ==========================================
         with tab2:
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -786,9 +891,14 @@ else:
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(idx_e))
                                 st.success("Movido."); time.sleep(1); st.rerun()
                     st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
-                else: st.info("Bitácora vacía.")
-            except: st.info("Sincronizando...")
+                else: 
+                    st.info("Bitácora vacía.")
+            except: 
+                st.info("Sincronizando...")
 
+        # ==========================================
+        # PESTAÑA 4: PAPELERA DE RECICLAJE
+        # ==========================================
         with tab3:
             if st.session_state.perfil == "ADMIN":
                 try:
@@ -813,8 +923,10 @@ else:
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
                                 st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
                         st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
-                    else: st.info("Papelera vacía.")
-                except: st.info("Cargando papelera...")
+                    else: 
+                        st.info("Papelera vacía.")
+                except: 
+                    st.info("Cargando papelera...")
 
     elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Arquitecto de Procesos & Oficios")
