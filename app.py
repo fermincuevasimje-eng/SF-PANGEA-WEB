@@ -589,7 +589,10 @@ else:
                                 
                                 folios_a_buscar = list(st.session_state.lista_bajas.keys())
                                 df_final_bajas = df_ref[df_ref[id_col_sf2].astype(str).isin(folios_a_buscar)].copy()
-                                df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].map(st.session_state.lista_bajas)
+                                
+                                # ACOPLE DE TIRO SEGURO: Convertimos a String ambas partes para asegurar que no falle el mapeo en Excel
+                                mapa_limpio = {str(key).strip(): str(val) for key, val in st.session_state.lista_bajas.items()}
+                                df_final_bajas['RESPUESTA 127'] = df_final_bajas[id_col_sf2].astype(str).str.strip().map(mapa_limpio)
                                 
                                 output_sf2 = io.BytesIO()
                                 with pd.ExcelWriter(output_sf2, engine='openpyxl') as writer:
