@@ -494,15 +494,16 @@ else:
                 c_input, c_lista = st.columns([1, 1])
                 
                 # =========================================================
-                # COLUMNA IZQUIERDA: CAPTURA DE DATOS (FOCO REPARADO)
+                # COLUMNA IZQUIERDA: CAPTURA DE DATOS (FOCO EN RÁFAGA)
                 # =========================================================
                 with c_input:
                     st.subheader("⌨️ Captura de Folios")
                     
-                    # El formulario cambia de ID dinámicamente con input_key para obligar al cursor a regresar arriba
+                    # El formulario cambia de ID dinámicamente con input_key para forzar reinicio limpio
                     with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
                         col_f_in, col_ot_in = st.columns([1.2, 1.0])
                         with col_f_in:
+                            # Le asignamos un ID HTML estático 'campo_folio' mediante el truco de la key dinámica
                             in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
                         with col_ot_in:
                             in_ot_val = st.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
@@ -533,7 +534,7 @@ else:
                                     else:
                                         fecha_final_texto = date_picker.strftime("%d/%m/%Y")
                                     
-                                    # 3. Construcción de la respuesta sin recortes restrictivos de longitud
+                                    # 3. Construcción de la respuesta sin recortes de longitud
                                     ot_part = f"O.T. {in_ot_val.strip()}" if in_ot_val.strip() else ""
                                     libre_part = in_libre_val.strip()
                                     
@@ -542,7 +543,7 @@ else:
                                         componentes = [c for c in [ot_part, "ATENDIDO", fecha_final_texto] if c]
                                         c_final = " | ".join(componentes)
                                     else:
-                                        # Si el usuario sí escribió observaciones, preserva todo lo capturado completo sin mochar nada
+                                        # Si el usuario sí escribió observaciones, preserva todo lo capturado completo
                                         componentes = [c for c in [ot_part, fecha_final_texto, libre_part] if c]
                                         c_final = " | ".join(componentes)
                                     
@@ -550,8 +551,19 @@ else:
                                     st.session_state.lista_bajas[f_final] = c_final
                                     st.toast(f"Folio {f_final} validado", icon="✅")
                                     
-                                    # GATILLO DEL CURSOR: Cambiamos la llave maestra para reiniciar el formulario y regresar el foco al primer campo
+                                    # GATILLO ULTRA-RÁPIDO: Incrementamos la clave para resetear inputs
                                     st.session_state.input_key += 1
+                                    
+                                    # INYECCIÓN SCRIPT: Forzamos al navegador a buscar el primer input de texto disponible y darle focus()
+                                    st.components.v1.html(
+                                        """
+                                        <script>
+                                            window.parent.document.querySelector('input[data-testid="stTextInput"]').focus();
+                                        </script>
+                                        """,
+                                        height=0,
+                                        width=0,
+                                    )
                                     st.rerun()
                                 else:
                                     st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
