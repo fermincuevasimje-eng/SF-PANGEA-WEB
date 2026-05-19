@@ -791,6 +791,7 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
+                max_puntos_ruta = 30  # Capacidad estándar de brigada
                 datos_vienen_de_sf5 = "df_transferido" in st.session_state and st.session_state.df_transferido is not None
                 if datos_vienen_de_sf5:
                     st.info(f"📦 Usando datos procesados de: {st.session_state.nombre_archivo_transferido}")
@@ -948,6 +949,61 @@ else:
         # PESTAÑA 3: BITÁCORA DE PROCESOS
         # ==========================================
         with tab2:
+            try:
+                conn = st.connection("gsheets", type=GSheetsConnection)
+                df_bt = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                if not df_bt.empty:
+                    df_bt_v = df_bt.copy()
+                    df_bt_v.insert(0, "ID_Reg", range(1, len(df_bt_v) + 1))
+                    if st.session_state.perfil == "ADMIN":
+                        c_sel, c_del = st.columns([3, 1])
+                        ids_e = st.multiselect("ID para mover a papelera:", df_bt_v["ID_Reg"].tolist())
+                        if c_del.button("🗑️ Mover"):
+                            if ids_e:
+                                idx_e = df_bt_v[df_bt_v["ID_Reg"].isin(ids_e)].index
+                                df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[idx_e]], ignore_index=True))
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(idx_e))
+                                st.success("Movido."); time.sleep(1); st.rerun()
+                    st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
+                else: 
+                    st.info("Bitácora vacía.")
+            except Exception as e: 
+                st.info(f"Sincronizando bitácora... {e}")
+
+        # ==========================================
+        # PESTAÑA 4: PAPELERA
+        # ==========================================
+        with tab3:
+            if st.session_state.perfil == "ADMIN":
+                try:
+                    conn = st.connection("gsheets", type=GSheetsConnection)
+                    df_tr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, ttl=0).dropna(how='all')
+                    if not df_tr.empty:
+                        df_tr_v = df_tr.copy()
+                        df_tr_v.insert(0, "ID_Reg", range(1, len(df_tr_v) + 1))
+                        col_r1, col_r2, col_r3 = st.columns([2, 1, 1])
+                        with col_r1: ids_r = st.multiselect("ID para restaurar:", df_tr_v["ID_Reg"].tolist())
+                        with col_r2: 
+                            if st.button("♻️ Restaurar"):
+                                if ids_r:
+                                    idx_r = df_tr_v[df_tr_v["ID_Reg"].isin(ids_r)].index
+                                    df_pr = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_pr, df_tr.loc[idx_r]], ignore_index=True))
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_tr.drop(idx_r))
+                                    st.success("Restaurado."); time.sleep(1); st.rerun()
+                        with col_r3:
+                            if st.button("🔥 VACIAR PAPELERA"):
+                                df_vacio = pd.DataFrame(columns=df_tr.columns)
+                                conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
+                                st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
+                        st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
+                    else: 
+                        st.info("Papelera vacía.")
+                except Exception as e: 
+                    st.info(f"Cargando papelera... {e}")
+            else:
+                st.warning("🔒 Área restringida para administradores.")
 
     elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Arquitecto de Procesos & Oficios")
