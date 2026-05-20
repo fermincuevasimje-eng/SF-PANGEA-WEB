@@ -1692,7 +1692,6 @@ else:
                     st.info("No hay materiales registrados para incrementar. Dé de alta materiales primero.")
                         
             elif opcion_gestion == "🆕 Alta de Materiales / Carga de Excel":
-                # Sub-sección 1: Carga masiva por archivo de Excel
                 st.markdown("### 📊 Opción A: Cargar Catálogo desde Excel")
                 archivo_cargado = st.file_uploader("Arrastra tu plantilla de inventario (.xlsx):", type=["xlsx"])
                 
@@ -1701,7 +1700,6 @@ else:
                         df_excel = pd.read_excel(archivo_cargado)
                         columnas_req = ["Material", "Unidad", "Stock", "Min", "Costo"]
                         
-                        # Validación estricta de estructura de columnas
                         if all(col in df_excel.columns for col in columnas_req):
                             if st.button("🚀 REEMPLAZAR E INICIALIZAR CATÁLOGO"):
                                 st.session_state.db_inventario = df_excel[columnas_req].copy()
@@ -1714,7 +1712,6 @@ else:
                 
                 st.write("---")
                 
-                # Sub-sección 2: Registro Manual tradicional (No pierde su propósito original)
                 st.markdown("### ✍️ Opción B: Registro Manual Individual")
                 with st.form("alta_material"):
                     nuevo_nombre = st.text_input("Nombre / Descripción completa del Material:")
