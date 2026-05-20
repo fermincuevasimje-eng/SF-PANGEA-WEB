@@ -1526,12 +1526,15 @@ else:
         st.subheader("🚨 Dashboard de Inventario")
         
         m1, m2, m3 = st.columns(3)
-        criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
+        criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']]) if not df_inv.empty else 0
         m1.metric("📦 Items Totales", len(df_inv))
         m2.metric("⚠️ Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
-        m3.metric("💰 Valor Almacén", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}")
+        m3.metric("💰 Valor Almacén", f"${(df_inv['Stock'] * df_inv['Costo']).sum():,.2f}" if not df_inv.empty else "$0.00")
 
-        st.dataframe(df_inv.style.apply(lambda r: ['background-color: #ffcccc' if r.Stock <= r.Min else '' for _ in r], axis=1), use_container_width=True, hide_index=True)
+        if not df_inv.empty:
+            st.dataframe(df_inv.style.apply(lambda r: ['background-color: #ffcccc' if r.Stock <= r.Min else '' for _ in r], axis=1), use_container_width=True, hide_index=True)
+        else:
+            st.info("El inventario está vacío. Cargue un catálogo en la pestaña de Gestión.")
         
         if st.button("📄 GENERAR RESUMEN EJECUTIVO (EXCEL)", use_container_width=True):
             import io
@@ -1547,23 +1550,26 @@ else:
         folio_actual = f"DAP-{prox_folio_num}"
         st.info(f"Próximo Folio a Generar: **{folio_actual}**")
 
-        with st.container(border=True):
-            c1, c2, c3 = st.columns([1.5, 2, 1])
-            bri_sel = c1.selectbox("Brigada Destino:", [f"Brigada {i}" for i in range(1, 18)])
-            mat_sel = c2.selectbox("Material:", df_inv['Material'].tolist())
-            can_sel = c3.number_input("Cantidad:", min_value=1, step=1)
-            
-            if st.button("➕ Agregar al Vale"):
-                stock_real = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
-                if stock_real >= can_sel:
-                    st.session_state.carrito_vale.append({
-                        "Material": mat_sel, 
-                        "Cantidad": can_sel, 
-                        "Unidad": df_inv.loc[df_inv['Material'] == mat_sel, 'Unidad'].values[0]
-                    })
-                    st.toast(f"{mat_sel} agregado.")
-                else:
-                    st.error(f"⚠️ Stock insuficiente ({stock_real} disponibles).")
+        if not df_inv.empty:
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([1.5, 2, 1])
+                bri_sel = c1.selectbox("Brigada Destino:", [f"Brigada {i}" for i in range(1, 18)])
+                mat_sel = c2.selectbox("Material:", df_inv['Material'].tolist())
+                can_sel = c3.number_input("Cantidad:", min_value=1, step=1)
+                
+                if st.button("➕ Agregar al Vale"):
+                    stock_real = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
+                    if stock_real >= can_sel:
+                        st.session_state.carrito_vale.append({
+                            "Material": mat_sel, 
+                            "Cantidad": can_sel, 
+                            "Unidad": df_inv.loc[df_inv['Material'] == mat_sel, 'Unidad'].values[0]
+                        })
+                        st.toast(f"{mat_sel} agregado.")
+                    else:
+                        st.error(f"⚠️ Stock insuficiente ({stock_real} disponibles).")
+        else:
+            st.warning("⚠️ No hay materiales disponibles en el catálogo para generar vales.")
 
         if st.session_state.carrito_vale:
             st.write("---")
@@ -1582,7 +1588,6 @@ else:
                 st.rerun()
             
             if col_v2.button("💾 REGISTRAR Y GENERAR PDF", type="primary", use_container_width=True):
-                # Descontar del inventario real en la sesión
                 for item in st.session_state.carrito_vale:
                     idx = df_inv[df_inv['Material'] == item['Material']].index[0]
                     st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
@@ -1593,14 +1598,12 @@ else:
                 pdf = FPDF()
                 pdf.add_page()
                 
-                # Encabezados Oficiales
                 pdf.set_font("Arial", 'B', 14)
                 pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
                 pdf.set_font("Arial", 'B', 12)
                 pdf.cell(0, 10, "DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
                 pdf.ln(5)
                 
-                # Sección Destacada del Folio y Brigada (¡Más Grande!)
                 pdf.set_fill_color(240, 240, 240)
                 pdf.set_font("Arial", 'B', 14)
                 pdf.cell(0, 12, f"VALE DE SALIDA: {folio_actual}", border=1, ln=True, align='C', fill=True)
@@ -1608,12 +1611,10 @@ else:
                 pdf.cell(0, 12, f"DESTINO REQUERIDO: {bri_sel.upper()}", border=1, ln=True, align='C')
                 pdf.ln(5)
                 
-                # Metadatos del Vale
                 pdf.set_font("Arial", '', 10)
                 pdf.cell(0, 8, f"Fecha y Hora de Emisión: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
                 pdf.ln(4)
                 
-                # Tabla de Materiales Entregados
                 pdf.set_font("Arial", 'B', 10)
                 pdf.set_fill_color(220, 220, 220)
                 pdf.cell(110, 8, "Descripción del Material", 1, 0, 'L', True)
@@ -1622,30 +1623,24 @@ else:
                 
                 pdf.set_font("Arial", '', 10)
                 for it in st.session_state.carrito_vale:
-                    # Usamos celdas proporcionales para evitar desbordes de texto largo
                     pdf.cell(110, 8, str(it['Material']), 1, 0, 'L')
                     pdf.cell(35, 8, str(it['Cantidad']), 1, 0, 'C')
                     pdf.cell(35, 8, str(it['Unidad']), 1, 1, 'C')
                 
-                # Leyenda Jurídico-Administrativa
                 pdf.ln(15)
                 pdf.set_font("Arial", 'I', 9)
                 pdf.multi_cell(0, 5, LEYENDA_OFICIAL, align='C')
                 
-                # Sección de Firmas de Control (Parte Inferior)
                 pdf.ln(25)
                 pdf.set_font("Arial", 'B', 10)
                 
-                # Coordenadas calculadas para firmas en paralelo
                 x_actual = pdf.get_x()
                 y_actual = pdf.get_y()
                 
-                # Columna Izquierda: Entrega
                 pdf.line(x_actual + 15, y_actual, x_actual + 75, y_actual)
                 pdf.set_xy(x_actual + 15, y_actual + 2)
                 pdf.multi_cell(60, 5, "ENTREGA (ALMACÉN)\nDirección de Alumbrado Público", align='C')
                 
-                # Columna Derecha: Recibe
                 pdf.line(x_actual + 115, y_actual, x_actual + 175, y_actual)
                 pdf.set_xy(x_actual + 115, y_actual + 2)
                 pdf.multi_cell(60, 5, f"RECIBE (RESPONSABLE)\n{bri_sel}", align='C')
@@ -1654,7 +1649,7 @@ else:
                 st.download_button(f"📥 DESCARGAR VALE {folio_actual}", pdf_bytes, f"Vale_{folio_actual}.pdf", "application/pdf", use_container_width=True)
                 
                 st.session_state.carrito_vale = []
-                st.success(f"Vale {folio_actual} procesado y listo para firmas físicas.")
+                st.success(f"Vale {folio_actual} procesado con éxito.")
 
     with tab_admin:
         st.subheader("⚙️ Gestión de Almacén")
@@ -1675,29 +1670,53 @@ else:
             
             st.divider()
             
-            # Sub-menú de Gestión para decidir qué acción tomar
             opcion_gestion = st.radio(
                 "Seleccione la acción a realizar:",
-                ["📥 Registrar Entrada de Stock Existente", "🆕 Dar de Alta un Nuevo Catálogo/Material"],
+                ["📥 Registrar Entrada de Stock Existente", "🆕 Alta de Materiales / Carga de Excel"],
                 horizontal=True
             )
             
             if opcion_gestion == "📥 Registrar Entrada de Stock Existente":
-                with st.form("entrada_stock"):
-                    st.write("**Entrada de Material en Catálogo**")
-                    m_in = st.selectbox("Material a incrementar:", df_inv['Material'].tolist())
-                    c_in = st.number_input("Cantidad que ingresa:", min_value=1, step=1)
-                    
-                    if st.form_submit_button("✅ ACTUALIZAR STOCK"):
-                        idx = df_inv[df_inv['Material'] == m_in].index[0]
-                        st.session_state.db_inventario.at[idx, 'Stock'] += c_in
-                        st.success(f"Se sumaron {c_in} unidades al stock de {m_in}.")
-                        st.rerun()
+                if not df_inv.empty:
+                    with st.form("entrada_stock"):
+                        st.write("**Entrada de Material en Catálogo**")
+                        m_in = st.selectbox("Material a incrementar:", df_inv['Material'].tolist())
+                        c_in = st.number_input("Cantidad que ingresa:", min_value=1, step=1)
                         
-            elif opcion_gestion == "🆕 Dar de Alta un Nuevo Catálogo/Material":
+                        if st.form_submit_button("✅ ACTUALIZAR STOCK"):
+                            idx = df_inv[df_inv['Material'] == m_in].index[0]
+                            st.session_state.db_inventario.at[idx, 'Stock'] += c_in
+                            st.success(f"Se sumaron {c_in} unidades al stock de {m_in}.")
+                            st.rerun()
+                else:
+                    st.info("No hay materiales registrados para incrementar. Dé de alta materiales primero.")
+                        
+            elif opcion_gestion == "🆕 Alta de Materiales / Carga de Excel":
+                # Sub-sección 1: Carga masiva por archivo de Excel
+                st.markdown("### 📊 Opción A: Cargar Catálogo desde Excel")
+                archivo_cargado = st.file_uploader("Arrastra tu plantilla de inventario (.xlsx):", type=["xlsx"])
+                
+                if archivo_cargado is not None:
+                    try:
+                        df_excel = pd.read_excel(archivo_cargado)
+                        columnas_req = ["Material", "Unidad", "Stock", "Min", "Costo"]
+                        
+                        # Validación estricta de estructura de columnas
+                        if all(col in df_excel.columns for col in columnas_req):
+                            if st.button("🚀 REEMPLAZAR E INICIALIZAR CATÁLOGO"):
+                                st.session_state.db_inventario = df_excel[columnas_req].copy()
+                                st.success("🎉 ¡Catálogo cargado e inicializado exitosamente desde el Excel!")
+                                st.rerun()
+                        else:
+                            st.error(f"El archivo debe contener exactamente las siguientes columnas: {columnas_req}")
+                    except Exception as e:
+                        st.error(f"Error al leer el archivo: {e}")
+                
+                st.write("---")
+                
+                # Sub-sección 2: Registro Manual tradicional (No pierde su propósito original)
+                st.markdown("### ✍️ Opción B: Registro Manual Individual")
                 with st.form("alta_material"):
-                    st.write("**Formulario de Registro de Nuevo Material**")
-                    
                     nuevo_nombre = st.text_input("Nombre / Descripción completa del Material:")
                     
                     col_u1, col_u2, col_u3, col_u4 = st.columns(4)
@@ -1706,13 +1725,12 @@ else:
                     nuevo_min = col_u3.number_input("Stock Mínimo (Alerta):", min_value=0, step=1, value=5)
                     nuevo_costo = col_u4.number_input("Costo Unitario ($):", min_value=0.0, step=0.5, value=0.0)
                     
-                    if st.form_submit_button("💾 GRABAR NUEVO MATERIAL EN INVENTARIO"):
+                    if st.form_submit_button("💾 GRABAR NUEVO MATERIAL"):
                         if nuevo_nombre.strip() == "":
                             st.error("El nombre del material no puede estar vacío.")
-                        elif nuevo_nombre in df_inv['Material'].tolist():
-                            st.error("Este material ya existe en el catálogo actual. Utilice la opción de 'Registrar Entrada'.")
+                        elif not df_inv.empty and nuevo_nombre in df_inv['Material'].tolist():
+                            st.error("Este material ya existe. Use 'Registrar Entrada de Stock Existente'.")
                         else:
-                            # Estructura limpia para el DataFrame coincidiendo con tus columnas originales
                             nuevo_item = {
                                 "Material": nuevo_nombre.strip(),
                                 "Unidad": nueva_unidad,
@@ -1721,5 +1739,5 @@ else:
                                 "Costo": nuevo_costo
                             }
                             st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_item])], ignore_index=True)
-                            st.success(f"✨ ¡{nuevo_nombre} dado de alta con éxito!")
+                            st.success(f"✨ ¡{nuevo_nombre} añadido con éxito!")
                             st.rerun()
