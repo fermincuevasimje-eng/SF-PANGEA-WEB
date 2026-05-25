@@ -94,10 +94,18 @@ MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lis
 
 # --- 1.6 INVENTARIO MAESTRO (SF6) ---
 STOCK_INICIAL = [
-    {"ID": "LUM-01", "Material": "Luminaria LED 100W", "Stock": 150, "Min": 20, "Unidad": "Pza"},
-    {"ID": "FOT-02", "Material": "Fotocelda Universal", "Stock": 300, "Min": 50, "Unidad": "Pza"},
-    {"ID": "CAB-03", "Material": "Cable Aluminio Neutra 2+1", "Stock": 5000, "Min": 500, "Unidad": "m"},
-    {"ID": "BRA-04", "Material": "Brazo Galvanizado 1.5m", "Stock": 80, "Min": 15, "Unidad": "Pza"}
+    {"ID": "LUM-01", "Material": "Luminaria LED 100W", "Stock": 150, "Min": 20, "Unidad": "Piezas"},
+    {"ID": "FOT-02", "Material": "Fotocelda Universal", "Stock": 300, "Min": 50, "Unidad": "Piezas"},
+    {"ID": "CAB-03", "Material": "Cable Aluminio Neutra 2+1", "Stock": 5000, "Min": 500, "Unidad": "Metros"},
+    {"ID": "BRA-04", "Material": "Brazo Galvanizado 1.5m", "Stock": 80, "Min": 15, "Unidad": "Piezas"},
+    {"ID": "CIN-05", "Material": "Cinta Aisgla Super 33", "Stock": 200, "Min": 30, "Unidad": "Piezas"},
+    {"ID": "PIN-06", "Material": "Pintura Esmalte (Comex)", "Stock": 50, "Min": 10, "Unidad": "Litros"},
+    {"ID": "THI-07", "Material": "Tíner Estándar", "Stock": 40, "Min": 8, "Unidad": "Litros"},
+    {"ID": "CEM-08", "Material": "Cemento Gris CPC 30", "Stock": 100, "Min": 15, "Unidad": "Bultos"},
+    {"ID": "GRA-09", "Material": "Grava Triturada", "Stock": 30, "Min": 5, "Unidad": "Metro Cúbico"},
+    {"ID": "ARE-10", "Material": "Arena de Mina", "Stock": 45, "Min": 5, "Unidad": "Metro Cúbico"},
+    {"ID": "CON-11", "Material": "Conectores Línea Bimetálicos", "Stock": 500, "Min": 50, "Unidad": "Cajas"},
+    {"ID": "REC-12", "Material": "Residuo/Escombro Limpio", "Stock": 1000, "Min": 0, "Unidad": "Kilos"}
 ]
 
 # --- 2. MOTOR LÓGICO MEJORADO ---
@@ -1507,7 +1515,7 @@ else:
         st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
         
         PIN_ALMACEN = "DAP-2026"
-        LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento y se genera en la Dirección de Alumbrado Público"
+        LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento de Toluca y se genera en la Dirección de Alumbrado Público"
 
         if "db_inventario" not in st.session_state:
             st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
@@ -1518,7 +1526,7 @@ else:
         if "admin_auth" not in st.session_state:
             st.session_state.admin_auth = False
 
-        tab_inv, tab_vales, tab_admin = st.tabs(["📊 Existencias y Resumen", "🚚 Salida (Vale)", "⚙️ Gestión Almacén"])
+        tab_inv, tab_vales, tab_admin = st.tabs(["📊 Existencias y Resumen", "🚚 Salida (Vale Oficial)", "⚙️ Gestión Almacén"])
 
         # --- PESTAÑA 1: EXISTENCIAS Y RESUMEN ---
         with tab_inv:
@@ -1531,7 +1539,7 @@ else:
             c_met1.metric("📦 Materiales en Catálogo", len(df_inv))
             c_met2.metric("⚠️ Alertas de Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
 
-            st.write("### Inventario Actual")
+            st.write("### Inventario Actual de Materiales e Insumos")
             st.dataframe(df_inv, use_container_width=True, hide_index=True)
             
             if st.button("📄 GENERAR RESUMEN EJECUTIVO (EXCEL)", use_container_width=True):
@@ -1545,21 +1553,42 @@ else:
                     use_container_width=True
                 )
 
-        # --- PESTAÑA 2: SALIDA (VALE) ---
+        # --- PESTAÑA 2: SALIDA (VALE OFICIAL CON FIRMAS) ---
         with tab_vales:
-            st.subheader("🧾 Generador de Vale de Salida")
+            st.subheader("🧾 Generador de Vale de Salida Oficial")
             
             prox_folio_num = len(st.session_state.vales_historial) + 1
             folio_actual = f"DAP-{prox_folio_num}"
-            st.info(f"Próximo Folio a Generar: **{folio_actual}**")
+            
+            # --- SECCIÓN A: ASIGNACIÓN DESTACADA DE BRIGADA ---
+            st.markdown(
+                """
+                <div style='background-color: #eef4f8; padding: 15px; border-left: 6px solid #1f4e78; border-radius: 6px; margin-bottom: 15px;'>
+                    <h4 style='margin:0; color: #1f4e78;'>🚚 ASIGNACIÓN DE UNIDAD / BRIGADA</h4>
+                    <p style='margin:0; font-size:13px; color:#555;'>Seleccione la cuadrilla operativa responsable del traslado y aplicación del material.</p>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+            
+            col_bri_haz = st.columns([1.5, 2])
+            with col_bri_haz[0]:
+                bri_sel = st.selectbox(
+                    "Seleccione Brigada Asignada:", 
+                    [f"Brigada {i}" for i in range(1, 18)] + ["Personal de Mantenimiento Interno", "Cuadrilla de Alumbrado Especial"],
+                    key="brigada_salida_vales"
+                )
+            with col_bri_haz[1]:
+                st.info(f"Folio del Vale en Proceso: **{folio_actual}**")
 
+            # --- SECCIÓN B: CAPTURA DE MATERIALES ---
             with st.container(border=True):
-                c1, c2, c3 = st.columns([1, 2, 1])
-                bri_sel = c1.selectbox("Brigada Destino:", [f"Brigada {i}" for i in range(1, 18)])
-                mat_sel = c2.selectbox("Material:", df_inv['Material'].tolist())
-                can_sel = c3.number_input("Cantidad:", min_value=1, step=1)
+                st.markdown("**🛒 Adición de Materiales al Lote**")
+                c2, c3 = st.columns([2, 1])
+                mat_sel = c2.selectbox("Seleccione Insumo:", df_inv['Material'].tolist())
+                can_sel = c3.number_input("Cantidad a Entregar:", min_value=1, step=1)
                 
-                if st.button("➕ Agregar al Vale", use_container_width=True):
+                if st.button("➕ Agregar Insumo al Carrito", use_container_width=True):
                     stock_real = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
                     if stock_real >= can_sel:
                         existe = False
@@ -1569,7 +1598,7 @@ else:
                                     item['Cantidad'] += can_sel
                                     existe = True
                                 else:
-                                    st.error("⚠️ La cantidad total solicitada supera el stock en almacén.")
+                                    st.error("⚠️ La cantidad agregada supera las existencias físicas en el almacén.")
                                     existe = True
                         if not existe:
                             st.session_state.carrito_vale.append({
@@ -1577,15 +1606,23 @@ else:
                                 "Cantidad": can_sel, 
                                 "Unidad": df_inv.loc[df_inv['Material'] == mat_sel, 'Unidad'].values[0]
                             })
-                        st.toast(f"✅ {mat_sel} integrado al vale.")
+                        st.toast(f"✅ {mat_sel} sumado al vale actual.")
                         time.sleep(0.3)
                         st.rerun()
                     else:
-                        st.error(f"⚠️ Cantidad insuficiente en almacén ({stock_real} actualmente).")
+                        st.error(f"⚠️ No hay suficiente material disponible. Existencia actual: {stock_real}")
+
+            # --- SECCIÓN C: OBSERVACIONES DIGITALES ---
+            st.markdown("### 📝 Control y Notas de Entrega")
+            obs_digital = st.text_area(
+                "Observaciones del Responsable de Almacén (Se captura en sistema):", 
+                placeholder="Ej: Material destinado a la rehabilitación de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
+                key="obs_responsable_entrega"
+            )
 
             if st.session_state.carrito_vale:
                 st.write("---")
-                st.markdown("### **Materiales Listos para Salida:**")
+                st.markdown("### **Resumen del Pedido Operativo:**")
                 
                 df_carrito = pd.DataFrame(st.session_state.carrito_vale)
                 st.dataframe(df_carrito, use_container_width=True, hide_index=True)
@@ -1596,39 +1633,89 @@ else:
                     st.session_state.carrito_vale = []
                     st.rerun()
                 
-                # Armado estructurado del PDF del Vale
+                # --- GENERACIÓN AVANZADA DEL PDF ADMINISTRATIVO ---
                 from fpdf import FPDF
                 pdf = FPDF()
                 pdf.add_page()
+                
+                # Encabezados institucionales
                 pdf.set_font("Arial", 'B', 14)
                 pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
                 pdf.set_font("Arial", 'B', 12)
-                pdf.cell(0, 10, "DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
-                pdf.cell(0, 10, f"VALE DE SALIDA: {folio_actual}", ln=True, align='C')
-                pdf.ln(10)
-                pdf.set_font("Arial", '', 10)
-                pdf.cell(0, 10, f"Fecha/Hora: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')} | Asignado a: {bri_sel}", ln=True)
-                pdf.ln(5)
+                pdf.cell(0, 8, "DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
+                pdf.cell(0, 8, f"VALE OFICIAL DE SALIDA: {folio_actual}", ln=True, align='C')
+                pdf.ln(8)
                 
-                pdf.set_fill_color(230, 230, 230)
-                pdf.cell(120, 8, "Material Autorizado", 1, 0, 'C', True)
-                pdf.cell(40, 8, "Cantidad Entregada", 1, 1, 'C', True)
+                # Metadatos del documento
+                pdf.set_font("Arial", '', 10)
+                pdf.cell(0, 6, f"Fecha y Hora de Emisión: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
+                pdf.set_font("Arial", 'B', 10)
+                pdf.cell(0, 6, f"UNIDAD/BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
+                pdf.ln(4)
+                
+                # Tabla de insumos entregados
+                pdf.set_fill_color(220, 225, 230)
+                pdf.set_font("Arial", 'B', 10)
+                pdf.cell(110, 8, "Descripción del Material", 1, 0, 'C', True)
+                pdf.cell(50, 8, "Cantidad y Unidad", 1, 1, 'C', True)
                 
                 pdf.set_font("Arial", '', 10)
                 for it in st.session_state.carrito_vale:
-                    pdf.cell(120, 8, str(it['Material']), 1)
-                    pdf.cell(40, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 1, 'C')
+                    pdf.cell(110, 8, f" {str(it['Material'])}", 1)
+                    pdf.cell(50, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 1, 'C')
                 
+                pdf.ln(6)
+                
+                # Bloque de observaciones digitales
+                pdf.set_font("Arial", 'B', 10)
+                pdf.cell(0, 6, "Observaciones del Responsable de Almacén (Sistema):", ln=True)
+                pdf.set_font("Arial", '', 9)
+                msg_obs = obs_digital if obs_digital.strip() else "Ninguna anotada en sistema al momento de la salida."
+                pdf.multi_cell(0, 5, msg_obs.encode('latin-1', 'replace').decode('latin-1'), 1)
+                pdf.ln(4)
+                
+                # Bloque de observaciones físicas para el destinatario
+                pdf.set_font("Arial", 'B', 10)
+                pdf.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Físico a Mano):", ln=True)
+                pdf.set_fill_color(255, 255, 255)
+                # Creamos un cuadro en blanco espacioso para que escriban a mano
+                pdf.cell(0, 18, "", 1, ln=True, fill=True)
                 pdf.ln(15)
+                
+                # Leyenda de propiedad
                 pdf.set_font("Arial", 'I', 9)
                 pdf.multi_cell(0, 5, LEYENDA_OFICIAL, align='C')
+                pdf.ln(15)
+                
+                # Distribución de las Firmas Oficiales abajo del documento
+                y_pos_firmas = pdf.get_y()
+                pdf.set_font("Arial", 'B', 9)
+                
+                # Columna de entrega (Almacén)
+                pdf.set_xy(15, y_pos_firmas)
+                pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
+                pdf.set_xy(15, y_pos_firmas + 4)
+                pdf.cell(75, 4, "RESPONSABLE DE ENTREGA DE MATERIAL", ln=False, align='C')
+                pdf.set_xy(15, y_pos_firmas + 8)
+                pdf.set_font("Arial", '', 8)
+                pdf.cell(75, 4, "(Firma y Sello de Almacén DAP)", ln=False, align='C')
+                
+                # Columna de recepción (Brigada)
+                pdf.set_font("Arial", 'B', 9)
+                pdf.set_xy(115, y_pos_firmas)
+                pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
+                pdf.set_xy(115, y_pos_firmas + 4)
+                pdf.cell(75, 4, "RESPONSABLE QUE RECIBE MATERIAL", ln=False, align='C')
+                pdf.set_xy(115, y_pos_firmas + 8)
+                pdf.set_font("Arial", '', 8)
+                pdf.cell(75, 4, f"({bri_sel.upper()})", ln=False, align='C')
                 
                 pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
                 
                 if col_v2.download_button(
-                    label=f"💾 PROCESAR SALIDA Y DESCARGAR {folio_actual}",
+                    label=f"💾 EMITIR VALE Y DESCARGAR PDF ({folio_actual})",
                     data=pdf_bytes,
-                    file_name=f"Vale_Salida_{folio_actual}.pdf",
+                    file_name=f"Vale_Oficial_Salida_{folio_actual}.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 ):
@@ -1638,7 +1725,7 @@ else:
                     
                     st.session_state.vales_historial.append({"Folio": folio_actual, "Brigada": bri_sel})
                     st.session_state.carrito_vale = []
-                    st.success(f"✅ Salida de material registrada bajo el folio {folio_actual}.")
+                    st.success(f"✅ Vale oficial {folio_actual} procesado y guardado.")
                     time.sleep(0.5)
                     st.rerun()
 
