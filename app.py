@@ -1716,19 +1716,37 @@ else:
             df_inv = st.session_state.db_inventario
             st.subheader("🚨 Dashboard de Inventario")
             
+            if "filtrar_critico" not in st.session_state:
+                st.session_state.filtrar_critico = False
+
             criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
             
             c_met1, c_met2 = st.columns(2)
             c_met1.metric("📦 Materiales en Catálogo", len(df_inv))
             c_met2.metric("⚠️ Alertas de Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
 
-            st.write("### Inventario Actual de Materiales e Insumos")
-            st.dataframe(df_inv, use_container_width=True, hide_index=True)
+            text_filtro = "👁️ Mostrar SOLO materiales con Stock Crítico" if not st.session_state.filtrar_critico else "🔄 Mostrar TODO el Catálogo"
+            type_filtro = "secondary" if not st.session_state.filtrar_critico else "primary"
+            
+            if st.button(text_filtro, type=type_filtro, use_container_width=True):
+                st.session_state.filtrar_critico = not st.session_state.filtrar_critico
+                st.rerun()
+
+            if st.session_state.filtrar_critico:
+                st.markdown("### ⚠️ Mostrando Materiales en Stock Crítico o Alerta")
+                df_mostrar = df_inv[df_inv['Stock'] <= df_inv['Min']].reset_index(drop=True)
+                if df_mostrar.empty:
+                    st.success("🎉 ¡Excelente! No hay ningún material con stock crítico en este momento.")
+            else:
+                st.write("### Inventario Actual de Materiales e Insumos")
+                df_mostrar = df_inv
+
+            st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
             
             if st.button("📄 GENERAR RESUMEN EJECUTIVO (EXCEL)", use_container_width=True):
                 output_res = io.BytesIO()
                 with pd.ExcelWriter(output_res, engine='openpyxl') as writer:
-                    df_inv.to_excel(writer, index=False, sheet_name='Estado_Almacen')
+                    df_mostrar.to_excel(writer, index=False, sheet_name='Estado_Almacen')
                 st.download_button(
                     label="📥 Descargar Reporte de Stock", 
                     data=output_res.getvalue(), 
@@ -1746,7 +1764,6 @@ else:
             prox_folio_num = len(st.session_state.vales_historial) + 1
             folio_actual = f"DAP-{prox_folio_num}"
             
-            # --- SECCIÓN A: ASIGNACIÓN DESTACADA DE BRIGADA ---
             st.markdown(
                 """
                 <div style='background-color: #eef4f8; padding: 15px; border-left: 6px solid #1f4e78; border-radius: 6px; margin-bottom: 15px;'>
@@ -1767,7 +1784,6 @@ else:
             with col_bri_haz[1]:
                 st.info(f"Folio del Vale en Proceso: **{folio_actual}**")
 
-            # --- SECCIÓN B: CAPTURA DE MATERIALES ---
             with st.container(border=True):
                 st.markdown("**🛒 Adición de Materiales al Lote**")
                 c2, c3 = st.columns([2, 1])
@@ -1798,7 +1814,6 @@ else:
                     else:
                         st.error(f"⚠️ No hay suficiente material disponible. Existencia actual: {stock_real}")
 
-            # --- SECCIÓN C: OBSERVACIONES DIGITALES ---
             st.markdown("### 📝 Control y Notas de Entrega")
             obs_digital = st.text_area(
                 "Observaciones del Responsable de Almacén (Se captura en sistema):", 
@@ -1819,12 +1834,10 @@ else:
                     st.session_state.carrito_vale = []
                     st.rerun()
                 
-                # --- GENERACIÓN AVANZADA DEL PDF ADMINISTRATIVO ---
                 from fpdf import FPDF
                 pdf = FPDF()
                 pdf.add_page()
                 
-                # Encabezados institucionales
                 pdf.set_font("Arial", 'B', 14)
                 pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
                 pdf.set_font("Arial", 'B', 12)
@@ -1832,14 +1845,12 @@ else:
                 pdf.cell(0, 8, f"VALE OFICIAL DE SALIDA: {folio_actual}", ln=True, align='C')
                 pdf.ln(8)
                 
-                # Metadatos del documento
                 pdf.set_font("Arial", '', 10)
                 pdf.cell(0, 6, f"Fecha y Hora de Emisión: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
                 pdf.set_font("Arial", 'B', 10)
                 pdf.cell(0, 6, f"UNIDAD/BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
                 pdf.ln(4)
                 
-                # Tabla oficial corregida
                 pdf.set_fill_color(230, 235, 240)
                 pdf.set_font("Arial", 'B', 10)
                 pdf.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
@@ -1856,7 +1867,6 @@ else:
                 
                 pdf.ln(6)
                 
-                # Bloque de observaciones digitales
                 pdf.set_font("Arial", 'B', 10)
                 pdf.cell(0, 6, "Observaciones del Responsable de Almacén (Sistema):", ln=True)
                 pdf.set_font("Arial", '', 9)
@@ -1864,19 +1874,16 @@ else:
                 pdf.multi_cell(0, 5, msg_obs.encode('latin-1', 'replace').decode('latin-1'), 1)
                 pdf.ln(4)
                 
-                # Bloque de observaciones físicas para el destinatario
                 pdf.set_font("Arial", 'B', 10)
                 pdf.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Físico a Mano):", ln=True)
                 pdf.set_fill_color(255, 255, 255)
                 pdf.cell(0, 18, "", 1, ln=True, fill=True)
                 pdf.ln(15)
                 
-                # Leyenda de propiedad
                 pdf.set_font("Arial", 'I', 9)
                 pdf.multi_cell(0, 5, LEYENDA_OFICIAL, align='C')
                 pdf.ln(15)
                 
-                # Distribución de las Firmas Oficiales abajo del documento
                 y_pos_firmas = pdf.get_y()
                 pdf.set_font("Arial", 'B', 9)
                 
@@ -1949,7 +1956,7 @@ else:
                 
                 st.divider()
                 
-                # --- APARTADO A: CONTENEDOR CONTRAÍBLE DE ABASTECIMIENTO ---
+                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (CONTRAÍBLE) ---
                 with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
                     with st.form("entrada_stock"):
                         m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist())
@@ -1962,9 +1969,9 @@ else:
                             time.sleep(0.4)
                             st.rerun()
                 
-                # --- APARTADO B: CONTENEDOR CONTRAÍBLE DE NUEVOS ÍTEMS ---
+                # --- APARTADO B: AGREGAR NUEVO ÍTEM AL CATÁLOGO (CONTRAÍBLE) ---
                 with st.expander("➕ Dar de Alta Nuevo Ítem en el Catálogo Oficial", expanded=False):
-                    with st.container():
+                    with st.container(border=True):
                         nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: TUBO CONDUIT ACERO GALVANIZADO 2\"").upper().strip()
                         c1, c2 = st.columns(2)
                         nueva_unidad = c1.selectbox("Unidad de Medida:", ["Piezas", "Metros", "Kilos", "Bultos", "Cajas", "Tramos", "Litros", "Botes", "Juegos", "Metro Cúbico"])
@@ -1993,9 +2000,9 @@ else:
                                 time.sleep(0.5)
                                 st.rerun()
 
-                # --- APARTADO C: CONTENEDOR CONTRAÍBLE DE BAJAS ---
+                # --- APARTADO C: ELIMINAR ÍTEM DEL CATÁLOGO (CONTRAÍBLE) ---
                 with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
-                    with st.container():
+                    with st.container(border=True):
                         mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar por completo del sistema:", df_inv['Material'].tolist(), key="del_item_catalog")
                         st.warning(f"⚠️ Al eliminar '{mat_a_eliminar}', desaparecerá por completo de la tabla de existencias actuales.")
                         
