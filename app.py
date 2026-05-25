@@ -1709,7 +1709,9 @@ else:
 
         tab_inv, tab_vales, tab_admin = st.tabs(["📊 Existencias y Resumen", "🚚 Salida (Vale Oficial)", "⚙️ Gestión Almacén"])
 
+        # ==========================================
         # --- PESTAÑA 1: EXISTENCIAS Y RESUMEN ---
+        # ==========================================
         with tab_inv:
             df_inv = st.session_state.db_inventario
             st.subheader("🚨 Dashboard de Inventario")
@@ -1734,8 +1736,11 @@ else:
                     use_container_width=True
                 )
 
-        # --- PESTAÑA 2: SALIDA (VALE OFICIAL CON FIRMAS) ---
+        # ==========================================
+        # --- PESTAÑA 2: SALIDA (VALE OFICIAL) ---
+        # ==========================================
         with tab_vales:
+            df_inv = st.session_state.db_inventario
             st.subheader("🧾 Generador de Vale de Salida Oficial")
             
             prox_folio_num = len(st.session_state.vales_historial) + 1
@@ -1834,7 +1839,7 @@ else:
                 pdf.cell(0, 6, f"UNIDAD/BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
                 pdf.ln(4)
                 
-                # Tabla oficial corregida y sin duplicados residuales
+                # Tabla oficial corregida
                 pdf.set_fill_color(230, 235, 240)
                 pdf.set_font("Arial", 'B', 10)
                 pdf.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
@@ -1846,8 +1851,8 @@ else:
                 for it in st.session_state.carrito_vale:
                     pdf.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
                     pdf.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
-                    pdf.cell(22, 8, "", 1, 0, 'C') # Celda para requisitar en campo a mano
-                    pdf.cell(22, 8, "", 1, 1, 'C') # Celda para requisitar en campo a mano
+                    pdf.cell(22, 8, "", 1, 0, 'C')
+                    pdf.cell(22, 8, "", 1, 1, 'C')
                 
                 pdf.ln(6)
                 
@@ -1863,7 +1868,6 @@ else:
                 pdf.set_font("Arial", 'B', 10)
                 pdf.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Físico a Mano):", ln=True)
                 pdf.set_fill_color(255, 255, 255)
-                # Creamos un cuadro en blanco espacioso para que escriban a mano
                 pdf.cell(0, 18, "", 1, ln=True, fill=True)
                 pdf.ln(15)
                 
@@ -1872,11 +1876,10 @@ else:
                 pdf.multi_cell(0, 5, LEYENDA_OFICIAL, align='C')
                 pdf.ln(15)
                 
-                # Distribución de las Firmas Oficiales abajo del documento
+                # Distribución de las Firmas Oficiales
                 y_pos_firmas = pdf.get_y()
                 pdf.set_font("Arial", 'B', 9)
                 
-                # Columna de entrega (Almacén)
                 pdf.set_xy(15, y_pos_firmas)
                 pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
                 pdf.set_xy(15, y_pos_firmas + 4)
@@ -1885,7 +1888,6 @@ else:
                 pdf.set_font("Arial", '', 8)
                 pdf.cell(75, 4, "(Firma y Sello de Almacén DAP)", ln=False, align='C')
                 
-                # Columna de recepción (Brigada)
                 pdf.set_font("Arial", 'B', 9)
                 pdf.set_xy(115, y_pos_firmas)
                 pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
@@ -1907,27 +1909,29 @@ else:
                     # --- FILTRO DE SEGURIDAD EXPLICITO ANTI-DUPLICADOS ---
                     folios_existentes = [v["Folio"] for v in st.session_state.vales_historial]
                     if folio_actual in folios_existentes:
-                        st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya fue registrado previamente en la Bóveda. Operación abortada para evitar duplicidad.")
+                        st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya fue registrado previamente en la Bóveda. Operación abortada.")
                     else:
                         for item in st.session_state.carrito_vale:
                             idx = df_inv[df_inv['Material'] == item['Material']].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
                         
-                        # Se almacena el registro completo con desglose en la Bóveda de forma única
                         st.session_state.vales_historial.append({
                             "Folio": folio_actual, 
                             "Fecha": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
                             "Brigada": bri_sel,
-                            "Materiales": list(st.session_state.carrito_vale), # Clonar estado del carrito
-                            "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
+                            "Materiales": list(st.session_state.carrito_vale),
+                            "Observations": obs_digital if obs_digital.strip() else "Sin observaciones"
                         })
                         st.session_state.carrito_vale = []
-                        st.success(f"✅ Vale oficial {folio_actual} procesado y resguardado en Bóveda de forma segura.")
+                        st.success(f"✅ Vale oficial {folio_actual} procesado y resguardado de forma segura.")
                         time.sleep(0.5)
                         st.rerun()
 
-        # --- PESTAÑA 3: GESTIÓN ALMACÉN (ENTRADAS) ---
+        # ==========================================
+        # --- PESTAÑA 3: GESTIÓN ALMACÉN ---
+        # ==========================================
         with tab_admin:
+            df_inv = st.session_state.db_inventario
             st.subheader("⚙️ Panel de Control de Existencias")
             if not st.session_state.admin_auth:
                 st.warning("🔒 Este apartado requiere clave de acceso de Almacén.")
@@ -1945,6 +1949,7 @@ else:
                     st.rerun()
                 
                 st.divider()
+                
                 # --- SUB-APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS ---
                 with st.form("entrada_stock"):
                     st.write("📥 **Aumentar Existencias Físicas (Abastecimiento)**")
@@ -1976,7 +1981,6 @@ else:
                         elif nuevo_nombre in df_inv['Material'].tolist():
                             st.error(f"❌ El material '{nuevo_nombre}' ya existe en el catálogo actual.")
                         else:
-                            # Generar ID correlativo automático (ej: MAT-193)
                             num_actual = len(df_inv) + 1
                             nuevo_id = f"MAT-{num_actual}"
                             
@@ -2018,7 +2022,6 @@ else:
                 if not st.session_state.vales_historial:
                     st.info("📂 La bóveda se encuentra vacía. No se han emitido vales oficiales en esta sesión.")
                 else:
-                    # Formatear la vista rápida usando .get() seguro para evitar KeyErrors
                     tabla_boveda = []
                     for v in st.session_state.vales_historial:
                         tabla_boveda.append({
@@ -2031,12 +2034,10 @@ else:
                     df_boveda = pd.DataFrame(tabla_boveda)
                     st.dataframe(df_boveda, use_container_width=True, hide_index=True)
                     
-                    # Buscador e inspector individual de vales blindados
                     st.markdown("**🔍 Auditoría e Inspección de Folio**")
                     folios_disponibles = [v["Folio"] for v in st.session_state.vales_historial]
                     folio_select = st.selectbox("Seleccione Folio para auditoría interna:", folios_disponibles)
                     
-                    # Recuperar datos del vale seleccionado
                     vale_auditado = next(item for item in st.session_state.vales_historial if item["Folio"] == folio_select)
                     
                     with st.container(border=True):
@@ -2059,9 +2060,7 @@ else:
                         check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select} de los registros", key=f"chk_del_{folio_select}")
                         
                         if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
-                            # Remover el objeto del historial en session_state de forma segura
                             st.session_state.vales_historial = [item for item in st.session_state.vales_historial if item["Folio"] != folio_select]
                             st.warning(f"El vale {folio_select} ha sido purgado del historial de Almacén.")
                             time.sleep(0.4)
-                            # Forzar recarga limpia manteniendo el módulo activo
                             st.rerun()
