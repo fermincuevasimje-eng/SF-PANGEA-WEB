@@ -1904,22 +1904,27 @@ else:
                     mime="application/pdf",
                     use_container_width=True
                 ):
-                    for item in st.session_state.carrito_vale:
-                        idx = df_inv[df_inv['Material'] == item['Material']].index[0]
-                        st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
-                    
-                    # Se almacena el registro completo con desglose en la Bóveda
-                    st.session_state.vales_historial.append({
-                        "Folio": folio_actual, 
-                        "Fecha": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
-                        "Brigada": bri_sel,
-                        "Materiales": list(st.session_state.carrito_vale), # Clonar estado del carrito
-                        "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
-                    })
-                    st.session_state.carrito_vale = []
-                    st.success(f"✅ Vale oficial {folio_actual} procesado y resguardado en Bóveda.")
-                    time.sleep(0.5)
-                    st.rerun()
+                    # --- FILTRO DE SEGURIDAD EXPLICITO ANTI-DUPLICADOS ---
+                    folios_existentes = [v["Folio"] for v in st.session_state.vales_historial]
+                    if folio_actual in folios_existentes:
+                        st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya fue registrado previamente en la Bóveda. Operación abortada para evitar duplicidad.")
+                    else:
+                        for item in st.session_state.carrito_vale:
+                            idx = df_inv[df_inv['Material'] == item['Material']].index[0]
+                            st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
+                        
+                        # Se almacena el registro completo con desglose en la Bóveda de forma única
+                        st.session_state.vales_historial.append({
+                            "Folio": folio_actual, 
+                            "Fecha": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
+                            "Brigada": bri_sel,
+                            "Materiales": list(st.session_state.carrito_vale), # Clonar estado del carrito
+                            "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
+                        })
+                        st.session_state.carrito_vale = []
+                        st.success(f"✅ Vale oficial {folio_actual} procesado y resguardado en Bóveda de forma segura.")
+                        time.sleep(0.5)
+                        st.rerun()
 
         # --- PESTAÑA 3: GESTIÓN ALMACÉN (ENTRADAS) ---
         with tab_admin:
