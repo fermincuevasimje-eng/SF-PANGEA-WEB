@@ -1963,16 +1963,20 @@ else:
                     stock_previo = df_inv.loc[df_inv['Material'] == m_in, 'Stock'].values[0]
                     unidad_medida = df_inv.loc[df_inv['Material'] == m_in, 'Unidad'].values[0]
                     
-                    with st.form("entrada_stock"):
+                    # Contenedor limpio sin st.form para permitir reactividad en tiempo real al digitar
+                    with st.container(border=True):
                         st.markdown(f"📋 **Material:** {m_in}")
                         st.markdown(f"📉 **Cantidad Actual en Almacén:** `{stock_previo} {unidad_medida}`")
                         
-                        c_in = st.number_input("Cantidad a ingresar:", min_value=1, step=1, value=1)
+                        # Al digitar aquí, Streamlit recalculará el bloque completo al instante
+                        c_in = st.number_input("Cantidad a ingresar:", min_value=1, step=1, value=1, key="cant_ingresar_live")
                         
+                        # El cálculo ahora sí es 100% real y dinámico al vuelo
                         stock_proyectado = stock_previo + c_in
-                        st.markdown(f"📈 **Cantidad Posterior al registro:** `{stock_proyectado} {unidad_medida}`")
+                        st.markdown(f"📈 **Cantidad Posterior al registro:** :green[{stock_proyectado} {unidad_medida}]")
                         
-                        if st.form_submit_button("✅ ACTUALIZAR STOCK"):
+                        st.write("")
+                        if st.button("✅ ACTUALIZAR STOCK", use_container_width=True, key="btn_actualizar_stock_live"):
                             idx = df_inv[df_inv['Material'] == m_in].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] += c_in
                             st.success(f"📦 Entrada registrada correctamente. Nuevo stock de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} {unidad_medida}.")
