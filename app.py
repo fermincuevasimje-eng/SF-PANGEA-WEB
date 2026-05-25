@@ -1653,10 +1653,10 @@ else:
                 pdf.cell(0, 6, f"UNIDAD/BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
                 pdf.ln(4)
                 
-                # Tabla oficial con columnas agregadas correctamente a la derecha
+                # Tabla oficial corregida y sin duplicados residuales
                 pdf.set_fill_color(230, 235, 240)
                 pdf.set_font("Arial", 'B', 10)
-                pdf.cell(110, 8, " Descripción del Material / Insumo", 1, 0, 'L', True)
+                pdf.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
                 pdf.cell(36, 8, "Entregado", 1, 0, 'C', True)
                 pdf.cell(22, 8, "Utilizado", 1, 0, 'C', True)
                 pdf.cell(22, 8, "Devuelto", 1, 1, 'C', True)
@@ -1665,13 +1665,8 @@ else:
                 for it in st.session_state.carrito_vale:
                     pdf.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
                     pdf.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
-                    pdf.cell(22, 8, "", 1, 0, 'C') # Celda vacía a la derecha para llenar en campo
-                    pdf.cell(22, 8, "", 1, 1, 'C') # Celda vacía a la derecha para llenar en campo
-                
-                pdf.set_font("Arial", '', 10)
-                for it in st.session_state.carrito_vale:
-                    pdf.cell(110, 8, f" {str(it['Material'])}", 1)
-                    pdf.cell(50, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 1, 'C')
+                    pdf.cell(22, 8, "", 1, 0, 'C') # Celda para requisitar en campo a mano
+                    pdf.cell(22, 8, "", 1, 1, 'C') # Celda para requisitar en campo a mano
                 
                 pdf.ln(6)
                 
