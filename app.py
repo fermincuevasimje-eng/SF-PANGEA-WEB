@@ -1727,9 +1727,16 @@ else:
                         idx = df_inv[df_inv['Material'] == item['Material']].index[0]
                         st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
                     
-                    st.session_state.vales_historial.append({"Folio": folio_actual, "Brigada": bri_sel})
+                    # Se almacena el registro completo con desglose en la Bóveda
+                    st.session_state.vales_historial.append({
+                        "Folio": folio_actual, 
+                        "Fecha": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
+                        "Brigada": bri_sel,
+                        "Materiales": list(st.session_state.carrito_vale), # Clonar estado del carrito
+                        "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
+                    })
                     st.session_state.carrito_vale = []
-                    st.success(f"✅ Vale oficial {folio_actual} procesado y guardado.")
+                    st.success(f"✅ Vale oficial {folio_actual} procesado y resguardado en Bóveda.")
                     time.sleep(0.5)
                     st.rerun()
 
@@ -1761,3 +1768,41 @@ else:
                         idx = df_inv[df_inv['Material'] == m_in].index[0]
                         st.session_state.db_inventario.at[idx, 'Stock'] += c_in
                         st.success(f"📦 Entrada registrada. Stock actualizado de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} unidades.")
+                        st.write("")
+                st.markdown("---")
+                st.subheader("🔒 Bóveda de Vales Emitidos (Historial Antirrobos)")
+                st.caption("Registro histórico inmutable de salidas de material de la Dirección de Alumbrado Público.")
+
+                if not st.session_state.vales_historial:
+                    st.info("📂 La bóveda se encuentra vacía. No se han emitido vales oficiales en esta sesión.")
+                else:
+                    # Formatear la vista rápida de la bóveda
+                    tabla_boveda = []
+                    for v in st.session_state.vales_historial:
+                        tabla_boveda.append({
+                            "Folio": v["Folio"],
+                            "Fecha/Hora": v.get("Fecha", "N/A"),
+                            "Brigada / Destino": v["Brigada"],
+                            "Total Insumos": len(v["Materiales"])
+                        })
+                    
+                    df_boveda = pd.DataFrame(tabla_boveda)
+                    st.dataframe(df_boveda, use_container_width=True, hide_index=True)
+                    
+                    # Buscador e inspector individual de vales blindados
+                    st.markdown("**🔍 Auditoría e Inspección de Folio**")
+                    folios_disponibles = [v["Folio"] for v in st.session_state.vales_historial]
+                    folio_select = st.selectbox("Seleccione Folio para auditoría interna:", folios_disponibles)
+                    
+                    # Recuperar datos del vale seleccionado
+                    vale_auditado = next(item for item in st.session_state.vales_historial if item["Folio"] == folio_select)
+                    
+                    with st.container(border=True):
+                        st.markdown(f"### 📄 Expediente: {vale_auditado['Folio']}")
+                        st.write(f"**Fecha de Emisión:** {vale_auditado.get('Fecha', 'N/A')}")
+                        st.write(f"**Asignado a:** {vale_auditado['Brigada']}")
+                        st.write(f"**Notas de Almacén:** {vale_auditado['Observaciones']}")
+                        
+                        st.write("**Desglose de Material Entregado:**")
+                        df_mat_auditoria = pd.DataFrame(vale_auditado["Materiales"])
+                        st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
