@@ -1811,3 +1811,15 @@ else:
                             st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
                         else:
                             st.warning("⚠️ Este vale corresponde a un registro antiguo sin desglose digital de materiales.")
+                        
+                        # --- FILTRO ANTIRROBOS: BOTÓN DE ELIMINACIÓN SEGURA ---
+                        st.write("")
+                        st.markdown("**🚨 Zona Crítica de Auditoría**")
+                        check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select} de los registros", key=f"chk_del_{folio_select}")
+                        
+                        if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
+                            # Remover el objeto del historial en session_state
+                            st.session_state.vales_historial = [item for item in st.session_state.vales_historial if item["Folio"] != folio_select]
+                            st.warning(f"El vale {folio_select} ha sido purgado del historial de Almacén.")
+                            time.sleep(0.5)
+                            st.rerun()
