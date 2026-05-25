@@ -1958,15 +1958,25 @@ else:
                 
                 # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (CONTRAÍBLE) ---
                 with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
+                    m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist(), key="sb_abastecer")
+                    
+                    stock_previo = df_inv.loc[df_inv['Material'] == m_in, 'Stock'].values[0]
+                    unidad_medida = df_inv.loc[df_inv['Material'] == m_in, 'Unidad'].values[0]
+                    
                     with st.form("entrada_stock"):
-                        m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist())
-                        c_in = st.number_input("Cantidad Recibida:", min_value=1, step=1)
+                        st.markdown(f"📋 **Material:** {m_in}")
+                        st.markdown(f"📉 **Cantidad Actual en Almacén:** `{stock_previo} {unidad_medida}`")
+                        
+                        c_in = st.number_input("Cantidad a ingresar:", min_value=1, step=1, value=1)
+                        
+                        stock_proyectado = stock_previo + c_in
+                        st.markdown(f"📈 **Cantidad Posterior al registro:** `{stock_proyectado} {unidad_medida}`")
                         
                         if st.form_submit_button("✅ ACTUALIZAR STOCK"):
                             idx = df_inv[df_inv['Material'] == m_in].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] += c_in
-                            st.success(f"📦 Entrada registrada. Nuevo stock de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} unidades.")
-                            time.sleep(0.4)
+                            st.success(f"📦 Entrada registrada correctamente. Nuevo stock de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} {unidad_medida}.")
+                            time.sleep(0.6)
                             st.rerun()
                 
                 # --- APARTADO B: AGREGAR NUEVO ÍTEM AL CATÁLOGO (CONTRAÍBLE) ---
