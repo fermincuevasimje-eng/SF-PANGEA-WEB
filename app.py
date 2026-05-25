@@ -1876,7 +1876,7 @@ else:
                 pdf.multi_cell(0, 5, LEYENDA_OFICIAL, align='C')
                 pdf.ln(15)
                 
-                # Distribución de las Firmas Oficiales
+                # Distribución de las Firmas Oficiales abajo del documento
                 y_pos_firmas = pdf.get_y()
                 pdf.set_font("Arial", 'B', 9)
                 
@@ -1920,7 +1920,7 @@ else:
                             "Fecha": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
                             "Brigada": bri_sel,
                             "Materiales": list(st.session_state.carrito_vale),
-                            "Observations": obs_digital if obs_digital.strip() else "Sin observaciones"
+                            "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
                         })
                         st.session_state.carrito_vale = []
                         st.success(f"✅ Vale oficial {folio_actual} procesado y resguardado de forma segura.")
@@ -1979,7 +1979,7 @@ else:
                         if not nuevo_nombre:
                             st.error("⚠️ El nombre del material no puede estar vacío.")
                         elif nuevo_nombre in df_inv['Material'].tolist():
-                            st.error(f"❌ El material '{nuevo_nombre}' ya existe en el catálogo actual.")
+                            st.error(f"❌ El material '{nuevo_nombre}' ya existe del catálogo actual.")
                         else:
                             num_actual = len(df_inv) + 1
                             nuevo_id = f"MAT-{num_actual}"
