@@ -1653,20 +1653,20 @@ else:
                 pdf.cell(0, 6, f"UNIDAD/BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
                 pdf.ln(4)
                 
-                # Tabla adaptada con control de Retorno/Devolución
-                pdf.set_fill_color(220, 225, 230)
-                pdf.set_font("Arial", 'B', 9)
-                pdf.cell(90, 8, "Descripción del Insumo", 1, 0, 'C', True)
-                pdf.cell(30, 8, "Entregado", 1, 0, 'C', True)
-                pdf.cell(25, 8, "Utilizado", 1, 0, 'C', True)
-                pdf.cell(25, 8, "Devuelto", 1, 1, 'C', True)
+                # Tabla oficial con columnas agregadas correctamente a la derecha
+                pdf.set_fill_color(230, 235, 240)
+                pdf.set_font("Arial", 'B', 10)
+                pdf.cell(110, 8, " Descripción del Material / Insumo", 1, 0, 'L', True)
+                pdf.cell(36, 8, "Entregado", 1, 0, 'C', True)
+                pdf.cell(22, 8, "Utilizado", 1, 0, 'C', True)
+                pdf.cell(22, 8, "Devuelto", 1, 1, 'C', True)
                 
-                pdf.set_font("Arial", '', 9)
+                pdf.set_font("Arial", '', 10)
                 for it in st.session_state.carrito_vale:
-                    pdf.cell(90, 8, f" {str(it['Material'])}", 1)
-                    pdf.cell(30, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
-                    pdf.cell(25, 8, "", 1, 0, 'C') # Espacio físico para anotar uso
-                    pdf.cell(25, 8, "", 1, 1, 'C') # Espacio físico para anotar devolución
+                    pdf.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
+                    pdf.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
+                    pdf.cell(22, 8, "", 1, 0, 'C') # Celda vacía a la derecha para llenar en campo
+                    pdf.cell(22, 8, "", 1, 1, 'C') # Celda vacía a la derecha para llenar en campo
                 
                 pdf.set_font("Arial", '', 10)
                 for it in st.session_state.carrito_vale:
