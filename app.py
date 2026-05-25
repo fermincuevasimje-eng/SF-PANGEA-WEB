@@ -1967,7 +1967,7 @@ else:
                 
                 # --- SUB-APARTADO B: AGREGAR NUEVO ÍTEM AL CATÁLOGO ---
                 st.write("➕ **Dar de Alta Nuevo Ítem en el Catálogo Oficial**")
-                with st.container(border=True):
+                with st.container(border=False):
                     nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: TUBO CONDUIT ACERO GALVANIZADO 2\"").upper().strip()
                     c1, c2 = st.columns(2)
                     nueva_unidad = c1.selectbox("Unidad de Medida:", ["Piezas", "Metros", "Kilos", "Bultos", "Cajas", "Tramos", "Litros", "Botes", "Juegos", "Metro Cúbico"])
