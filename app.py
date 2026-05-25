@@ -1768,6 +1768,7 @@ else:
                         idx = df_inv[df_inv['Material'] == m_in].index[0]
                         st.session_state.db_inventario.at[idx, 'Stock'] += c_in
                         st.success(f"📦 Entrada registrada. Stock actualizado de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} unidades.")
+                        
                         st.write("")
                 st.markdown("---")
                 st.subheader("🔒 Bóveda de Vales Emitidos (Historial Antirrobos)")
