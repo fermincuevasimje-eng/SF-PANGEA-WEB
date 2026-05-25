@@ -1949,69 +1949,63 @@ else:
                 
                 st.divider()
                 
-                # --- SUB-APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS ---
-                with st.form("entrada_stock"):
-                    st.write("📥 **Aumentar Existencias Físicas (Abastecimiento)**")
-                    m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist())
-                    c_in = st.number_input("Cantidad Recibida:", min_value=1, step=1)
-                    
-                    if st.form_submit_button("✅ ACTUALIZAR STOCK"):
-                        idx = df_inv[df_inv['Material'] == m_in].index[0]
-                        st.session_state.db_inventario.at[idx, 'Stock'] += c_in
-                        st.success(f"📦 Entrada registrada. Nuevo stock de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} unidades.")
-                        time.sleep(0.4)
-                        st.rerun()
-
-                st.write("")
-                st.markdown("---")
+                # --- APARTADO A: CONTENEDOR CONTRAÍBLE DE ABASTECIMIENTO ---
+                with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
+                    with st.form("entrada_stock"):
+                        m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist())
+                        c_in = st.number_input("Cantidad Recibida:", min_value=1, step=1)
+                        
+                        if st.form_submit_button("✅ ACTUALIZAR STOCK"):
+                            idx = df_inv[df_inv['Material'] == m_in].index[0]
+                            st.session_state.db_inventario.at[idx, 'Stock'] += c_in
+                            st.success(f"📦 Entrada registrada. Nuevo stock de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} unidades.")
+                            time.sleep(0.4)
+                            st.rerun()
                 
-                # --- SUB-APARTADO B: AGREGAR NUEVO ÍTEM AL CATÁLOGO ---
-                st.write("➕ **Dar de Alta Nuevo Ítem en el Catálogo Oficial**")
-                with st.container(border=True):
-                    nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: TUBO CONDUIT ACERO GALVANIZADO 2\"").upper().strip()
-                    c1, c2 = st.columns(2)
-                    nueva_unidad = c1.selectbox("Unidad de Medida:", ["Piezas", "Metros", "Kilos", "Bultos", "Cajas", "Tramos", "Litros", "Botes", "Juegos", "Metro Cúbico"])
-                    stock_inicial_item = c2.number_input("Stock Inicial Físico:", min_value=0, value=100, step=1)
-                    minimo_alerta = c2.number_input("Stock Mínimo (Alerta Crítica):", min_value=1, value=10, step=1)
-                    
-                    if st.button("🚀 REGISTRAR NUEVO MATERIAL INMUEBLE", use_container_width=True):
-                        if not nuevo_nombre:
-                            st.error("⚠️ El nombre del material no puede estar vacío.")
-                        elif nuevo_nombre in df_inv['Material'].tolist():
-                            st.error(f"❌ El material '{nuevo_nombre}' ya existe del catálogo actual.")
-                        else:
-                            num_actual = len(df_inv) + 1
-                            nuevo_id = f"MAT-{num_actual}"
-                            
-                            nuevo_registro = {
-                                "ID": nuevo_id,
-                                "Material": nuevo_nombre,
-                                "Stock": stock_inicial_item,
-                                "Min": minimo_alerta,
-                                "Unidad": nueva_unidad
-                            }
-                            
-                            st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
-                            st.success(f"✅ Registrado con éxito: {nuevo_id} - {nuevo_nombre}")
+                # --- APARTADO B: CONTENEDOR CONTRAÍBLE DE NUEVOS ÍTEMS ---
+                with st.expander("➕ Dar de Alta Nuevo Ítem en el Catálogo Oficial", expanded=False):
+                    with st.container():
+                        nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: TUBO CONDUIT ACERO GALVANIZADO 2\"").upper().strip()
+                        c1, c2 = st.columns(2)
+                        nueva_unidad = c1.selectbox("Unidad de Medida:", ["Piezas", "Metros", "Kilos", "Bultos", "Cajas", "Tramos", "Litros", "Botes", "Juegos", "Metro Cúbico"])
+                        stock_inicial_item = c2.number_input("Stock Inicial Físico:", min_value=0, value=100, step=1)
+                        minimo_alerta = c2.number_input("Stock Mínimo (Alerta Crítica):", min_value=1, value=10, step=1)
+                        
+                        if st.button("🚀 REGISTRAR NUEVO MATERIAL INMUEBLE", use_container_width=True):
+                            if not nuevo_nombre:
+                                st.error("⚠️ El nombre del material no puede estar vacío.")
+                            elif nuevo_nombre in df_inv['Material'].tolist():
+                                st.error(f"❌ El material '{nuevo_nombre}' ya existe del catálogo actual.")
+                            else:
+                                num_actual = len(df_inv) + 1
+                                nuevo_id = f"MAT-{num_actual}"
+                                
+                                nuevo_registro = {
+                                    "ID": nuevo_id,
+                                    "Material": nuevo_nombre,
+                                    "Stock": stock_inicial_item,
+                                    "Min": minimo_alerta,
+                                    "Unidad": nueva_unidad
+                                }
+                                
+                                st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
+                                st.success(f"✅ Registrado con éxito: {nuevo_id} - {nuevo_nombre}")
+                                time.sleep(0.5)
+                                st.rerun()
+
+                # --- APARTADO C: CONTENEDOR CONTRAÍBLE DE BAJAS ---
+                with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
+                    with st.container():
+                        mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar por completo del sistema:", df_inv['Material'].tolist(), key="del_item_catalog")
+                        st.warning(f"⚠️ Al eliminar '{mat_a_eliminar}', desaparecerá por completo de la tabla de existencias actuales.")
+                        
+                        check_seguro_item = st.checkbox(f"Confirmar que deseo borrar de forma permanente este concepto del almacén", key="chk_seguro_item_del")
+                        
+                        if st.button(f"💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
+                            st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
+                            st.success(f"🗑️ El ítem '{mat_a_eliminar}' ha sido borrado del catálogo oficial.")
                             time.sleep(0.5)
                             st.rerun()
-
-                st.write("")
-                st.markdown("---")
-
-                # --- SUB-APARTADO C: ELIMINAR ÍTEM DEL CATÁLOGO ---
-                st.write("🗑️ **Eliminar Ítem del Catálogo (Baja Definitiva)**")
-                with st.container(border=True):
-                    mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar por completo del sistema:", df_inv['Material'].tolist(), key="del_item_catalog")
-                    st.warning(f"⚠️ Al eliminar '{mat_a_eliminar}', desaparecerá por completo de la tabla de existencias actuales.")
-                    
-                    check_seguro_item = st.checkbox(f"Confirmar que deseo borrar de forma permanente este concepto del almacén", key="chk_seguro_item_del")
-                    
-                    if st.button(f"💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
-                        st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
-                        st.success(f"🗑️ El ítem '{mat_a_eliminar}' ha sido borrado del catálogo oficial.")
-                        time.sleep(0.5)
-                        st.rerun()
                 
                 st.write("")
                 st.markdown("---")
