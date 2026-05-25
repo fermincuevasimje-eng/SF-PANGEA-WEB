@@ -94,10 +94,10 @@ MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lis
 
 # --- 1.6 INVENTARIO MAESTRO (SF6) ---
 STOCK_INICIAL = [
-    {"ID": "LUM-01", "Material": "Luminaria LED 100W", "Stock": 150, "Min": 20, "Costo": 2500, "Unidad": "Pza"},
-    {"ID": "FOT-02", "Material": "Fotocelda Universal", "Stock": 300, "Min": 50, "Costo": 180, "Unidad": "Pza"},
-    {"ID": "CAB-03", "Material": "Cable Aluminio Neutra 2+1", "Stock": 5000, "Min": 500, "Costo": 45, "Unidad": "m"},
-    {"ID": "BRA-04", "Material": "Brazo Galvanizado 1.5m", "Stock": 80, "Min": 15, "Costo": 650, "Unidad": "Pza"}
+    {"ID": "LUM-01", "Material": "Luminaria LED 100W", "Stock": 150, "Min": 20, "Unidad": "Pza"},
+    {"ID": "FOT-02", "Material": "Fotocelda Universal", "Stock": 300, "Min": 50, "Unidad": "Pza"},
+    {"ID": "CAB-03", "Material": "Cable Aluminio Neutra 2+1", "Stock": 5000, "Min": 500, "Unidad": "m"},
+    {"ID": "BRA-04", "Material": "Brazo Galvanizado 1.5m", "Stock": 80, "Min": 15, "Unidad": "Pza"}
 ]
 
 # --- 2. MOTOR LÓGICO MEJORADO ---
