@@ -390,7 +390,7 @@ else:
         if st.button("📊 SF3-Captura y Métricas", use_container_width=True): st.session_state.menu = "SF3"
         if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): st.session_state.menu = "SF4"
         if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): st.session_state.menu = "SF5"
-        if st.button("📦 -Almacén e Inventario", use_container_width=True): st.session_state.menu = ""
+        if st.button("📦 -Almacén e Inventario", use_container_width=True): st.session_state.menu = "SF6"
         st.write("---")
         if st.session_state.menu == "SF1":
             st.subheader("📊 Ajustes GdR Multi-Ruta")
@@ -1906,7 +1906,6 @@ else:
                     mime="application/pdf",
                     use_container_width=True
                 ):
-                    # --- FILTRO DE SEGURIDAD EXPLICITO ANTI-DUPLICADOS ---
                     folios_existentes = [v["Folio"] for v in st.session_state.vales_historial]
                     if folio_actual in folios_existentes:
                         st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya fue registrado previamente en la Bóveda. Operación abortada.")
@@ -2054,7 +2053,6 @@ else:
                         else:
                             st.warning("⚠️ Este vale corresponde a un registro antiguo sin desglose digital de materiales.")
                         
-                        # --- FILTRO ANTIRROBOS: BOTÓN DE ELIMINACIÓN SEGURA CORREGIDO ---
                         st.write("")
                         st.markdown("**🚨 Zona Crítica de Auditoría**")
                         check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select} de los registros", key=f"chk_del_{folio_select}")
