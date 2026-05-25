@@ -1768,8 +1768,8 @@ else:
                         idx = df_inv[df_inv['Material'] == m_in].index[0]
                         st.session_state.db_inventario.at[idx, 'Stock'] += c_in
                         st.success(f"📦 Entrada registrada. Stock actualizado de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} unidades.")
-                        
-                        st.write("")
+                
+                st.write("")
                 st.markdown("---")
                 st.subheader("🔒 Bóveda de Vales Emitidos (Historial Antirrobos)")
                 st.caption("Registro histórico inmutable de salidas de material de la Dirección de Alumbrado Público.")
@@ -1777,14 +1777,14 @@ else:
                 if not st.session_state.vales_historial:
                     st.info("📂 La bóveda se encuentra vacía. No se han emitido vales oficiales en esta sesión.")
                 else:
-                    # Formatear la vista rápida de la bóveda
+                    # Formatear la vista rápida usando .get() seguro para evitar KeyErrors
                     tabla_boveda = []
                     for v in st.session_state.vales_historial:
                         tabla_boveda.append({
                             "Folio": v["Folio"],
                             "Fecha/Hora": v.get("Fecha", "N/A"),
                             "Brigada / Destino": v["Brigada"],
-                            "Total Insumos": len(v["Materiales"])
+                            "Total Insumos": len(v.get("Materiales", []))
                         })
                     
                     df_boveda = pd.DataFrame(tabla_boveda)
@@ -1802,8 +1802,12 @@ else:
                         st.markdown(f"### 📄 Expediente: {vale_auditado['Folio']}")
                         st.write(f"**Fecha de Emisión:** {vale_auditado.get('Fecha', 'N/A')}")
                         st.write(f"**Asignado a:** {vale_auditado['Brigada']}")
-                        st.write(f"**Notas de Almacén:** {vale_auditado['Observaciones']}")
+                        st.write(f"**Notas de Almacén:** {vale_auditado.get('Observaciones', 'Sin notas registradas')}")
                         
                         st.write("**Desglose de Material Entregado:**")
-                        df_mat_auditoria = pd.DataFrame(vale_auditado["Materiales"])
-                        st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
+                        lista_materiales = vale_auditado.get("Materiales", [])
+                        if lista_materiales:
+                            df_mat_auditoria = pd.DataFrame(lista_materiales)
+                            st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
+                        else:
+                            st.warning("⚠️ Este vale corresponde a un registro antiguo sin desglose digital de materiales.")
