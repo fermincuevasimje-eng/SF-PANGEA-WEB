@@ -1698,20 +1698,16 @@ else:
         PIN_ALMACEN = "DAP-2026"
         LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento de Toluca y se genera en la Dirección de Alumbrado Público"
 
-        # Listas oficiales de control territorial para Toluca
-        DELEGACIONES_TOLUCA = [
-            "Centro Histórico", "Barrios Tradicionales", "Árbol de las Manitas", "La Maquinita", 
-            "Independencia", "San Sebastián", "Universidad", "Santa María de las Rosas", 
-            "Del Parque", "Delegación del Parque 18 de Marzo", "Adolfo López Mateos", 
-            "Ciudad Universitaria", "Nueva Oxtotitlán", "San Buenaventura", "Capultitlán", 
-            "Tlacotepec", "San Juan Tilapa", "San Felipe Tlalmimilolpan", "Pino Suárez", 
-            "San Mateo Oxtotitlán", "Santa Cruz Atzcapotzaltongo", "San Pedro Totoltepec", 
-            "San Lorenzo Tepaltitlán", "San Andrés Cuexcontitlán", "San Cristóbal Huichochitlán", 
-            "San Pablo Autopan", "San Juan Autopan", "San Martín Toltepec", "Sauces", 
-            "Calixtlahuaca", "Tecaxic", "San Antonio Buenavista"
-        ]
-        
-        UTBS_TOLUCA = [f"UTB {i}" for i in range(1, 25)]
+        # Cargar base de datos territorial (Delegaciones y UTBs) desde el CSV oficial de forma dinámica
+        try:
+            df_territorial = pd.read_csv('DELEUTB2.csv')
+            df_territorial['DELEGACION'] = df_territorial['DELEGACION'].str.strip()
+            df_territorial['UTB'] = df_territorial['UTB'].str.strip()
+            DELEGACIONES_TOLUCA = sorted(df_territorial['DELEGACION'].unique().tolist())
+        except Exception as e:
+            st.error(f"🚨 Error al cargar el archivo de control territorial DELEUTB2.csv: {e}")
+            DELEGACIONES_TOLUCA = []
+            df_territorial = pd.DataFrame(columns=['DELEGACION', 'UTB'])
 
         if "db_inventario" not in st.session_state:
             st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
@@ -1805,7 +1801,12 @@ else:
             with c_bri2:
                 delegacion_sel = st.selectbox("Delegación Destino:", DELEGACIONES_TOLUCA, key="delegacion_salida_vales")
             with c_bri3:
-                utb_sel = st.selectbox("UTB Destino:", UTBS_TOLUCA, key="utb_salida_vales")
+                # Filtrado dinámico de UTBs según la Delegación seleccionada en el archivo CSV
+                if not df_territorial.empty and delegacion_sel:
+                    utbs_filtradas = sorted(df_territorial[df_territorial['DELEGACION'] == delegacion_sel]['UTB'].unique().tolist())
+                else:
+                    utbs_filtradas = []
+                utb_sel = st.selectbox("UTB Destino:", utbs_filtradas, key="utb_salida_vales")
 
             st.info(f"Folio del Vale en Proceso: **{folio_actual}**")
 
@@ -2051,15 +2052,25 @@ else:
                 df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
                 
                 with c_f2:
-                    delegaciones_dispo = sorted(df_filtrado["Delegación"].unique())
-                    del_filtro = st.selectbox("2. Filtrar por Delegación:", ["TODAS"] + delegaciones_dispo)
+                    # Desplegar el catálogo oficial desde el archivo
+                    delegaciones_dispo = ["TODAS"] + DELEGACIONES_TOLUCA
+                    del_filtro = st.selectbox("2. Filtrar por Delegación:", delegaciones_dispo, key="sb_filtrar_delegacion_rep")
                 
                 if del_filtro != "TODAS":
                     df_filtrado = df_filtrado[df_filtrado["Delegación"] == del_filtro]
+                    # Vinculación de UTBs según la delegación elegida
+                    if not df_territorial.empty:
+                        utbs_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['DELEGACION'] == del_filtro]['UTB'].unique().tolist())
+                    else:
+                        utbs_dispo = ["TODAS"]
+                else:
+                    if not df_territorial.empty:
+                        utbs_dispo = ["TODAS"] + sorted(df_territorial['UTB'].unique().tolist())
+                    else:
+                        utbs_dispo = ["TODAS"]
                     
                 with c_f3:
-                    utbs_dispo = sorted(df_filtrado["UTB"].unique())
-                    utb_filtro = st.selectbox("3. Filtrar por UTB:", ["TODAS"] + utbs_dispo)
+                    utb_filtro = st.selectbox("3. Filtrar por UTB:", utbs_dispo, key="sb_filtrar_utb_rep")
                     
                 if utb_filtro != "TODAS":
                     df_filtrado = df_filtrado[df_filtrado["UTB"] == utb_filtro]
