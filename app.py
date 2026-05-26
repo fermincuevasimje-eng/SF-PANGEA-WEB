@@ -2078,26 +2078,61 @@ else:
                 
                 df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
                 
-                with c_f2:
-                    delegaciones_dispo = ["TODAS"] + DELEGACIONES_TOLUCA
-                    del_filtro = st.selectbox("2. Filtrar por Delegación:", delegaciones_dispo, key="sb_filtrar_delegacion_rep")
-                
-                if del_filtro != "TODAS":
-                    df_filtrado = df_filtrado[df_filtrado["Delegación"] == del_filtro]
-                    # Vinculación dinámica de UTBs según la delegación elegida
-                    if not df_territorial.empty:
-                        utbs_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['DELEGACION'] == del_filtro]['UTB'].unique().tolist())
-                    else:
-                        utbs_dispo = ["TODAS"]
+                # --- ASIGNACIÓN DE ESTADOS INICIALES PARA EL FILTRADO CRUZADO INTELIGENTE ---
+                if "sb_filtrar_delegacion_rep" not in st.session_state:
+                    st.session_state.sb_filtrar_delegacion_rep = "TODAS"
+                if "sb_filtrar_utb_rep" not in st.session_state:
+                    st.session_state.sb_filtrar_utb_rep = "TODAS"
+
+                # REGLA A: Si se escoge una UTB primero y la delegación está en "TODAS", auto-vincular si es única
+                if st.session_state.sb_filtrar_utb_rep != "TODAS" and st.session_state.sb_filtrar_delegacion_rep == "TODAS" and not df_territorial.empty:
+                    deles_asociadas = df_territorial[df_territorial['UTB'] == st.session_state.sb_filtrar_utb_rep]['DELEGACION'].unique().tolist()
+                    if len(deles_asociadas) == 1:
+                        st.session_state.sb_filtrar_delegacion_rep = deles_asociadas[0]
+
+                # REGLA B: Construir dinámicamente las Delegaciones válidas basadas en la UTB seleccionada
+                if st.session_state.sb_filtrar_utb_rep != "TODAS" and not df_territorial.empty:
+                    deles_compatibles = sorted(df_territorial[df_territorial['UTB'] == st.session_state.sb_filtrar_utb_rep]['DELEGACION'].unique().tolist())
+                    delegaciones_dispo = ["TODAS"] + deles_compatibles
                 else:
-                    if not df_territorial.empty:
-                        utbs_dispo = ["TODAS"] + sorted(df_territorial['UTB'].unique().tolist())
-                    else:
-                        utbs_dispo = ["TODAS"]
+                    delegaciones_dispo = ["TODAS"] + DELEGACIONES_TOLUCA
+
+                if st.session_state.sb_filtrar_delegacion_rep not in delegaciones_dispo:
+                    st.session_state.sb_filtrar_delegacion_rep = "TODAS"
+                
+                idx_del = delegaciones_dispo.index(st.session_state.sb_filtrar_delegacion_rep)
+
+                with c_f2:
+                    del_filtro = st.selectbox(
+                        "2. Filtrar por Delegación:", 
+                        delegaciones_dispo, 
+                        index=idx_del, 
+                        key="sb_filtrar_delegacion_rep"
+                    )
+                
+                # REGLA C: Construir dinámicamente las UTBs válidas basadas en la Delegación seleccionada
+                if st.session_state.sb_filtrar_delegacion_rep != "TODAS" and not df_territorial.empty:
+                    utbs_compatibles = sorted(df_territorial[df_territorial['DELEGACION'] == st.session_state.sb_filtrar_delegacion_rep]['UTB'].unique().tolist())
+                    utbs_dispo = ["TODAS"] + utbs_compatibles
+                else:
+                    utbs_dispo = ["TODAS"] + sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else ["TODAS"]
+
+                if st.session_state.sb_filtrar_utb_rep not in utbs_dispo:
+                    st.session_state.sb_filtrar_utb_rep = "TODAS"
+                
+                idx_utb = utbs_dispo.index(st.session_state.sb_filtrar_utb_rep)
                     
                 with c_f3:
-                    utb_filtro = st.selectbox("3. Filtrar por UTB:", utbs_dispo, key="sb_filtrar_utb_rep")
-                    
+                    utb_filtro = st.selectbox(
+                        "3. Filtrar por UTB:", 
+                        utbs_dispo, 
+                        index=idx_utb, 
+                        key="sb_filtrar_utb_rep"
+                    )
+                
+                # Ejecutar filtros sobre la tabla de informes finales
+                if del_filtro != "TODAS":
+                    df_filtrado = df_filtrado[df_filtrado["Delegación"] == del_filtro]
                 if utb_filtro != "TODAS":
                     df_filtrado = df_filtrado[df_filtrado["UTB"] == utb_filtro]
                 
@@ -2253,7 +2288,7 @@ else:
                             df_mat_auditoria = pd.DataFrame(lista_materiales)
                             st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
                         else:
-                            st.warning("⚠️ Este vale corresponde a un registro antiguo sin desglose digital de materiales.")
+                            st.warning("⚠️ Este vale corresponds a un registro antiguo sin desglose digital de materiales.")
                         
                         st.write("")
                         st.markdown("**🚨 Zona Crítica de Auditoría**")
