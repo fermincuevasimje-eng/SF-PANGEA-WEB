@@ -1693,743 +1693,770 @@ else:
                 st.error("No se detectaron coordenadas válidas en los archivos.")
 
     elif st.session_state.menu == "SF6":
-    # --- El sistema continúa con todo su poder sin bloqueos iniciales ---
-    st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
-    
-    PIN_ALMACEN = "DAP-2026"
-    LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento de Toluca y se genera en la Dirección de Alumbrado Público"
+        # ==========================================
+        # --- FILTRO 1: INICIO MAESTRO DEL SISTEMA (PIN 1827) ---
+        # ==========================================
+        if "maestro_auth" not in st.session_state:
+            st.session_state.maestro_auth = False
 
-    # Lector ultra-robusto: Intenta abrir el archivo compatible con formatos Excel y UTF-8
-    try:
-        try:
-            df_territorial = pd.read_csv('DELEUTB2.csv', encoding='utf-8')
-        except Exception:
-            try:
-                df_territorial = pd.read_csv('DELEUTB2.csv', encoding='latin-1')
-            except Exception:
-                df_territorial = pd.read_csv('DELEUTB2.csv', encoding='utf-8-sig')
-        
-        # Limpieza profunda de columnas y textos para evitar errores de coincidencia
-        df_territorial.columns = [str(c).strip().upper() for c in df_territorial.columns]
-        df_territorial = df_territorial.dropna(subset=['DELEGACION', 'UTB'])
-        df_territorial['DELEGACION'] = df_territorial['DELEGACION'].astype(str).str.strip().str.upper()
-        df_territorial['UTB'] = df_territorial['UTB'].astype(str).str.strip().str.upper()
-        
-        # Extraer las delegaciones ordenadas desde el archivo original
-        DELEGACIONES_TOLUCA = sorted(df_territorial['DELEGACION'].unique().tolist())
-    except Exception as e:
-        # Respaldo de seguridad temporal si el servidor tarda en sincronizar el archivo físico
-        st.sidebar.info("⚙️ Sincronizando base territorial del repositorio...")
-        DELEGACIONES_TOLUCA = [
-            "CENTRO HISTORICO", "BARRIOS TRADICIONALES", "ARBOL DE LAS MANITAS", "LA MAQUINITA", 
-            "INDEPENDENCIA", "SAN SEBASTIAN", "UNIVERSIDAD", "SANTA MARIA DE LAS ROSAS", 
-            "DEL PARQUE", "DELEGACION DEL PARQUE 18 DE MARZO", "ADOLFO LOPEZ MATEOS", 
-            "CIUDAD UNIVERSITARIA", "NUEVA OXTOTITLAN", "SAN BUENAVENTURA", "CAPULTITLAN", 
-            "TLACOTEPEC", "SAN JUAN TILAPA", "SAN FELIPE TLALMIMILOLPAN", "PINO SUAREZ", 
-            "SAN MATEO OXTOTITLAN", "SANTA CRUZ ATZCAPOTZALTONGO", "SAN PEDRO TOTOLTEPEC", 
-            "SAN LORENZO TEPALTITLAN", "SAN ANDRES CUEXCONTITLAN", "SAN CRISTOBAL HUICHOCHITLAN", 
-            "SAN PABLO AUTOPAN", "SAN JUAN AUTOPAN", "SAN MARTIN TOLTEPEC", "SAUCES", 
-            "CALIXTLAHUACA", "TECAXIC", "SAN ANTONIO BUENAVISTA"
-        ]
-        respaldo_datos = []
-        for d in DELEGACIONES_TOLUCA:
-            for i in range(1, 6):
-                respaldo_datos.append({"DELEGACION": d, "UTB": f"UTB {i}"})
-        df_territorial = pd.DataFrame(respaldo_datos)
-
-    # ==========================================
-    # --- MOTOR DE PERSISTENCIA INMUTABLE (F5 PROOF) ---
-    # ==========================================
-    import os
-    import json
-
-    # Inicialización de Inventario Persistente fijado en 100 y 10 para la presentación
-    if "db_inventario" not in st.session_state:
-        if os.path.exists('inventario_dap_guardado.csv'):
-            st.session_state.db_inventario = pd.read_csv('inventario_dap_guardado.csv')
-        else:
-            df_base = pd.DataFrame(STOCK_INICIAL)
-            df_base['Stock'] = 100  # Forzar stock ideal de presentación
-            df_base['Min'] = 10     # Forzar mínimo ideal de presentación
-            df_base.to_csv('inventario_dap_guardado.csv', index=False)
-            st.session_state.db_inventario = df_base
-
-    # Inicialización de Historial de Vales Persistente
-    if "vales_historial" not in st.session_state:
-        if os.path.exists('vales_historial_guardado.json'):
-            with open('vales_historial_guardado.json', 'r', encoding='utf-8') as f:
-                st.session_state.vales_historial = json.load(f)
-        else:
-            st.session_state.vales_historial = []
-
-    if "carrito_vale" not in st.session_state:
-        st.session_state.carrito_vale = []
-    if "admin_auth" not in st.session_state:
-        st.session_state.admin_auth = False
-
-    # Declaración oficial de las 4 pestañas de operación originales
-    tab_inv, tab_vales, tab_seguimiento, tab_admin = st.tabs([
-        "📊 Existencias y Resumen", 
-        "🚚 Salida (Vale Oficial)", 
-        "🎯 Seguimiento y Consumos",
-        "⚙️ Gestión Almacén"
-    ])
-
-    # ==========================================
-    # --- PESTAÑA 1: EXISTENCIAS Y RESUMEN ---
-    # ==========================================
-    with tab_inv:
-        df_inv = st.session_state.db_inventario
-        st.subheader("🚨 Dashboard de Inventario")
-        
-        if "filtrar_critico" not in st.session_state:
-            st.session_state.filtrar_critico = False
-
-        criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
-        
-        c_met1, c_met2 = st.columns(2)
-        c_met1.metric("📦 Materiales en Catálogo", len(df_inv))
-        c_met2.metric("⚠️ Alertas de Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
-
-        text_filtro = "👁️ Mostrar SOLO materiales con Stock Crítico" if not st.session_state.filtrar_critico else "🔄 Mostrar TODO el Catálogo"
-        type_filtro = "secondary" if not st.session_state.filtrar_critico else "primary"
-        
-        if st.button(text_filtro, type=type_filtro, use_container_width=True):
-            st.session_state.filtrar_critico = not st.session_state.filtrar_critico
-            st.rerun()
-
-        if st.session_state.filtrar_critico:
-            st.markdown("### ⚠️ Mostrando Materiales en Stock Crítico o Alerta")
-            df_mostrar = df_inv[df_inv['Stock'] <= df_inv['Min']].reset_index(drop=True)
-            if df_mostrar.empty:
-                st.success("🎉 ¡Excelente! No hay ningún material con stock crítico en este momento.")
-        else:
-            st.write("### Inventario Actual de Materiales e Insumos")
-            df_mostrar = df_inv
-
-        st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
-        
-        if st.button("📄 GENERAR RESUMEN EJECUTIVO (EXCEL)", use_container_width=True):
-            output_res = io.BytesIO()
-            with pd.ExcelWriter(output_res, engine='openpyxl') as writer:
-                df_mostrar.to_excel(writer, index=False, sheet_name='Estado_Almacen')
-            st.download_button(
-                label="📥 Descargar Reporte de Stock", 
-                data=output_res.getvalue(), 
-                file_name=f"Resumen_Almacen_{pd.Timestamp.now().strftime('%d-%m-%Y')}.xlsx", 
-                use_container_width=True
-            )
-
-    # ==========================================
-    # --- PESTAÑA 2: SALIDA (VALE OFICIAL) ---
-    # ==========================================
-    with tab_vales:
-        df_inv = st.session_state.db_inventario
-        st.subheader("🧾 Generador de Vale de Salida Oficial")
-        
-        prox_folio_num = len(st.session_state.vales_historial) + 1
-        folio_actual = f"DAP-{prox_folio_num}"
-        
-        st.markdown(
-            """
-            <div style='background-color: #eef4f8; padding: 15px; border-left: 6px solid #1f4e78; border-radius: 6px; margin-bottom: 15px;'>
-                <h4 style='margin:0; color: #1f4e78;'>🚚 ASIGNACIÓN DE UNIDAD Y UBICACIÓN DE DESTINO</h4>
-                <p style='margin:0; font-size:13px; color:#555;'>Asigne la brigada y la delimitación territorial para el seguimiento posterior del material.</p>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-        
-        # --- MOTOR DE FILTRADO CON DETECCIÓN DE RESETEO PARA VALES ---
-        if "sb_vale_delegacion" not in st.session_state:
-            st.session_state.sb_vale_delegacion = "TODAS"
-        if "sb_vale_utb" not in st.session_state:
-            st.session_state.sb_vale_utb = "TODAS"
-        if "prev_vale_del" not in st.session_state:
-            st.session_state.prev_vale_del = "TODAS"
-        if "prev_vale_utb" not in st.session_state:
-            st.session_state.prev_vale_utb = "TODAS"
-
-        val_del_current = st.session_state.sb_vale_delegacion
-        val_utb_current = st.session_state.sb_vale_utb
-
-        if val_del_current != st.session_state.prev_vale_del:
-            if val_del_current == "TODAS":
-                st.session_state.sb_vale_utb = "TODAS"
-                val_utb_current = "TODAS"
-            else:
-                if not df_territorial.empty:
-                    utbs_validas = sorted(df_territorial[df_territorial['DELEGACION'] == val_del_current]['UTB'].unique().tolist())
-                    if val_utb_current != "TODAS" and val_utb_current not in utbs_validas:
-                        st.session_state.sb_vale_utb = "TODAS"
-                        val_utb_current = "TODAS"
-            st.session_state.prev_vale_del = val_del_current
-            st.session_state.prev_vale_utb = val_utb_current
-
-        elif val_utb_current != st.session_state.prev_vale_utb:
-            if val_utb_current != "TODAS" and not df_territorial.empty:
-                deles_de_utb = df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist()
-                if val_del_current == "TODAS" or val_del_current not in deles_de_utb:
-                    if deles_de_utb:
-                        st.session_state.sb_vale_delegacion = sorted(deles_de_utb)[0]
-                        val_del_current = sorted(deles_de_utb)[0]
-                        st.session_state.prev_vale_del = val_del_current
-            st.session_state.prev_vale_utb = val_utb_current
-
-        if val_utb_current != "TODAS" and not df_territorial.empty:
-            delegaciones_dispo_vale = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist())
-        else:
-            delegaciones_dispo_vale = ["TODAS"] + DELEGACIONES_TOLUCA
-
-        if val_del_current != "TODAS" and not df_territorial.empty:
-            utbs_dispo_vale = ["TODAS"] + sorted(df_territorial[df_territorial['DELEGACION'] == val_del_current]['UTB'].unique().tolist())
-        else:
-            utbs_dispo_vale = ["TODAS"] + (sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else [])
-
-        if val_del_current not in delegaciones_dispo_vale: val_del_current = "TODAS"
-        if val_utb_current not in utbs_dispo_vale: val_utb_current = "TODAS"
-
-        idx_del_vale = delegaciones_dispo_vale.index(val_del_current)
-        idx_utb_vale = utbs_dispo_vale.index(val_utb_current)
-
-        c_bri1, c_bri2, c_bri3 = st.columns(3)
-        with c_bri1:
-            bri_sel = st.selectbox(
-                "Brigada Asignada:", 
-                [f"Brigada {i}" for i in range(1, 18)] + ["Personal de Mantenimiento Interno", "Cuadrilla de Alumbrado Especial"],
-                key="brigada_salida_vales"
-            )
-        with c_bri2:
-            delegacion_sel = st.selectbox(
-                "Delegación Destino:", 
-                delegaciones_dispo_vale, 
-                index=idx_del_vale, 
-                key="sb_vale_delegacion"
-            )
-        with c_bri3:
-            utb_sel = st.selectbox(
-                "UTB Destino:", 
-                utbs_dispo_vale, 
-                index=idx_utb_vale, 
-                key="sb_vale_utb"
-            )
-
-        st.info(f"Folio del Vale en Proceso: **{folio_actual}**")
-
-        with st.container(border=True):
-            st.markdown("**🛒 Adición de Materiales al Lote**")
-            c2, c3 = st.columns([2, 1])
-            mat_sel = c2.selectbox("Seleccione Insumo:", df_inv['Material'].tolist())
-            can_sel = c3.number_input("Cantidad a Entregar:", min_value=1, step=1)
+        if not st.session_state.maestro_auth:
+            st.title("🔒 SF6 - Suite de Gestión Municipal (DAP)")
+            st.markdown("### **Control de Acceso Institucional**")
+            st.caption("Por seguridad de la Dirección de Alumbrado Público, ingrese el PIN Maestro para inicializar el módulo.")
             
-            if st.button("➕ Agregar Insumo al Carrito", use_container_width=True):
-                stock_real = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
-                if stock_real >= can_sel:
-                    existe = False
-                    for item in st.session_state.carrito_vale:
-                        if item['Material'] == mat_sel:
-                            if (item['Cantidad'] + can_sel) <= stock_real:
-                                item['Cantidad'] += can_sel
-                                existe = True
-                            else:
-                                st.error("⚠️ La cantidad agregada supera las existencias físicas en el almacén.")
-                                existe = True
-                    if not existe:
-                        st.session_state.carrito_vale.append({
-                            "Material": mat_sel, 
-                            "Cantidad": can_sel, 
-                            "Unidad": df_inv.loc[df_inv['Material'] == mat_sel, 'Unidad'].values[0]
-                        })
-                    
-                    st.session_state.vale_listo_descarga = None
-                    st.toast(f"✅ {mat_sel} sumado al vale actual.")
-                    time.sleep(0.3)
-                    st.rerun()
-                else:
-                    st.error(f"⚠️ No hay suficiente material disponible. Existencia actual: {stock_real}")
-
-        st.markdown("### 📝 Control y Notas de Entrega")
-        obs_digital = st.text_area(
-            "Observaciones del Responsable de Almacén (Se captura en sistema):", 
-            placeholder="Ej: Material destinado a la rehabilitación de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
-            key="obs_responsable_entrega"
-        )
-
-        # --- VISTA DEL CARRITO ACTIVO MIENTRAS CAPTURAS ---
-        if st.session_state.carrito_vale:
-            st.write("---")
-            st.markdown("### **🛒 Resumen del Lote a Entregar:**")
-            
-            df_carrito = pd.DataFrame(st.session_state.carrito_vale)
-            st.dataframe(df_carrito, use_container_width=True, hide_index=True)
-            
-            col_v1, col_v2 = st.columns(2)
-            
-            if col_v1.button("❌ Cancelar Vale Completo", use_container_width=True):
-                st.session_state.carrito_vale = []
-                st.rerun()
-            
-            if col_v2.button(f"🚀 PROCESAR Y EMITIR VALE ({folio_actual})", type="primary", use_container_width=True):
-                folios_existentes = [v["Folio"] for v in st.session_state.vales_historial]
-                
-                if folio_actual in folios_existentes:
-                    st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya existe en el histórico. Intente de nuevo.")
-                else:
-                    # --- CONSTRUCCIÓN COMPLETA DEL DOCUMENTO FPDF ---
-                    from fpdf import FPDF
-                    pdf = FPDF()
-                    pdf.add_page()
-                    
-                    pdf.set_font("Arial", 'B', 14)
-                    pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
-                    pdf.set_font("Arial", 'B', 12)
-                    pdf.cell(0, 8, "DIRECCION DE ALUMBRADO PUBLICO", ln=True, align='C')
-                    pdf.cell(0, 8, f"VALE OFICIAL DE SALIDA: {folio_actual}", ln=True, align='C')
-                    pdf.ln(8)
-                    
-                    pdf.set_font("Arial", '', 10)
-                    pdf.cell(0, 6, f"Fecha y Hora de Emision: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
-                    pdf.cell(0, 6, f"Ubicacion Geografica: {delegacion_sel} - {utb_sel}", ln=True)
-                    pdf.set_font("Arial", 'B', 10)
-                    pdf.cell(0, 6, f"UNIDAD / BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
-                    pdf.ln(4)
-                    
-                    pdf.set_fill_color(230, 235, 240)
-                    pdf.set_font("Arial", 'B', 10)
-                    pdf.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
-                    pdf.cell(36, 8, "Entregado", 1, 0, 'C', True)
-                    pdf.cell(22, 8, "Utilizado", 1, 0, 'C', True)
-                    pdf.cell(22, 8, "Devuelto", 1, 1, 'C', True)
-                    
-                    pdf.set_font("Arial", '', 10)
-                    for it in st.session_state.carrito_vale:
-                        pdf.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
-                        pdf.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
-                        pdf.cell(22, 8, "", 1, 0, 'C')
-                        pdf.cell(22, 8, "", 1, 1, 'C')
-                    pdf.ln(6)
-                    
-                    pdf.set_font("Arial", 'B', 10)
-                    pdf.cell(0, 6, "Observaciones del Responsable de Almacen (Sistema):", ln=True)
-                    pdf.set_font("Arial", 'I', 9)
-                    msg_obs = obs_digital if obs_digital.strip() else "Ninguna anotada en sistema al momento de la salida."
-                    pdf.multi_cell(0, 5, msg_obs.encode('latin-1', 'replace').decode('latin-1'), 1)
-                    pdf.ln(4)
-                    
-                    pdf.set_font("Arial", 'B', 10)
-                    pdf.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Fisico a Mano):", ln=True)
-                    pdf.set_fill_color(255, 255, 255)
-                    pdf.cell(0, 15, "", 1, ln=True, fill=True)
-                    pdf.ln(10)
-                    
-                    pdf.set_font("Arial", 'I', 9)
-                    pdf.multi_cell(0, 5, LEYENDA_OFICIAL.encode('latin-1', 'replace').decode('latin-1'), align='C')
-                    pdf.ln(12)
-                    
-                    y_pos_firmas = pdf.get_y()
-                    pdf.set_font("Arial", 'B', 8)
-                    
-                    pdf.set_xy(15, y_pos_firmas)
-                    pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
-                    pdf.set_xy(15, y_pos_firmas + 4)
-                    pdf.cell(75, 4, "RESPONSABLE DE ENTREGA DE MATERIAL", ln=False, align='C')
-                    pdf.set_xy(15, y_pos_firmas + 8)
-                    pdf.set_font("Arial", '', 7)
-                    pdf.cell(75, 4, "(Firma y Sello de Almacen DAP)", ln=False, align='C')
-                    
-                    pdf.set_font("Arial", 'B', 8)
-                    pdf.set_xy(115, y_pos_firmas)
-                    pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
-                    pdf.set_xy(115, y_pos_firmas + 4)
-                    pdf.cell(75, 4, "RESPONSABLE QUE RECIBE MATERIAL", ln=False, align='C')
-                    pdf.set_xy(115, y_pos_firmas + 8)
-                    pdf.set_font("Arial", '', 7)
-                    pdf.cell(75, 4, f"({bri_sel.upper()})", ln=False, align='C')
-                    
-                    pdf_output = pdf.output(dest='S')
-                    pdf_bytes = pdf_output.encode('latin-1', 'replace') if isinstance(pdf_output, str) else pdf_output
-                    
-                    for item in st.session_state.carrito_vale:
-                        idx = df_inv[df_inv['Material'] == item['Material']].index[0]
-                        st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
-                    
-                    # Persistencia del stock deducido
-                    st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                    
-                    materiales_con_cierres = []
-                    for m_car in st.session_state.carrito_vale:
-                        m_car["Utilizado"] = 0
-                        m_car["Devuelto"] = 0
-                        materiales_con_cierres.append(m_car)
-                    
-                    st.session_state.vales_historial.append({
-                        "Folio": folio_actual, 
-                        "Fecha": pd.Timestamp.now().strftime('%Y-%m-%d'),
-                        "FechaHora": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
-                        "Brigada": bri_sel,
-                        "Delegacion": delegacion_sel,      
-                        "UTB": utb_sel,                  
-                        "Delegacion_Real": delegacion_sel, 
-                        "UTB_Real": utb_sel,             
-                        "Estado": "Pendiente",
-                        "Materiales": materiales_con_cierres,
-                        "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
-                    })
-                    
-                    # Persistencia del JSON de vales
-                    with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
-                        json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
-                    
-                    st.session_state.vale_listo_descarga = {
-                        "folio": folio_actual,
-                        "bytes": pdf_bytes
-                    }
-                    
-                    st.session_state.carrito_vale = []
-                    st.rerun()
-
-        # --- COMPROBANTE DE DESCARGA ACTIVO ---
-        if "vale_listo_descarga" in st.session_state and st.session_state.vale_listo_descarga:
-            st.write("---")
-            vale_data = st.session_state.vale_listo_descarga
-            st.success(f"🎉 ¡Vale Oficial **{vale_data['folio']}** registrado exitosamente en la Bóveda de Almacén!")
-            
-            c_dl1, c_dl2 = st.columns([3, 1])
-            c_dl1.download_button(
-                label=f"📥 DESCARGAR COMPROBANTE PDF ({vale_data['folio']})",
-                data=vale_data["bytes"],
-                file_name=f"Vale_Oficial_Salida_{vale_data['folio']}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                type="primary"
-            )
-            if c_dl2.button("🔄 Ocultar Notificación", use_container_width=True):
-                st.session_state.vale_listo_descarga = None
-                st.rerun()
-
-    # ==========================================
-    # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS ---
-    # ==========================================
-    with tab_seguimiento:
-        st.subheader("🎯 Control de Material Aplicado en Campo y Devoluciones")
-        
-        total_vales = len(st.session_state.vales_historial)
-        pendientes = sum(1 for v in st.session_state.vales_historial if v.get("Estado", "Pendiente") == "Pendiente")
-        redireccionados = sum(1 for v in st.session_state.vales_historial if v.get("Delegacion") != v.get("Delegacion_Real"))
-        
-        c_seg1, c_seg2, c_seg3 = st.columns(3)
-        c_seg1.metric("📋 Total Vales Emitidos", total_vales)
-        c_seg2.metric("⏳ Pendientes de Conciliar", pendientes, delta=f"-{total_vales - pendientes} cerrados", delta_color="normal" if pendientes > 0 else "off")
-        c_seg3.metric("⚠️ Cambios de Ruta (Alertas)", redireccionados, delta="Incidencias en campo" if redireccionados > 0 else "Operación Nominal", delta_color="inverse" if redireccionados > 0 else "normal")
-        
-        if total_vales > 0:
-            st.markdown("### 📊 Monitoreo Técnico de Despliegue")
-            st.caption("Estatus operativo inmutable de las brigadas en territorio de Toluca:")
-            
-            tabla_resumen_seguimiento = []
-            for v in st.session_state.vales_historial:
-                loc_original = f"{v['Delegacion']} ({v['UTB']})"
-                loc_real = f"{v.get('Delegacion_Real', v['Delegacion'])} ({v.get('UTB_Real', v['UTB'])})"
-                
-                status_ruta = "📢 NOMINAL" if v['Delegacion'] == v.get('Delegacion_Real') else "🔄 REDIRECCIONADO"
-                status_cierre = "🔴 PENDIENTE" if v.get("Estado", "Pendiente") == "Pendiente" else "🟢 CONCILIADO"
-                
-                tabla_resumen_seguimiento.append({
-                    "Folio": v["Folio"],
-                    "Brigada": v["Brigada"],
-                    "Destino Almacén": loc_original,
-                    "Destino Real Aplicado": loc_real,
-                    "Ruta": status_ruta,
-                    "Estatus": status_cierre
-                })
-            st.dataframe(pd.DataFrame(tabla_resumen_seguimiento), use_container_width=True, hide_index=True)
-        
-        st.write("---")
-        
-        if not st.session_state.vales_historial:
-            st.info("📂 No hay vales registrados en la Bóveda para darles seguimiento.")
-        else:
-            st.markdown("### 🛠️ 1. Captura de Cierre y Redireccionamiento de Material")
-            folios_dispo = [v["Folio"] for v in st.session_state.vales_historial]
-            v_select = st.selectbox("Seleccione el Folio del Vale a conciliar:", folios_dispo, key="sb_seguimiento_folios")
-            
-            idx_vale = next(i for i, item in enumerate(st.session_state.vales_historial) if item["Folio"] == v_select)
-            vale_obj = st.session_state.vales_historial[idx_vale]
-            
-            if vale_obj.get("Estado", "Pendiente") == "Conciliado":
-                st.success(f"✅ Este folio ya se encuentra **CONCILIADO**. Puede volver a guardar para modificar los datos reales.")
-            
-            # --- FILTRADO CRUZADO DINÁMICO DE CONCILIACIÓN ---
-            if "sb_rec_delegacion" not in st.session_state or st.session_state.get("current_v_select") != v_select:
-                st.session_state.current_v_select = v_select
-                st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
-                st.session_state.sb_rec_utb = vale_obj.get("UTB_Real", vale_obj["UTB"])
-                st.session_state.prev_rec_del = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
-
-            rec_del_current = st.session_state.sb_rec_delegacion
-            rec_utb_current = st.session_state.sb_rec_utb
-
-            if rec_del_current != st.session_state.prev_rec_del:
-                if not df_territorial.empty:
-                    utbs_validas_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist())
-                    if utbs_validas_rec:
-                        st.session_state.sb_rec_utb = utbs_validas_rec[0]
-                        rec_utb_current = utbs_validas_rec[0]
-                st.session_state.prev_rec_del = rec_del_current
-
-            delegaciones_dispo_rec = DELEGACIONES_TOLUCA
-            utbs_dispo_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist()) if not df_territorial.empty else ["UTB 1"]
-
-            idx_del_rec = delegaciones_dispo_rec.index(rec_del_current) if rec_del_current in delegaciones_dispo_rec else 0
-            idx_utb_rec = utbs_dispo_rec.index(rec_utb_current) if rec_utb_current in utbs_dispo_rec else 0
-
-            with st.container(border=True):
-                st.markdown("⚠️ **¿La brigada fue redireccionada a otra ubicación inesperada?**")
-                col_re1, col_re2 = st.columns(2)
-                real_del_sel = col_re1.selectbox("Delegación REAL de aplicación en campo:", delegaciones_dispo_rec, index=idx_del_rec, key="sb_rec_delegacion")
-                real_utb_sel = col_re2.selectbox("UTB REAL de aplicación en campo:", utbs_dispo_rec, index=idx_utb_rec, key="sb_rec_utb")
-            
-            st.write("")
-            df_materiales_vale = pd.DataFrame(vale_obj["Materiales"])
-            
-            df_editado = st.data_editor(
-                df_materiales_vale,
-                column_config={
-                    "Material": st.column_config.TextColumn("Insumo", disabled=True),
-                    "Cantidad": st.column_config.NumberColumn("Entregado", disabled=True),
-                    "Unidad": st.column_config.TextColumn("Unidad", disabled=True),
-                    "Utilizado": st.column_config.NumberColumn("Utilizado (Instalado)", min_value=0, required=True),
-                    "Devuelto": st.column_config.NumberColumn("Devuelto (A Almacén)", min_value=0, required=True),
-                },
-                hide_index=True, use_container_width=True, key=f"editor_live_{v_select}"
-            )
-            
-            if st.button("💾 Guardar Conciliación de Materiales", use_container_width=True, type="primary"):
-                error_cantidades = False
-                for index, row in df_editado.iterrows():
-                    if (row["Utilizado"] + row["Devuelto"]) > row["Cantidad"]:
-                        st.error(f"⚠️ Error en {row['Material']}: La suma supera la cantidad entregada original ({row['Cantidad']}).")
-                        error_cantidades = True
-                
-                if not error_cantidades:
-                    for index, row in df_editado.iterrows():
-                        dif_devolucion = row["Devuelto"] - df_materiales_vale.loc[index, "Devuelto"]
-                        if dif_devolucion > 0:
-                            idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
-                            st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
-                    
-                    st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                    st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
-                    st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
-                    st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
-                    st.session_state.vales_historial[idx_vale]["Estado"] = "Conciliado"
-                    
-                    with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
-                        json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
-                    
-                    st.success(f"📊 Cierre técnico del folio {v_select} procesado con éxito.")
+            pass_maestro = st.text_input("🔑 Ingrese PIN Maestro:", type="password", key="pass_maestro_root")
+            if st.button("🔓 Inicializar Sistema", use_container_width=True, type="primary"):
+                if pass_maestro == "1827":
+                    st.session_state.maestro_auth = True
+                    st.success("🎉 Acceso Maestro concedido. Inicializando entorno...")
                     time.sleep(0.5)
                     st.rerun()
-            
-            # --- REPORTE COMPLETO DINÁMICO DE CONSUMO HISTÓRICO ---
-            st.divider()
-            st.markdown("### 📈 2. Reporte Dinámico de Consumo Real e Histórico")
-            
-            datos_reporte_completo = []
-            for v in st.session_state.vales_historial:
-                for mat in v["Materiales"]:
-                    datos_reporte_completo.append({
-                        "Vale": v["Folio"], "Fecha": v["Fecha"], "Brigada": v["Brigada"],
-                        "Del. Programada": v["Delegacion"], "UTB Programada": v["UTB"],
-                        "Del. Real (Aplicada)": v.get("Delegacion_Real", v["Delegacion"]),
-                        "UTB Real (Aplicada)": v.get("UTB_Real", v["UTB"]),
-                        "Material": mat["Material"], "Entregado": mat["Cantidad"],
-                        "Utilizado": mat.get("Utilizado", 0), "Devuelto": mat.get("Devuelto", 0), "Unidad": mat["Unidad"]
-                    })
-            
-            df_reporte_base = pd.DataFrame(datos_reporte_completo)
-            
-            c_f1, c_f2, c_f3 = st.columns(3)
-            with c_f1:
-                fechas_dispo = sorted(df_reporte_base["Fecha"].unique())
-                fecha_filtro = st.selectbox("1. Filtrar por Fecha Determinante:", ["TODAS"] + fechas_dispo)
-            
-            df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
-            
-            # Filtrados dinámicos cruzados del reporte
-            if "sb_filtrar_delegacion_rep" not in st.session_state:
-                st.session_state.sb_filtrar_delegacion_rep = "TODAS"
-            if "sb_filtrar_utb_rep" not in st.session_state:
-                st.session_state.sb_filtrar_utb_rep = "TODAS"
-
-            rep_del_current = st.session_state.sb_filtrar_delegacion_rep
-            rep_utb_current = st.session_state.sb_filtrar_utb_rep
-
-            if rep_utb_current != "TODAS" and not df_territorial.empty:
-                delegaciones_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == rep_utb_current]['DELEGACION'].unique().tolist())
-            else:
-                delegaciones_dispo = ["TODAS"] + DELEGACIONES_TOLUCA
-
-            if rep_del_current != "TODAS" and not df_territorial.empty:
-                utbs_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['DELEGACION'] == rep_del_current]['UTB'].unique().tolist())
-            else:
-                utbs_dispo = ["TODAS"] + (sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else [])
-
-            idx_del = delegaciones_dispo.index(rep_del_current) if rep_del_current in delegaciones_dispo else 0
-            idx_utb = utbs_dispo.index(rep_utb_current) if rep_utb_current in utbs_dispo else 0
-                
-            with c_f2:
-                del_filtro = st.selectbox("2. Filtrar por Delegación Real Aplicada:", delegaciones_dispo, index=idx_del, key="sb_filtrar_delegacion_rep")
-            with c_f3:
-                utb_filtro = st.selectbox("3. Filtrar por UTB Real Aplicada:", utbs_dispo, index=idx_utb, key="sb_filtrar_utb_rep")
-            
-            if del_filtro != "TODAS":
-                df_filtrado = df_filtrado[df_filtrado["Del. Real (Aplicada)"] == del_filtro]
-            if utb_filtro != "TODAS":
-                df_filtrado = df_filtrado[df_filtrado["UTB Real (Aplicada)"] == utb_filtro]
-            
-            st.markdown("#### **Informe Resultante de Material en Calle**")
-            st.dataframe(df_filtrado[["Vale", "Fecha", "Brigada", "Del. Programada", "Del. Real (Aplicada)", "UTB Real (Aplicada)", "Material", "Entregado", "Utilizado", "Devuelto", "Unidad"]], use_container_width=True, hide_index=True)
-            
-            st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
-            c_m1, c_m2, c_m3 = st.columns(3)
-            c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas")
-            c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas")
-            c_m3.metric("🔄 Total Devuelto", f"{int(df_filtrado['Devuelto'].sum())} pzas")
-            
-            output_rep = io.BytesIO()
-            with pd.ExcelWriter(output_rep, engine='openpyxl') as writer:
-                df_filtrado.to_excel(writer, index=False, sheet_name='Reporte_Consumos_DAP')
-            st.download_button(label="📄 DESCARGAR REPORTE FILTRADO EN EXCEL", data=output_rep.getvalue(), file_name=f"Reporte_Consumos_DAP_{pd.Timestamp.now().strftime('%d-%m-%Y')}.xlsx", use_container_width=True)
-
-    # --- PESTAÑA 4: GESTIÓN ALMACÉN ---
-    with tab_admin:
-        df_inv = st.session_state.db_inventario
-        st.subheader("⚙️ Panel de Control de Existencias")
-        if not st.session_state.admin_auth:
-            st.warning("🔒 Este apartado requiere clave de acceso de Almacén.")
-            pass_in = st.text_input("🔑 Ingrese PIN de Almacén:", type="password")
-            if st.button("🔓 Conceder Acceso"):
-                if pass_in == PIN_ALMACEN:
-                    st.session_state.admin_auth = True
-                    st.rerun()
                 else:
-                    st.error("❌ Contraseña incorrecta para el área DAP.")
-        else:
-            st.success("✅ Acceso de Administrador de Almacén Concedido")
-            if st.button("🔒 Bloquear Panel de Gestión", type="secondary"):
-                st.session_state.admin_auth = False
+                    st.error("❌ PIN Maestro incorrecto. Acceso denegado al módulo SF6.")
+            st.stop()
+
+        # --- El sistema continúa con todo su poder si el PIN Maestro es correcto ---
+        st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
+        
+        PIN_ALMACEN = "DAP-2026"
+        LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento de Toluca y se genera en la Dirección de Alumbrado Público"
+
+        # Lector ultra-robusto: Intenta abrir el archivo compatible con formatos Excel y UTF-8
+        try:
+            try:
+                df_territorial = pd.read_csv('DELEUTB2.csv', encoding='utf-8')
+            except Exception:
+                try:
+                    df_territorial = pd.read_csv('DELEUTB2.csv', encoding='latin-1')
+                except Exception:
+                    df_territorial = pd.read_csv('DELEUTB2.csv', encoding='utf-8-sig')
+            
+            # Limpieza profunda de columnas y textos para evitar errores de coincidencia
+            df_territorial.columns = [str(c).strip().upper() for c in df_territorial.columns]
+            df_territorial = df_territorial.dropna(subset=['DELEGACION', 'UTB'])
+            df_territorial['DELEGACION'] = df_territorial['DELEGACION'].astype(str).str.strip().str.upper()
+            df_territorial['UTB'] = df_territorial['UTB'].astype(str).str.strip().str.upper()
+            
+            # Extraer las delegaciones ordenadas desde el archivo original
+            DELEGACIONES_TOLUCA = sorted(df_territorial['DELEGACION'].unique().tolist())
+        except Exception as e:
+            # Respaldo de seguridad temporal si el servidor tarda en sincronizar el archivo físico
+            st.sidebar.info("⚙️ Sincronizando base territorial del repositorio...")
+            DELEGACIONES_TOLUCA = [
+                "CENTRO HISTORICO", "BARRIOS TRADICIONALES", "ARBOL DE LAS MANITAS", "LA MAQUINITA", 
+                "INDEPENDENCIA", "SAN SEBASTIAN", "UNIVERSIDAD", "SANTA MARIA DE LAS ROSAS", 
+                "DEL PARQUE", "DELEGACION DEL PARQUE 18 DE MARZO", "ADOLFO LOPEZ MATEOS", 
+                "CIUDAD UNIVERSITARIA", "NUEVA OXTOTITLAN", "SAN BUENAVENTURA", "CAPULTITLAN", 
+                "TLACOTEPEC", "SAN JUAN TILAPA", "SAN FELIPE TLALMIMILOLPAN", "PINO SUAREZ", 
+                "SAN MATEO OXTOTITLAN", "SANTA CRUZ ATZCAPOTZALTONGO", "SAN PEDRO TOTOLTEPEC", 
+                "SAN LORENZO TEPALTITLAN", "SAN ANDRES CUEXCONTITLAN", "SAN CRISTOBAL HUICHOCHITLAN", 
+                "SAN PABLO AUTOPAN", "SAN JUAN AUTOPAN", "SAN MARTIN TOLTEPEC", "SAUCES", 
+                "CALIXTLAHUACA", "TECAXIC", "SAN ANTONIO BUENAVISTA"
+            ]
+            respaldo_datos = []
+            for d in DELEGACIONES_TOLUCA:
+                for i in range(1, 6):
+                    respaldo_datos.append({"DELEGACION": d, "UTB": f"UTB {i}"})
+            df_territorial = pd.DataFrame(respaldo_datos)
+
+        # ==========================================
+        # --- MOTOR DE PERSISTENCIA INMUTABLE (F5 PROOF) ---
+        # ==========================================
+        import os
+        import json
+
+        # Inicialización de Inventario Persistente fijado en 100 y 10 para la presentación
+        if "db_inventario" not in st.session_state:
+            if os.path.exists('inventario_dap_guardado.csv'):
+                st.session_state.db_inventario = pd.read_csv('inventario_dap_guardado.csv')
+            else:
+                df_base = pd.DataFrame(STOCK_INICIAL)
+                df_base['Stock'] = 100  # Forzar stock ideal de presentación
+                df_base['Min'] = 10     # Forzar mínimo ideal de presentación
+                df_base.to_csv('inventario_dap_guardado.csv', index=False)
+                st.session_state.db_inventario = df_base
+
+        # Inicialización de Historial de Vales Persistente
+        if "vales_historial" not in st.session_state:
+            if os.path.exists('vales_historial_guardado.json'):
+                with open('vales_historial_guardado.json', 'r', encoding='utf-8') as f:
+                    st.session_state.vales_historial = json.load(f)
+            else:
+                st.session_state.vales_historial = []
+
+        if "carrito_vale" not in st.session_state:
+            st.session_state.carrito_vale = []
+        if "admin_auth" not in st.session_state:
+            st.session_state.admin_auth = False
+
+        # Declaración oficial de las 4 pestañas de operación originales
+        tab_inv, tab_vales, tab_seguimiento, tab_admin = st.tabs([
+            "📊 Existencias y Resumen", 
+            "🚚 Salida (Vale Oficial)", 
+            "🎯 Seguimiento y Consumos",
+            "⚙️ Gestión Almacén"
+        ])
+
+        # ==========================================
+        # --- PESTAÑA 1: EXISTENCIAS Y RESUMEN ---
+        # ==========================================
+        with tab_inv:
+            df_inv = st.session_state.db_inventario
+            st.subheader("🚨 Dashboard de Inventario")
+            
+            if "filtrar_critico" not in st.session_state:
+                st.session_state.filtrar_critico = False
+
+            criticos = len(df_inv[df_inv['Stock'] <= df_inv['Min']])
+            
+            c_met1, c_met2 = st.columns(2)
+            c_met1.metric("📦 Materiales en Catálogo", len(df_inv))
+            c_met2.metric("⚠️ Alertas de Stock Crítico", criticos, delta=-criticos, delta_color="inverse")
+
+            text_filtro = "👁️ Mostrar SOLO materiales con Stock Crítico" if not st.session_state.filtrar_critico else "🔄 Mostrar TODO el Catálogo"
+            type_filtro = "secondary" if not st.session_state.filtrar_critico else "primary"
+            
+            if st.button(text_filtro, type=type_filtro, use_container_width=True):
+                st.session_state.filtrar_critico = not st.session_state.filtrar_critico
                 st.rerun()
+
+            if st.session_state.filtrar_critico:
+                st.markdown("### ⚠️ Mostrando Materiales en Stock Crítico o Alerta")
+                df_mostrar = df_inv[df_inv['Stock'] <= df_inv['Min']].reset_index(drop=True)
+                if df_mostrar.empty:
+                    st.success("🎉 ¡Excelente! No hay ningún material con stock crítico en este momento.")
+            else:
+                st.write("### Inventario Actual de Materiales e Insumos")
+                df_mostrar = df_inv
+
+            st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
             
-            st.divider()
+            if st.button("📄 GENERAR RESUMEN EJECUTIVO (EXCEL)", use_container_width=True):
+                output_res = io.BytesIO()
+                with pd.ExcelWriter(output_res, engine='openpyxl') as writer:
+                    df_mostrar.to_excel(writer, index=False, sheet_name='Estado_Almacen')
+                st.download_button(
+                    label="📥 Descargar Reporte de Stock", 
+                    data=output_res.getvalue(), 
+                    file_name=f"Resumen_Almacen_{pd.Timestamp.now().strftime('%d-%m-%Y')}.xlsx", 
+                    use_container_width=True
+                )
+
+        # ==========================================
+        # --- PESTAÑA 2: SALIDA (VALE OFICIAL) ---
+        # ==========================================
+        with tab_vales:
+            df_inv = st.session_state.db_inventario
+            st.subheader("🧾 Generador de Vale de Salida Oficial")
             
-            # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (ABASTECIMIENTO) ---
-            with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
-                m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist(), key="sb_abastecer")
-                stock_previo = df_inv.loc[df_inv['Material'] == m_in, 'Stock'].values[0]
-                unidad_medida = df_inv.loc[df_inv['Material'] == m_in, 'Unidad'].values[0]
+            prox_folio_num = len(st.session_state.vales_historial) + 1
+            folio_actual = f"DAP-{prox_folio_num}"
+            
+            st.markdown(
+                """
+                <div style='background-color: #eef4f8; padding: 15px; border-left: 6px solid #1f4e78; border-radius: 6px; margin-bottom: 15px;'>
+                    <h4 style='margin:0; color: #1f4e78;'>🚚 ASIGNACIÓN DE UNIDAD Y UBICACIÓN DE DESTINO</h4>
+                    <p style='margin:0; font-size:13px; color:#555;'>Asigne la brigada y la delimitación territorial para el seguimiento posterior del material.</p>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+            
+            # --- MOTOR DE FILTRADO CON DETECCIÓN DE RESETEO PARA VALES ---
+            if "sb_vale_delegacion" not in st.session_state:
+                st.session_state.sb_vale_delegacion = "TODAS"
+            if "sb_vale_utb" not in st.session_state:
+                st.session_state.sb_vale_utb = "TODAS"
+            if "prev_vale_del" not in st.session_state:
+                st.session_state.prev_vale_del = "TODAS"
+            if "prev_vale_utb" not in st.session_state:
+                st.session_state.prev_vale_utb = "TODAS"
+
+            val_del_current = st.session_state.sb_vale_delegacion
+            val_utb_current = st.session_state.sb_vale_utb
+
+            if val_del_current != st.session_state.prev_vale_del:
+                if val_del_current == "TODAS":
+                    st.session_state.sb_vale_utb = "TODAS"
+                    val_utb_current = "TODAS"
+                else:
+                    if not df_territorial.empty:
+                        utbs_validas = sorted(df_territorial[df_territorial['DELEGACION'] == val_del_current]['UTB'].unique().tolist())
+                        if val_utb_current != "TODAS" and val_utb_current not in utbs_validas:
+                            st.session_state.sb_vale_utb = "TODAS"
+                            val_utb_current = "TODAS"
+                st.session_state.prev_vale_del = val_del_current
+                st.session_state.prev_vale_utb = val_utb_current
+
+            elif val_utb_current != st.session_state.prev_vale_utb:
+                if val_utb_current != "TODAS" and not df_territorial.empty:
+                    deles_de_utb = df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist()
+                    if val_del_current == "TODAS" or val_del_current not in deles_de_utb:
+                        if deles_de_utb:
+                            st.session_state.sb_vale_delegacion = sorted(deles_de_utb)[0]
+                            val_del_current = sorted(deles_de_utb)[0]
+                            st.session_state.prev_vale_del = val_del_current
+                st.session_state.prev_vale_utb = val_utb_current
+
+            if val_utb_current != "TODAS" and not df_territorial.empty:
+                delegaciones_dispo_vale = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist())
+            else:
+                delegaciones_dispo_vale = ["TODAS"] + DELEGACIONES_TOLUCA
+
+            if val_del_current != "TODAS" and not df_territorial.empty:
+                utbs_dispo_vale = ["TODAS"] + sorted(df_territorial[df_territorial['DELEGACION'] == val_del_current]['UTB'].unique().tolist())
+            else:
+                utbs_dispo_vale = ["TODAS"] + (sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else [])
+
+            if val_del_current not in delegaciones_dispo_vale: val_del_current = "TODAS"
+            if val_utb_current not in utbs_dispo_vale: val_utb_current = "TODAS"
+
+            idx_del_vale = delegaciones_dispo_vale.index(val_del_current)
+            idx_utb_vale = utbs_dispo_vale.index(val_utb_current)
+
+            c_bri1, c_bri2, c_bri3 = st.columns(3)
+            with c_bri1:
+                bri_sel = st.selectbox(
+                    "Brigada Asignada:", 
+                    [f"Brigada {i}" for i in range(1, 18)] + ["Personal de Mantenimiento Interno", "Cuadrilla de Alumbrado Especial"],
+                    key="brigada_salida_vales"
+                )
+            with c_bri2:
+                delegacion_sel = st.selectbox(
+                    "Delegación Destino:", 
+                    delegaciones_dispo_vale, 
+                    index=idx_del_vale, 
+                    key="sb_vale_delegacion"
+                )
+            with c_bri3:
+                utb_sel = st.selectbox(
+                    "UTB Destino:", 
+                    utbs_dispo_vale, 
+                    index=idx_utb_vale, 
+                    key="sb_vale_utb"
+                )
+
+            st.info(f"Folio del Vale en Proceso: **{folio_actual}**")
+
+            with st.container(border=True):
+                st.markdown("**🛒 Adición de Materiales al Lote**")
+                c2, c3 = st.columns([2, 1])
+                mat_sel = c2.selectbox("Seleccione Insumo:", df_inv['Material'].tolist())
+                can_sel = c3.number_input("Cantidad a Entregar:", min_value=1, step=1)
                 
-                with st.container(border=True):
-                    st.markdown(f"📋 **Material:** {m_in} | **Cantidad Actual:** `{stock_previo} {unidad_medida}`")
-                    c_in = st.number_input("Cantidad a ingresar:", min_value=1, step=1, value=1, key="cant_ingresar_live")
+                if st.button("➕ Agregar Insumo al Carrito", use_container_width=True):
+                    stock_real = df_inv.loc[df_inv['Material'] == mat_sel, 'Stock'].values[0]
+                    if stock_real >= can_sel:
+                        existe = False
+                        for item in st.session_state.carrito_vale:
+                            if item['Material'] == mat_sel:
+                                if (item['Cantidad'] + can_sel) <= stock_real:
+                                    item['Cantidad'] += can_sel
+                                    existe = True
+                                else:
+                                    st.error("⚠️ La cantidad agregada supera las existencias físicas en el almacén.")
+                                    existe = True
+                        if not existe:
+                            st.session_state.carrito_vale.append({
+                                "Material": mat_sel, 
+                                "Cantidad": can_sel, 
+                                "Unidad": df_inv.loc[df_inv['Material'] == mat_sel, 'Unidad'].values[0]
+                            })
+                        
+                        st.session_state.vale_listo_descarga = None
+                        st.toast(f"✅ {mat_sel} sumado al vale actual.")
+                        time.sleep(0.3)
+                        st.rerun()
+                    else:
+                        st.error(f"⚠️ No hay suficiente material disponible. Existencia actual: {stock_real}")
+
+            st.markdown("### 📝 Control y Notas de Entrega")
+            obs_digital = st.text_area(
+                "Observaciones del Responsable de Almacén (Se captura en sistema):", 
+                placeholder="Ej: Material destinado a la rehabilitación de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
+                key="obs_responsable_entrega"
+            )
+
+            # --- VISTA DEL CARRITO ACTIVO MIENTRAS CAPTURAS ---
+            if st.session_state.carrito_vale:
+                st.write("---")
+                st.markdown("### **🛒 Resumen del Lote a Entregar:**")
+                
+                df_carrito = pd.DataFrame(st.session_state.carrito_vale)
+                st.dataframe(df_carrito, use_container_width=True, hide_index=True)
+                
+                col_v1, col_v2 = st.columns(2)
+                
+                if col_v1.button("❌ Cancelar Vale Completo", use_container_width=True):
+                    st.session_state.carrito_vale = []
+                    st.rerun()
+                
+                if col_v2.button(f"🚀 PROCESAR Y EMITIR VALE ({folio_actual})", type="primary", use_container_width=True):
+                    folios_existentes = [v["Folio"] for v in st.session_state.vales_historial]
                     
-                    if st.button("✅ ACTUALIZAR STOCK", use_container_width=True, key="btn_actualizar_stock_live"):
-                        idx = df_inv[df_inv['Material'] == m_in].index[0]
-                        st.session_state.db_inventario.at[idx, 'Stock'] += c_in
+                    if folio_actual in folios_existentes:
+                        st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya existe en el histórico. Intente de nuevo.")
+                    else:
+                        # --- CONSTRUCCIÓN COMPLETA DEL DOCUMENTO FPDF ---
+                        from fpdf import FPDF
+                        pdf = FPDF()
+                        pdf.add_page()
+                        
+                        pdf.set_font("Arial", 'B', 14)
+                        pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
+                        pdf.set_font("Arial", 'B', 12)
+                        pdf.cell(0, 8, "DIRECCION DE ALUMBRADO PUBLICO", ln=True, align='C')
+                        pdf.cell(0, 8, f"VALE OFICIAL DE SALIDA: {folio_actual}", ln=True, align='C')
+                        pdf.ln(8)
+                        
+                        pdf.set_font("Arial", '', 10)
+                        pdf.cell(0, 6, f"Fecha y Hora de Emision: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
+                        pdf.cell(0, 6, f"Ubicacion Geografica: {delegacion_sel} - {utb_sel}", ln=True)
+                        pdf.set_font("Arial", 'B', 10)
+                        pdf.cell(0, 6, f"UNIDAD / BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
+                        pdf.ln(4)
+                        
+                        pdf.set_fill_color(230, 235, 240)
+                        pdf.set_font("Arial", 'B', 10)
+                        pdf.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
+                        pdf.cell(36, 8, "Entregado", 1, 0, 'C', True)
+                        pdf.cell(22, 8, "Utilizado", 1, 0, 'C', True)
+                        pdf.cell(22, 8, "Devuelto", 1, 1, 'C', True)
+                        
+                        pdf.set_font("Arial", '', 10)
+                        for it in st.session_state.carrito_vale:
+                            pdf.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
+                            pdf.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
+                            pdf.cell(22, 8, "", 1, 0, 'C')
+                            pdf.cell(22, 8, "", 1, 1, 'C')
+                        pdf.ln(6)
+                        
+                        pdf.set_font("Arial", 'B', 10)
+                        pdf.cell(0, 6, "Observaciones del Responsable de Almacen (Sistema):", ln=True)
+                        pdf.set_font("Arial", 'I', 9)
+                        msg_obs = obs_digital if obs_digital.strip() else "Ninguna anotada en sistema al momento de la salida."
+                        pdf.multi_cell(0, 5, msg_obs.encode('latin-1', 'replace').decode('latin-1'), 1)
+                        pdf.ln(4)
+                        
+                        pdf.set_font("Arial", 'B', 10)
+                        pdf.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Fisico a Mano):", ln=True)
+                        pdf.set_fill_color(255, 255, 255)
+                        pdf.cell(0, 15, "", 1, ln=True, fill=True)
+                        pdf.ln(10)
+                        
+                        pdf.set_font("Arial", 'I', 9)
+                        pdf.multi_cell(0, 5, LEYENDA_OFICIAL.encode('latin-1', 'replace').decode('latin-1'), align='C')
+                        pdf.ln(12)
+                        
+                        y_pos_firmas = pdf.get_y()
+                        pdf.set_font("Arial", 'B', 8)
+                        
+                        pdf.set_xy(15, y_pos_firmas)
+                        pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
+                        pdf.set_xy(15, y_pos_firmas + 4)
+                        pdf.cell(75, 4, "RESPONSABLE DE ENTREGA DE MATERIAL", ln=False, align='C')
+                        pdf.set_xy(15, y_pos_firmas + 8)
+                        pdf.set_font("Arial", '', 7)
+                        pdf.cell(75, 4, "(Firma y Sello de Almacen DAP)", ln=False, align='C')
+                        
+                        pdf.set_font("Arial", 'B', 8)
+                        pdf.set_xy(115, y_pos_firmas)
+                        pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
+                        pdf.set_xy(115, y_pos_firmas + 4)
+                        pdf.cell(75, 4, "RESPONSABLE QUE RECIBE MATERIAL", ln=False, align='C')
+                        pdf.set_xy(115, y_pos_firmas + 8)
+                        pdf.set_font("Arial", '', 7)
+                        pdf.cell(75, 4, f"({bri_sel.upper()})", ln=False, align='C')
+                        
+                        pdf_output = pdf.output(dest='S')
+                        pdf_bytes = pdf_output.encode('latin-1', 'replace') if isinstance(pdf_output, str) else pdf_output
+                        
+                        for item in st.session_state.carrito_vale:
+                            idx = df_inv[df_inv['Material'] == item['Material']].index[0]
+                            st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
+                        
+                        # Persistencia del stock deducido
                         st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                        st.success(f"📦 Entrada registrada correctamente.")
+                        
+                        materiales_con_cierres = []
+                        for m_car in st.session_state.carrito_vale:
+                            m_car["Utilizado"] = 0
+                            m_car["Devuelto"] = 0
+                            materiales_con_cierres.append(m_car)
+                        
+                        st.session_state.vales_historial.append({
+                            "Folio": folio_actual, 
+                            "Fecha": pd.Timestamp.now().strftime('%Y-%m-%d'),
+                            "FechaHora": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
+                            "Brigada": bri_sel,
+                            "Delegacion": delegacion_sel,      
+                            "UTB": utb_sel,                  
+                            "Delegacion_Real": delegacion_sel, 
+                            "UTB_Real": utb_sel,             
+                            "Estado": "Pendiente",
+                            "Materiales": materiales_con_cierres,
+                            "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
+                        })
+                        
+                        # Persistencia del JSON de vales
+                        with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
+                            json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
+                        
+                        st.session_state.vale_listo_descarga = {
+                            "folio": folio_actual,
+                            "bytes": pdf_bytes
+                        }
+                        
+                        st.session_state.carrito_vale = []
+                        st.rerun()
+
+            # --- COMPROBANTE DE DESCARGA ACTIVO ---
+            if "vale_listo_descarga" in st.session_state and st.session_state.vale_listo_descarga:
+                st.write("---")
+                vale_data = st.session_state.vale_listo_descarga
+                st.success(f"🎉 ¡Vale Oficial **{vale_data['folio']}** registrado exitosamente en la Bóveda de Almacén!")
+                
+                c_dl1, c_dl2 = st.columns([3, 1])
+                c_dl1.download_button(
+                    label=f"📥 DESCARGAR COMPROBANTE PDF ({vale_data['folio']})",
+                    data=vale_data["bytes"],
+                    file_name=f"Vale_Oficial_Salida_{vale_data['folio']}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary"
+                )
+                if c_dl2.button("🔄 Ocultar Notificación", use_container_width=True):
+                    st.session_state.vale_listo_descarga = None
+                    st.rerun()
+
+        # ==========================================
+        # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS COMPLETO ---
+        # ==========================================
+        with tab_seguimiento:
+            st.subheader("🎯 Control de Material Aplicado en Campo y Devoluciones")
+            
+            total_vales = len(st.session_state.vales_historial)
+            pendientes = sum(1 for v in st.session_state.vales_historial if v.get("Estado", "Pendiente") == "Pendiente")
+            redireccionados = sum(1 for v in st.session_state.vales_historial if v.get("Delegacion") != v.get("Delegacion_Real"))
+            
+            c_seg1, c_seg2, c_seg3 = st.columns(3)
+            c_seg1.metric("📋 Total Vales Emitidos", total_vales)
+            c_seg2.metric("⏳ Pendientes de Conciliar", pendientes, delta=f"-{total_vales - pendientes} cerrados", delta_color="normal" if pendientes > 0 else "off")
+            c_seg3.metric("⚠️ Cambios de Ruta (Alertas)", redireccionados, delta="Incidencias en campo" if redireccionados > 0 else "Operación Nominal", delta_color="inverse" if redireccionados > 0 else "normal")
+            
+            if total_vales > 0:
+                st.markdown("### 📊 Monitoreo Técnico de Despliegue")
+                st.caption("Estatus operativo inmutable de las brigadas en territorio de Toluca:")
+                
+                tabla_resumen_seguimiento = []
+                for v in st.session_state.vales_historial:
+                    loc_original = f"{v['Delegacion']} ({v['UTB']})"
+                    loc_real = f"{v.get('Delegacion_Real', v['Delegacion'])} ({v.get('UTB_Real', v['UTB'])})"
+                    
+                    status_ruta = "📢 NOMINAL" if v['Delegacion'] == v.get('Delegacion_Real') else "🔄 REDIRECCIONADO"
+                    status_cierre = "🔴 PENDIENTE" if v.get("Estado", "Pendiente") == "Pendiente" else "🟢 CONCILIADO"
+                    
+                    tabla_resumen_seguimiento.append({
+                        "Folio": v["Folio"],
+                        "Brigada": v["Brigada"],
+                        "Destino Almacén": loc_original,
+                        "Destino Real Aplicado": loc_real,
+                        "Ruta": status_ruta,
+                        "Estatus": status_cierre
+                    })
+                st.dataframe(pd.DataFrame(tabla_resumen_seguimiento), use_container_width=True, hide_index=True)
+            
+            st.write("---")
+            
+            if not st.session_state.vales_historial:
+                st.info("📂 No hay vales registrados en la Bóveda para darles seguimiento.")
+            else:
+                st.markdown("### 🛠️ 1. Captura de Cierre y Redireccionamiento de Material")
+                folios_dispo = [v["Folio"] for v in st.session_state.vales_historial]
+                v_select = st.selectbox("Seleccione el Folio del Vale a conciliar:", folios_dispo, key="sb_seguimiento_folios")
+                
+                idx_vale = next(i for i, item in enumerate(st.session_state.vales_historial) if item["Folio"] == v_select)
+                vale_obj = st.session_state.vales_historial[idx_vale]
+                
+                if vale_obj.get("Estado", "Pendiente") == "Conciliado":
+                    st.success(f"✅ Este folio ya se encuentra **CONCILIADO**. Puede volver a guardar para modificar los datos reales.")
+                
+                # --- FILTRADO CRUZADO DINÁMICO DE CONCILIACIÓN ---
+                if "sb_rec_delegacion" not in st.session_state or st.session_state.get("current_v_select") != v_select:
+                    st.session_state.current_v_select = v_select
+                    st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
+                    st.session_state.sb_rec_utb = vale_obj.get("UTB_Real", vale_obj["UTB"])
+                    st.session_state.prev_rec_del = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
+
+                rec_del_current = st.session_state.sb_rec_delegacion
+                rec_utb_current = st.session_state.sb_rec_utb
+
+                if rec_del_current != st.session_state.prev_rec_del:
+                    if not df_territorial.empty:
+                        utbs_validas_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist())
+                        if utbs_validas_rec:
+                            st.session_state.sb_rec_utb = utbs_validas_rec[0]
+                            rec_utb_current = utbs_validas_rec[0]
+                    st.session_state.prev_rec_del = rec_del_current
+
+                delegaciones_dispo_rec = DELEGACIONES_TOLUCA
+                utbs_dispo_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist()) if not df_territorial.empty else ["UTB 1"]
+
+                idx_del_rec = delegaciones_dispo_rec.index(rec_del_current) if rec_del_current in delegaciones_dispo_rec else 0
+                idx_utb_rec = utbs_dispo_rec.index(rec_utb_current) if rec_utb_current in utbs_dispo_rec else 0
+
+                with st.container(border=True):
+                    st.markdown("⚠️ **¿La brigada fue redireccionada a otra ubicación inesperada?**")
+                    col_re1, col_re2 = st.columns(2)
+                    real_del_sel = col_re1.selectbox("Delegación REAL de aplicación en campo:", delegaciones_dispo_rec, index=idx_del_rec, key="sb_rec_delegacion")
+                    real_utb_sel = col_re2.selectbox("UTB REAL de aplicación en campo:", utbs_dispo_rec, index=idx_utb_rec, key="sb_rec_utb")
+                
+                st.write("")
+                df_materiales_vale = pd.DataFrame(vale_obj["Materiales"])
+                
+                df_editado = st.data_editor(
+                    df_materiales_vale,
+                    column_config={
+                        "Material": st.column_config.TextColumn("Insumo", disabled=True),
+                        "Cantidad": st.column_config.NumberColumn("Entregado", disabled=True),
+                        "Unidad": st.column_config.TextColumn("Unidad", disabled=True),
+                        "Utilizado": st.column_config.NumberColumn("Utilizado (Instalado)", min_value=0, required=True),
+                        "Devuelto": st.column_config.NumberColumn("Devuelto (A Almacén)", min_value=0, required=True),
+                    },
+                    hide_index=True, use_container_width=True, key=f"editor_live_{v_select}"
+                )
+                
+                if st.button("💾 Guardar Conciliación de Materiales", use_container_width=True, type="primary"):
+                    error_cantidades = False
+                    for index, row in df_editado.iterrows():
+                        if (row["Utilizado"] + row["Devuelto"]) > row["Cantidad"]:
+                            st.error(f"⚠️ Error en {row['Material']}: La suma supera la cantidad entregada original ({row['Cantidad']}).")
+                            error_cantidades = True
+                    
+                    if not error_cantidades:
+                        for index, row in df_editado.iterrows():
+                            dif_devolucion = row["Devuelto"] - df_materiales_vale.loc[index, "Devuelto"]
+                            if dif_devolucion > 0:
+                                idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
+                                st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
+                        
+                        st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                        st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
+                        st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
+                        st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
+                        st.session_state.vales_historial[idx_vale]["Estado"] = "Conciliado"
+                        
+                        with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
+                            json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
+                        
+                        st.success(f"📊 Cierre técnico del folio {v_select} procesado con éxito.")
                         time.sleep(0.5)
                         st.rerun()
-            
-            # --- APARTADO B: ALTA EN EL CATÁLOGO ---
-            with st.expander("➕ Dar de Alta Nuevo Ítem en el Catálogo Oficial", expanded=False):
-                with st.container(border=True):
-                    nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: FOTOCELDA MULTIVOLTAJE").upper().strip()
-                    c1, c2 = st.columns(2)
-                    nueva_unidad = c1.selectbox("Unidad de Medida:", ["Piezas", "Metros", "Kilos", "Cajas"])
-                    stock_inicial_item = c2.number_input("Stock Inicial Físico:", min_value=0, value=100, step=1)
-                    minimo_alerta = c2.number_input("Stock Mínimo (Alerta Crítica):", min_value=1, value=10, step=1)
+                
+                # --- REPORTE COMPLETO DINÁMICO DE CONSUMO HISTÓRICO ---
+                st.divider()
+                st.markdown("### 📈 2. Reporte Dinámico de Consumo Real e Histórico")
+                
+                datos_reporte_completo = []
+                for v in st.session_state.vales_historial:
+                    for mat in v["Materiales"]:
+                        datos_reporte_completo.append({
+                            "Vale": v["Folio"], "Fecha": v["Fecha"], "Brigada": v["Brigada"],
+                            "Del. Programada": v["Delegacion"], "UTB Programada": v["UTB"],
+                            "Del. Real (Aplicada)": v.get("Delegacion_Real", v["Delegacion"]),
+                            "UTB Real (Aplicada)": v.get("UTB_Real", v["UTB"]),
+                            "Material": mat["Material"], "Entregado": mat["Cantidad"],
+                            "Utilizado": mat.get("Utilizado", 0), "Devuelto": mat.get("Devuelto", 0), "Unidad": mat["Unidad"]
+                        })
+                
+                df_reporte_base = pd.DataFrame(datos_reporte_completo)
+                
+                c_f1, c_f2, c_f3 = st.columns(3)
+                with c_f1:
+                    fechas_dispo = sorted(df_reporte_base["Fecha"].unique())
+                    fecha_filtro = st.selectbox("1. Filtrar por Fecha Determinante:", ["TODAS"] + fechas_dispo)
+                
+                df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
+                
+                # Filtrados dinámicos cruzados del reporte
+                if "sb_filtrar_delegacion_rep" not in st.session_state:
+                    st.session_state.sb_filtrar_delegacion_rep = "TODAS"
+                if "sb_filtrar_utb_rep" not in st.session_state:
+                    st.session_state.sb_filtrar_utb_rep = "TODAS"
+
+                rep_del_current = st.session_state.sb_filtrar_delegacion_rep
+                rep_utb_current = st.session_state.sb_filtrar_utb_rep
+
+                if rep_utb_current != "TODAS" and not df_territorial.empty:
+                    delegaciones_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == rep_utb_current]['DELEGACION'].unique().tolist())
+                else:
+                    delegaciones_dispo = ["TODAS"] + DELEGACIONES_TOLUCA
+
+                if rep_del_current != "TODAS" and not df_territorial.empty:
+                    utbs_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['DELEGACION'] == rep_del_current]['UTB'].unique().tolist())
+                else:
+                    utbs_dispo = ["TODAS"] + (sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else [])
+
+                idx_del = delegaciones_dispo.index(rep_del_current) if rep_del_current in delegaciones_dispo else 0
+                idx_utb = utbs_dispo.index(rep_utb_current) if rep_utb_current in utbs_dispo else 0
                     
-                    if st.button("🚀 REGISTRAR NUEVO MATERIAL INMUEBLE", use_container_width=True):
-                        if nuevo_nombre and nuevo_nombre not in df_inv['Material'].tolist():
-                            nuevo_registro = {"ID": f"MAT-{len(df_inv)+1}", "Material": nuevo_nombre, "Stock": stock_inicial_item, "Min": minimo_alerta, "Unidad": nueva_unidad}
-                            st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
+                with c_f2:
+                    del_filtro = st.selectbox("2. Filtrar por Delegación Real Aplicada:", delegaciones_dispo, index=idx_del, key="sb_filtrar_delegacion_rep")
+                with c_f3:
+                    utb_filtro = st.selectbox("3. Filtrar por UTB Real Aplicada:", utbs_dispo, index=idx_utb, key="sb_filtrar_utb_rep")
+                
+                if del_filtro != "TODAS":
+                    df_filtrado = df_filtrado[df_filtrado["Del. Real (Aplicada)"] == del_filtro]
+                if utb_filtro != "TODAS":
+                    df_filtrado = df_filtrado[df_filtrado["UTB Real (Aplicada)"] == utb_filtro]
+                
+                st.markdown("#### **Informe Resultante de Material en Calle**")
+                st.dataframe(df_filtrado[["Vale", "Fecha", "Brigada", "Del. Programada", "Del. Real (Aplicada)", "UTB Real (Aplicada)", "Material", "Entregado", "Utilizado", "Devuelto", "Unidad"]], use_container_width=True, hide_index=True)
+                
+                st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
+                c_m1, c_m2, c_m3 = st.columns(3)
+                c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas")
+                c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas")
+                c_m3.metric("🔄 Total Devuelto", f"{int(df_filtrado['Devuelto'].sum())} pzas")
+                
+                output_rep = io.BytesIO()
+                with pd.ExcelWriter(output_rep, engine='openpyxl') as writer:
+                    df_filtrado.to_excel(writer, index=False, sheet_name='Reporte_Consumos_DAP')
+                st.download_button(label="📄 DESCARGAR REPORTE FILTRADO EN EXCEL", data=output_rep.getvalue(), file_name=f"Reporte_Consumos_DAP_{pd.Timestamp.now().strftime('%d-%m-%Y')}.xlsx", use_container_width=True)
+
+        # ==========================================
+        # --- PESTAÑA 4: GESTIÓN ALMACÉN COMPLETA (PIN DAP-2026) ---
+        # ==========================================
+        with tab_admin:
+            df_inv = st.session_state.db_inventario
+            st.subheader("⚙️ Panel de Control de Existencias")
+            if not st.session_state.admin_auth:
+                st.warning("🔒 Este apartado requiere clave de acceso de Almacén.")
+                pass_in = st.text_input("🔑 Ingrese PIN de Almacén:", type="password")
+                if st.button("🔓 Conceder Acceso"):
+                    if pass_in == PIN_ALMACEN:
+                        st.session_state.admin_auth = True
+                        st.rerun()
+                    else:
+                        st.error("❌ Contraseña incorrecta para el área DAP.")
+            else:
+                st.success("✅ Acceso de Administrador de Almacén Concedido")
+                if st.button("🔒 Bloquear Panel de Gestión", type="secondary"):
+                    st.session_state.admin_auth = False
+                    st.rerun()
+                
+                st.divider()
+                
+                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (ABASTECIMIENTO) ---
+                with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
+                    m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist(), key="sb_abastecer")
+                    stock_previo = df_inv.loc[df_inv['Material'] == m_in, 'Stock'].values[0]
+                    unidad_medida = df_inv.loc[df_inv['Material'] == m_in, 'Unidad'].values[0]
+                    
+                    with st.container(border=True):
+                        st.markdown(f"📋 **Material:** {m_in} | **Cantidad Actual:** `{stock_previo} {unidad_medida}`")
+                        c_in = st.number_input("Cantidad a ingresar:", min_value=1, step=1, value=1, key="cant_ingresar_live")
+                        
+                        if st.button("✅ ACTUALIZAR STOCK", use_container_width=True, key="btn_actualizar_stock_live"):
+                            idx = df_inv[df_inv['Material'] == m_in].index[0]
+                            st.session_state.db_inventario.at[idx, 'Stock'] += c_in
                             st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                            st.success("✅ Alta registrada.")
+                            st.success(f"📦 Entrada registrada correctamente.")
+                            time.sleep(0.5)
+                            st.rerun()
+                
+                # --- APARTADO B: ALTA EN EL CATÁLOGO ---
+                with st.expander("➕ Dar de Alta Nuevo Ítem en el Catálogo Oficial", expanded=False):
+                    with st.container(border=True):
+                        nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: FOTOCELDA MULTIVOLTAJE").upper().strip()
+                        c1, c2 = st.columns(2)
+                        nueva_unidad = c1.selectbox("Unidad de Medida:", ["Piezas", "Metros", "Kilos", "Cajas"])
+                        stock_inicial_item = c2.number_input("Stock Inicial Físico:", min_value=0, value=100, step=1)
+                        minimo_alerta = c2.number_input("Stock Mínimo (Alerta Crítica):", min_value=1, value=10, step=1)
+                        
+                        if st.button("🚀 REGISTRAR NUEVO MATERIAL INMUEBLE", use_container_width=True):
+                            if nuevo_nombre and nuevo_nombre not in df_inv['Material'].tolist():
+                                nuevo_registro = {"ID": f"MAT-{len(df_inv)+1}", "Material": nuevo_nombre, "Stock": stock_inicial_item, "Min": minimo_alerta, "Unidad": nueva_unidad}
+                                st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
+                                st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                                st.success("✅ Alta registrada.")
+                                time.sleep(0.5)
+                                st.rerun()
+
+                # --- APARTADO C: BAJA DEL CATÁLOGO ---
+                with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
+                    with st.container(border=True):
+                        mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar:", df_inv['Material'].tolist(), key="del_item_catalog")
+                        check_seguro_item = st.checkbox("Confirmar que deseo borrar de forma permanente este concepto", key="chk_seguro_item_del")
+                        
+                        if st.button("💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
+                            st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
+                            st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                            st.success("🗑️ El ítem ha sido borrado.")
+                            time.sleep(0.5)
+                            st.rerun()
+                
+                # --- SECCIÓN DE BÓVEDA HISTÓRICA AUDITABLE ---
+                st.write("")
+                st.markdown("---")
+                st.subheader("🔒 Bóveda de Vales Emitidos (Historial Antirrobos)")
+                
+                if not st.session_state.vales_historial:
+                    st.info("📂 La bóveda se encuentra vacía.")
+                else:
+                    tabla_boveda = []
+                    for v in st.session_state.vales_historial:
+                        tabla_boveda.append({"Folio": v["Folio"], "Fecha/Hora": v.get("FechaHora", "N/A"), "Brigada": v["Brigada"], "Total Insumos": len(v.get("Materiales", []))})
+                    st.dataframe(pd.DataFrame(tabla_boveda), use_container_width=True, hide_index=True)
+                    
+                    folio_select = st.selectbox("Seleccione Folio para auditoría interna:", [v["Folio"] for v in st.session_state.vales_historial], key="sb_auditoria_boveda")
+                    vale_auditado = next(item for item in st.session_state.vales_historial if item["Folio"] == folio_select)
+                    
+                    with st.container(border=True):
+                        st.markdown(f"### 📄 Expediente: {vale_auditado['Folio']}")
+                        st.write(f"**Asignado a:** {vale_auditado['Brigada']} | **Ubicación:** {vale_auditado.get('Delegacion')} - {vale_auditado.get('UTB')}")
+                        df_mat_auditoria = pd.DataFrame(vale_auditado.get("Materiales", []))
+                        st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
+                        
+                        check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select}", key=f"chk_del_{folio_select}")
+                        if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
+                            st.session_state.vales_historial = [item for item in st.session_state.vales_historial if item["Folio"] != folio_select]
+                            with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
+                                json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
+                            st.warning("Vale purgado de la bóveda.")
                             time.sleep(0.5)
                             st.rerun()
 
-            # --- APARTADO C: BAJA DEL CATÁLOGO ---
-            with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
-                with st.container(border=True):
-                    mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar:", df_inv['Material'].tolist(), key="del_item_catalog")
-                    check_seguro_item = st.checkbox("Confirmar que deseo borrar de forma permanente este concepto", key="chk_seguro_item_del")
-                    
-                    if st.button("💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
-                        st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
-                        st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                        st.success("🗑️ El ítem ha sido borrado.")
-                        time.sleep(0.5)
-                        st.rerun()
-            
-            # --- SECCIÓN DE BÓVEDA HISTÓRICA AUDITABLE ---
-            st.write("")
-            st.markdown("---")
-            st.subheader("🔒 Bóveda de Vales Emitidos (Historial Antirrobos)")
-            
-            if not st.session_state.vales_historial:
-                st.info("📂 La bóveda se encuentra vacía.")
-            else:
-                tabla_boveda = []
-                for v in st.session_state.vales_historial:
-                    tabla_boveda.append({"Folio": v["Folio"], "Fecha/Hora": v.get("FechaHora", "N/A"), "Brigada": v["Brigada"], "Total Insumos": len(v.get("Materiales", []))})
-                st.dataframe(pd.DataFrame(tabla_boveda), use_container_width=True, hide_index=True)
+                # ==========================================
+                # --- BOTÓN SECRETO DE REINICIO MASTER (PIN 1827) ---
+                # ==========================================
+                st.write("")
+                st.markdown("---")
+                st.subheader("🚨 Zona de Despliegue Oficial (Pasar a Producción)")
+                st.caption("Usa este panel SOLO cuando termine la presentación para formatear las bases y arrancar en ceros.")
                 
-                folio_select = st.selectbox("Seleccione Folio para auditoría interna:", [v["Folio"] for v in st.session_state.vales_historial], key="sb_auditoria_boveda")
-                vale_auditado = next(item for item in st.session_state.vales_historial if item["Folio"] == folio_select)
+                pin_produccion = st.text_input("🔑 Ingrese PIN Maestro de Despliegue:", type="password", key="pin_despliegue_oficial")
+                check_reset_total = st.checkbox("Confirmar que deseo borrar toda la simulación y dejar stock en 0", key="chk_reset_total_prod")
                 
-                with st.container(border=True):
-                    st.markdown(f"### 📄 Expediente: {vale_auditado['Folio']}")
-                    st.write(f"**Asignado a:** {vale_auditado['Brigada']} | **Ubicación:** {vale_auditado.get('Delegacion')} - {vale_auditado.get('UTB')}")
-                    df_mat_auditoria = pd.DataFrame(vale_auditado.get("Materiales", []))
-                    st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
-                    
-                    check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select}", key=f"chk_del_{folio_select}")
-                    if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
-                        st.session_state.vales_historial = [item for item in st.session_state.vales_historial if item["Folio"] != folio_select]
-                        with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
-                            json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
-                        st.warning("Vale purgado de la bóveda.")
-                        time.sleep(0.5)
+                if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
+                    try:
+                        if os.path.exists('inventario_dap_guardado.csv'):
+                            os.remove('inventario_dap_guardado.csv')
+                        if os.path.exists('vales_historial_guardado.json'):
+                            os.remove('vales_historial_guardado.json')
+                        
+                        # Reconfiguración in-memory inmediata en ceros
+                        df_base = pd.DataFrame(STOCK_INICIAL)
+                        df_base['Stock'] = 0  
+                        df_base['Min'] = 0    
+                        df_base.to_csv('inventario_dap_guardado.csv', index=False)
+                        
+                        st.session_state.db_inventario = df_base
+                        st.session_state.vales_historial = []
+                        st.session_state.maestro_auth = False  # Saca de sesión por seguridad
+                        
+                        st.success("🎉 ¡Formateo Exitoso! El sistema ha sido desplegado a producción real en ceros.")
+                        time.sleep(1.5)
                         st.rerun()
-
-            # --- BOTÓN SECRETO DE REINICIO MASTER (PIN 1827) ---
-            st.write("")
-            st.markdown("---")
-            st.subheader("🚨 Zona de Despliegue Oficial (Pasar a Producción)")
-            st.caption("Usa este panel SOLO cuando termine la presentación para formatear las bases y arrancar en ceros.")
-            
-            pin_produccion = st.text_input("🔑 Ingrese PIN Maestro de Despliegue:", type="password", key="pin_despliegue_oficial")
-            check_reset_total = st.checkbox("Confirmar que deseo borrar toda la simulación y dejar stock en 0", key="chk_reset_total_prod")
-            
-            if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
-                try:
-                    if os.path.exists('inventario_dap_guardado.csv'):
-                        os.remove('inventario_dap_guardado.csv')
-                    if os.path.exists('vales_historial_guardado.json'):
-                        os.remove('vales_historial_guardado.json')
-                    
-                    # Reconfiguración in-memory inmediata en ceros
-                    df_base = pd.DataFrame(STOCK_INICIAL)
-                    df_base['Stock'] = 0  
-                    df_base['Min'] = 0    
-                    df_base.to_csv('inventario_dap_guardado.csv', index=False)
-                    
-                    st.session_state.db_inventario = df_base
-                    st.session_state.vales_historial = []
-                    
-                    st.success("🎉 ¡Formateo Exitoso! El sistema ha sido desplegado a producción real en ceros.")
-                    time.sleep(1.5)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"⚠️ Error en formateo: {e}")
+                    except Exception as e:
+                        st.error(f"⚠️ Error en formateo: {e}")
