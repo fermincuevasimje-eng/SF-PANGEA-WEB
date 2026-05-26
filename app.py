@@ -1818,29 +1818,61 @@ else:
                 unsafe_allow_html=True
             )
             
-            # --- CLONACIÓN EXACTA DEL MOTOR DE SEGUIMIENTO CON LA OPCIÓN "TODAS" ---
+            # --- MOTOR DE FILTRADO CON DETECCIÓN DE RESETEO PARA VALES ---
             if "sb_vale_delegacion" not in st.session_state:
                 st.session_state.sb_vale_delegacion = "TODAS"
             if "sb_vale_utb" not in st.session_state:
                 st.session_state.sb_vale_utb = "TODAS"
+            if "prev_vale_del" not in st.session_state:
+                st.session_state.prev_vale_del = "TODAS"
+            if "prev_vale_utb" not in st.session_state:
+                st.session_state.prev_vale_utb = "TODAS"
 
-            # REGLA A: Auto-vincular delegación si se elige una UTB específica que solo pertenece a una delegación
-            if st.session_state.sb_vale_utb != "TODAS" and st.session_state.sb_vale_delegacion == "TODAS" and not df_territorial.empty:
-                deles_asociadas_vale = df_territorial[df_territorial['UTB'] == st.session_state.sb_vale_utb]['DELEGACION'].unique().tolist()
-                if len(deles_asociadas_vale) == 1:
-                    st.session_state.sb_vale_delegacion = deles_asociadas_vale[0]
+            val_del_current = st.session_state.sb_vale_delegacion
+            val_utb_current = st.session_state.sb_vale_utb
 
-            # REGLA B: Construir dinámicamente las Delegaciones válidas basadas en la UTB seleccionada
-            if st.session_state.sb_vale_utb != "TODAS" and not df_territorial.empty:
-                deles_compatibles_vale = sorted(df_territorial[df_territorial['UTB'] == st.session_state.sb_vale_utb]['DELEGACION'].unique().tolist())
-                delegaciones_dispo_vale = ["TODAS"] + deles_compatibles_vale
+            # Evaluar cambios de interacción
+            if val_del_current != st.session_state.prev_vale_del:
+                if val_del_current == "TODAS":
+                    # REGLA SOLICITADA: Al poner Delegación en "TODAS", obligar a UTB a resetearse a "TODAS"
+                    st.session_state.sb_vale_utb = "TODAS"
+                    val_utb_current = "TODAS"
+                else:
+                    if not df_territorial.empty:
+                        utbs_validas = sorted(df_territorial[df_territorial['DELEGACION'] == val_del_current]['UTB'].unique().tolist())
+                        if val_utb_current != "TODAS" and val_utb_current not in utbs_validas:
+                            st.session_state.sb_vale_utb = "TODAS"
+                            val_utb_current = "TODAS"
+                st.session_state.prev_vale_del = val_del_current
+                st.session_state.prev_vale_utb = val_utb_current
+
+            elif val_utb_current != st.session_state.prev_vale_utb:
+                if val_utb_current != "TODAS" and not df_territorial.empty:
+                    deles_de_utb = df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist()
+                    if val_del_current == "TODAS" or val_del_current not in deles_de_utb:
+                        if deles_de_utb:
+                            st.session_state.sb_vale_delegacion = sorted(deles_de_utb)[0]
+                            val_del_current = sorted(deles_de_utb)[0]
+                            st.session_state.prev_vale_del = val_del_current
+                st.session_state.prev_vale_utb = val_utb_current
+
+            # Construcción dinámica de catálogos de opciones
+            if val_utb_current != "TODAS" and not df_territorial.empty:
+                delegaciones_dispo_vale = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist())
             else:
                 delegaciones_dispo_vale = ["TODAS"] + DELEGACIONES_TOLUCA
 
-            if st.session_state.sb_vale_delegacion not in delegaciones_dispo_vale:
-                st.session_state.sb_vale_delegacion = "TODAS"
-            
-            idx_del_vale = delegaciones_dispo_vale.index(st.session_state.sb_vale_delegacion)
+            if val_del_current != "TODAS" and not df_territorial.empty:
+                utbs_dispo_vale = ["TODAS"] + sorted(df_territorial[df_territorial['DELEGACION'] == val_del_current]['UTB'].unique().tolist())
+            else:
+                utbs_dispo_vale = ["TODAS"] + (sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else [])
+
+            # Corrección de índices por seguridad de Streamlit
+            if val_del_current not in delegaciones_dispo_vale: val_del_current = "TODAS"
+            if val_utb_current not in utbs_dispo_vale: val_utb_current = "TODAS"
+
+            idx_del_vale = delegaciones_dispo_vale.index(val_del_current)
+            idx_utb_vale = utbs_dispo_vale.index(val_utb_current)
 
             c_bri1, c_bri2, c_bri3 = st.columns(3)
             with c_bri1:
@@ -1856,19 +1888,6 @@ else:
                     index=idx_del_vale, 
                     key="sb_vale_delegacion"
                 )
-            
-            # REGLA C: Construir dinámicamente las UTBs válidas basadas en la Delegación seleccionada
-            if st.session_state.sb_vale_delegacion != "TODAS" and not df_territorial.empty:
-                utbs_compatibles_vale = sorted(df_territorial[df_territorial['DELEGACION'] == st.session_state.sb_vale_delegacion]['UTB'].unique().tolist())
-                utbs_dispo_vale = ["TODAS"] + utbs_compatibles_vale
-            else:
-                utbs_dispo_vale = ["TODAS"] + sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else ["TODAS"]
-
-            if st.session_state.sb_vale_utb not in utbs_dispo_vale:
-                st.session_state.sb_vale_utb = "TODAS"
-            
-            idx_utb_vale = utbs_dispo_vale.index(st.session_state.sb_vale_utb)
-                
             with c_bri3:
                 utb_sel = st.selectbox(
                     "UTB Destino:", 
@@ -2120,27 +2139,60 @@ else:
                 
                 df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
                 
+                # --- FILTRADO CRUZADO CON DETECCIÓN DE RESETEO PARA REPORTES ---
                 if "sb_filtrar_delegacion_rep" not in st.session_state:
                     st.session_state.sb_filtrar_delegacion_rep = "TODAS"
                 if "sb_filtrar_utb_rep" not in st.session_state:
                     st.session_state.sb_filtrar_utb_rep = "TODAS"
+                if "prev_rep_del" not in st.session_state:
+                    st.session_state.prev_rep_del = "TODAS"
+                if "prev_rep_utb" not in st.session_state:
+                    st.session_state.prev_rep_utb = "TODAS"
 
-                if st.session_state.sb_filtrar_utb_rep != "TODAS" and st.session_state.sb_filtrar_delegacion_rep == "TODAS" and not df_territorial.empty:
-                    deles_asociadas = df_territorial[df_territorial['UTB'] == st.session_state.sb_filtrar_utb_rep]['DELEGACION'].unique().tolist()
-                    if len(deles_asociadas) == 1:
-                        st.session_state.sb_filtrar_delegacion_rep = deles_asociadas[0]
+                rep_del_current = st.session_state.sb_filtrar_delegacion_rep
+                rep_utb_current = st.session_state.sb_filtrar_utb_rep
 
-                if st.session_state.sb_filtrar_utb_rep != "TODAS" and not df_territorial.empty:
-                    deles_compatibles = sorted(df_territorial[df_territorial['UTB'] == st.session_state.sb_filtrar_utb_rep]['DELEGACION'].unique().tolist())
-                    delegaciones_dispo = ["TODAS"] + deles_compatibles
+                if rep_del_current != st.session_state.prev_rep_del:
+                    if rep_del_current == "TODAS":
+                        # REGLA SOLICITADA: Resetear UTB a "TODAS" en cadena
+                        st.session_state.sb_filtrar_utb_rep = "TODAS"
+                        rep_utb_current = "TODAS"
+                    else:
+                        if not df_territorial.empty:
+                            utbs_validas_rep = sorted(df_territorial[df_territorial['DELEGACION'] == rep_del_current]['UTB'].unique().tolist())
+                            if rep_utb_current != "TODAS" and rep_utb_current not in utbs_validas_rep:
+                                st.session_state.sb_filtrar_utb_rep = "TODAS"
+                                rep_utb_current = "TODAS"
+                    st.session_state.prev_rep_del = rep_del_current
+                    st.session_state.prev_rep_utb = rep_utb_current
+
+                elif rep_utb_current != st.session_state.prev_rep_utb:
+                    if rep_utb_current != "TODAS" and not df_territorial.empty:
+                        deles_de_utb_rep = df_territorial[df_territorial['UTB'] == rep_utb_current]['DELEGACION'].unique().tolist()
+                        if rep_del_current == "TODAS" or rep_del_current not in deles_de_utb_rep:
+                            if deles_de_utb_rep:
+                                st.session_state.sb_filtrar_delegacion_rep = sorted(deles_de_utb_rep)[0]
+                                rep_del_current = sorted(deles_de_utb_rep)[0]
+                                st.session_state.prev_rep_del = rep_del_current
+                    st.session_state.prev_rep_utb = rep_utb_current
+
+                # Catálogos dinámicos
+                if rep_utb_current != "TODAS" and not df_territorial.empty:
+                    delegaciones_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == rep_utb_current]['DELEGACION'].unique().tolist())
                 else:
                     delegaciones_dispo = ["TODAS"] + DELEGACIONES_TOLUCA
 
-                if st.session_state.sb_filtrar_delegacion_rep not in delegaciones_dispo:
-                    st.session_state.sb_filtrar_delegacion_rep = "TODAS"
-                
-                idx_del = delegaciones_dispo.index(st.session_state.sb_filtrar_delegacion_rep)
+                if rep_del_current != "TODAS" and not df_territorial.empty:
+                    utbs_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['DELEGACION'] == rep_del_current]['UTB'].unique().tolist())
+                else:
+                    utbs_dispo = ["TODAS"] + (sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else [])
 
+                if rep_del_current not in delegaciones_dispo: rep_del_current = "TODAS"
+                if rep_utb_current not in utbs_dispo: rep_utb_current = "TODAS"
+
+                idx_del = delegaciones_dispo.index(rep_del_current)
+                idx_utb = utbs_dispo.index(rep_utb_current)
+                    
                 with c_f2:
                     del_filtro = st.selectbox(
                         "2. Filtrar por Delegación:", 
@@ -2148,18 +2200,6 @@ else:
                         index=idx_del, 
                         key="sb_filtrar_delegacion_rep"
                     )
-                
-                if st.session_state.sb_filtrar_delegacion_rep != "TODAS" and not df_territorial.empty:
-                    utbs_compatibles = sorted(df_territorial[df_territorial['DELEGACION'] == st.session_state.sb_filtrar_delegacion_rep]['UTB'].unique().tolist())
-                    utbs_dispo = ["TODAS"] + utbs_compatibles
-                else:
-                    utbs_dispo = ["TODAS"] + sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else ["TODAS"]
-
-                if st.session_state.sb_filtrar_utb_rep not in utbs_dispo:
-                    st.session_state.sb_filtrar_utb_rep = "TODAS"
-                
-                idx_utb = utbs_dispo.index(st.session_state.sb_filtrar_utb_rep)
-                    
                 with c_f3:
                     utb_filtro = st.selectbox(
                         "3. Filtrar por UTB:", 
