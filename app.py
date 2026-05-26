@@ -1693,6 +1693,29 @@ else:
                 st.error("No se detectaron coordenadas válidas en los archivos.")
 
     elif st.session_state.menu == "SF6":
+        # ==========================================
+        # --- FILTRO 1: INICIO MAESTRO DEL SISTEMA (PIN 1827) ---
+        # ==========================================
+        if "maestro_auth" not in st.session_state:
+            st.session_state.maestro_auth = False
+
+        if not st.session_state.maestro_auth:
+            st.title("🔒 SF6 - Suite de Gestión Municipal (DAP)")
+            st.markdown("### **Control de Acceso Institucional**")
+            st.caption("Por seguridad de la Dirección de Alumbrado Público, ingrese el PIN Maestro para inicializar el módulo.")
+            
+            pass_maestro = st.text_input("🔑 Ingrese PIN Maestro:", type="password", key="pass_maestro_root")
+            if st.button("🔓 Inicializar Sistema", use_container_width=True, type="primary"):
+                if pass_maestro == "1827":
+                    st.session_state.maestro_auth = True
+                    st.success("🎉 Acceso Maestro concedido. Inicializando entorno...")
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.error("❌ PIN Maestro incorrecto. Acceso denegado al módulo SF6.")
+            st.stop()
+
+        # --- El sistema continúa con todo su poder si el PIN Maestro es correcto ---
         st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
         
         PIN_ALMACEN = "DAP-2026"
@@ -1748,8 +1771,8 @@ else:
                 st.session_state.db_inventario = pd.read_csv('inventario_dap_guardado.csv')
             else:
                 df_base = pd.DataFrame(STOCK_INICIAL)
-                df_base['Stock'] = 100  # Forzar stock ideal
-                df_base['Min'] = 10     # Forzar mínimo ideal
+                df_base['Stock'] = 100  # Forzar stock ideal de presentación
+                df_base['Min'] = 10     # Forzar mínimo ideal de presentación
                 df_base.to_csv('inventario_dap_guardado.csv', index=False)
                 st.session_state.db_inventario = df_base
 
@@ -1766,7 +1789,7 @@ else:
         if "admin_auth" not in st.session_state:
             st.session_state.admin_auth = False
 
-        # Declaración oficial de las 4 pestañas de operación
+        # Declaración oficial de las 4 pestañas de operación originales
         tab_inv, tab_vales, tab_seguimiento, tab_admin = st.tabs([
             "📊 Existencias y Resumen", 
             "🚚 Salida (Vale Oficial)", 
@@ -1954,6 +1977,7 @@ else:
                 key="obs_responsable_entrega"
             )
 
+            # --- VISTA DEL CARRITO ACTIVO MIENTRAS CAPTURAS ---
             if st.session_state.carrito_vale:
                 st.write("---")
                 st.markdown("### **🛒 Resumen del Lote a Entregar:**")
@@ -1971,8 +1995,9 @@ else:
                     folios_existentes = [v["Folio"] for v in st.session_state.vales_historial]
                     
                     if folio_actual in folios_existentes:
-                        st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya exist existe en el histórico. Intente de nuevo.")
+                        st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya existe en el histórico. Intente de nuevo.")
                     else:
+                        # --- CONSTRUCCIÓN COMPLETA DEL DOCUMENTO FPDF ---
                         from fpdf import FPDF
                         pdf = FPDF()
                         pdf.add_page()
@@ -2050,7 +2075,7 @@ else:
                             idx = df_inv[df_inv['Material'] == item['Material']].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
                         
-                        # Guardado permanente de la deducción de Stock
+                        # Persistencia del stock deducido
                         st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
                         
                         materiales_con_cierres = []
@@ -2073,7 +2098,7 @@ else:
                             "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
                         })
                         
-                        # Guardado permanente del Historial de Vales
+                        # Persistencia del JSON de vales
                         with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
                             json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
                         
@@ -2085,6 +2110,7 @@ else:
                         st.session_state.carrito_vale = []
                         st.rerun()
 
+            # --- COMPROBANTE DE DESCARGA ACTIVO ---
             if "vale_listo_descarga" in st.session_state and st.session_state.vale_listo_descarga:
                 st.write("---")
                 vale_data = st.session_state.vale_listo_descarga
@@ -2104,7 +2130,7 @@ else:
                     st.rerun()
 
         # ==========================================
-        # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS (FILTRADO INTEGRADO) ---
+        # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS COMPLETO ---
         # ==========================================
         with tab_seguimiento:
             st.subheader("🎯 Control de Material Aplicado en Campo y Devoluciones")
@@ -2138,7 +2164,6 @@ else:
                         "Ruta": status_ruta,
                         "Estatus": status_cierre
                     })
-                
                 st.dataframe(pd.DataFrame(tabla_resumen_seguimiento), use_container_width=True, hide_index=True)
             
             st.write("---")
@@ -2156,14 +2181,8 @@ else:
                 if vale_obj.get("Estado", "Pendiente") == "Conciliado":
                     st.success(f"✅ Este folio ya se encuentra **CONCILIADO**. Puede volver a guardar para modificar los datos reales.")
                 
-                if "sb_rec_delegacion" not in st.session_state:
-                    st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
-                if "sb_rec_utb" not in st.session_state:
-                    st.session_state.sb_rec_utb = vale_obj.get("UTB_Real", vale_obj["UTB"])
-                if "prev_rec_del" not in st.session_state:
-                    st.session_state.prev_rec_del = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
-
-                if "current_v_select" not in st.session_state or st.session_state.current_v_select != v_select:
+                # --- FILTRADO CRUZADO DINÁMICO DE CONCILIACIÓN ---
+                if "sb_rec_delegacion" not in st.session_state or st.session_state.get("current_v_select") != v_select:
                     st.session_state.current_v_select = v_select
                     st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
                     st.session_state.sb_rec_utb = vale_obj.get("UTB_Real", vale_obj["UTB"])
@@ -2181,28 +2200,19 @@ else:
                     st.session_state.prev_rec_del = rec_del_current
 
                 delegaciones_dispo_rec = DELEGACIONES_TOLUCA
-                if not df_territorial.empty:
-                    utbs_dispo_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist())
-                else:
-                    utbs_dispo_rec = ["UTB 1", "UTB 2", "UTB 3", "UTB 4", "UTB 5"]
+                utbs_dispo_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist()) if not df_territorial.empty else ["UTB 1"]
 
-                if rec_del_current not in delegaciones_dispo_rec: rec_del_current = delegaciones_dispo_rec[0]
-                if rec_utb_current not in utbs_dispo_rec: rec_utb_current = utbs_dispo_rec[0]
-
-                idx_del_rec = delegaciones_dispo_rec.index(rec_del_current)
-                idx_utb_rec = utbs_dispo_rec.index(rec_utb_current)
+                idx_del_rec = delegaciones_dispo_rec.index(rec_del_current) if rec_del_current in delegaciones_dispo_rec else 0
+                idx_utb_rec = utbs_dispo_rec.index(rec_utb_current) if rec_utb_current in utbs_dispo_rec else 0
 
                 with st.container(border=True):
                     st.markdown("⚠️ **¿La brigada fue redireccionada a otra ubicación inesperada?**")
-                    st.caption(f"Destino original de salida en Almacén: **{vale_obj['Delegacion']} — {vale_obj['UTB']}**")
-                    
                     col_re1, col_re2 = st.columns(2)
                     real_del_sel = col_re1.selectbox("Delegación REAL de aplicación en campo:", delegaciones_dispo_rec, index=idx_del_rec, key="sb_rec_delegacion")
                     real_utb_sel = col_re2.selectbox("UTB REAL de aplicación en campo:", utbs_dispo_rec, index=idx_utb_rec, key="sb_rec_utb")
                 
                 st.write("")
                 df_materiales_vale = pd.DataFrame(vale_obj["Materiales"])
-                st.caption("📝 Modifique las columnas 'Utilizado' y 'Devuelto' según el reporte físico entregado por la brigada:")
                 
                 df_editado = st.data_editor(
                     df_materiales_vale,
@@ -2213,16 +2223,14 @@ else:
                         "Utilizado": st.column_config.NumberColumn("Utilizado (Instalado)", min_value=0, required=True),
                         "Devuelto": st.column_config.NumberColumn("Devuelto (A Almacén)", min_value=0, required=True),
                     },
-                    hide_index=True,
-                    use_container_width=True,
-                    key=f"editor_live_{v_select}"
+                    hide_index=True, use_container_width=True, key=f"editor_live_{v_select}"
                 )
                 
                 if st.button("💾 Guardar Conciliación de Materiales", use_container_width=True, type="primary"):
                     error_cantidades = False
                     for index, row in df_editado.iterrows():
                         if (row["Utilizado"] + row["Devuelto"]) > row["Cantidad"]:
-                            st.error(f"⚠️ Error en {row['Material']}: La suma de Utilizado y Devuelto supera la cantidad entregada original ({row['Cantidad']}).")
+                            st.error(f"⚠️ Error en {row['Material']}: La suma supera la cantidad entregada original ({row['Cantidad']}).")
                             error_cantidades = True
                     
                     if not error_cantidades:
@@ -2233,7 +2241,6 @@ else:
                                 st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
                         
                         st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                        
                         st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
                         st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
                         st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
@@ -2242,10 +2249,11 @@ else:
                         with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
                             json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
                         
-                        st.success(f"📊 Cierre técnico del folio {v_select} procesado con éxito. Ubicación real vinculada.")
+                        st.success(f"📊 Cierre técnico del folio {v_select} procesado con éxito.")
                         time.sleep(0.5)
                         st.rerun()
                 
+                # --- REPORTE COMPLETO DINÁMICO DE CONSUMO HISTÓRICO ---
                 st.divider()
                 st.markdown("### 📈 2. Reporte Dinámico de Consumo Real e Histórico")
                 
@@ -2253,18 +2261,12 @@ else:
                 for v in st.session_state.vales_historial:
                     for mat in v["Materiales"]:
                         datos_reporte_completo.append({
-                            "Vale": v["Folio"],
-                            "Fecha": v["Fecha"],
-                            "Brigada": v["Brigada"],
-                            "Del. Programada": v["Delegacion"],
-                            "UTB Programada": v["UTB"],
+                            "Vale": v["Folio"], "Fecha": v["Fecha"], "Brigada": v["Brigada"],
+                            "Del. Programada": v["Delegacion"], "UTB Programada": v["UTB"],
                             "Del. Real (Aplicada)": v.get("Delegacion_Real", v["Delegacion"]),
                             "UTB Real (Aplicada)": v.get("UTB_Real", v["UTB"]),
-                            "Material": mat["Material"],
-                            "Entregado": mat["Cantidad"],
-                            "Utilizado": mat.get("Utilizado", 0),
-                            "Devuelto": mat.get("Devuelto", 0),
-                            "Unidad": mat["Unidad"]
+                            "Material": mat["Material"], "Entregado": mat["Cantidad"],
+                            "Utilizado": mat.get("Utilizado", 0), "Devuelto": mat.get("Devuelto", 0), "Unidad": mat["Unidad"]
                         })
                 
                 df_reporte_base = pd.DataFrame(datos_reporte_completo)
@@ -2276,40 +2278,14 @@ else:
                 
                 df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
                 
+                # Filtrados dinámicos cruzados del reporte
                 if "sb_filtrar_delegacion_rep" not in st.session_state:
                     st.session_state.sb_filtrar_delegacion_rep = "TODAS"
                 if "sb_filtrar_utb_rep" not in st.session_state:
                     st.session_state.sb_filtrar_utb_rep = "TODAS"
-                if "prev_rep_del" not in st.session_state:
-                    st.session_state.prev_rep_del = "TODAS"
-                if "prev_rep_utb" not in st.session_state:
-                    st.session_state.prev_rep_utb = "TODAS"
 
                 rep_del_current = st.session_state.sb_filtrar_delegacion_rep
                 rep_utb_current = st.session_state.sb_filtrar_utb_rep
-
-                if rep_del_current != st.session_state.prev_rep_del:
-                    if rep_del_current == "TODAS":
-                        st.session_state.sb_filtrar_utb_rep = "TODAS"
-                        rep_utb_current = "TODAS"
-                    else:
-                        if not df_territorial.empty:
-                            utbs_validas_rep = sorted(df_territorial[df_territorial['DELEGACION'] == rep_del_current]['UTB'].unique().tolist())
-                            if rep_utb_current != "TODAS" and rep_utb_current not in utbs_validas_rep:
-                                st.session_state.sb_filtrar_utb_rep = "TODAS"
-                                rep_utb_current = "TODAS"
-                    st.session_state.prev_rep_del = rep_del_current
-                    st.session_state.prev_rep_utb = rep_utb_current
-
-                elif rep_utb_current != st.session_state.prev_rep_utb:
-                    if rep_utb_current != "TODAS" and not df_territorial.empty:
-                        deles_de_utb_rep = df_territorial[df_territorial['UTB'] == rep_utb_current]['DELEGACION'].unique().tolist()
-                        if rep_del_current == "TODAS" or rep_del_current not in deles_de_utb_rep:
-                            if deles_de_utb_rep:
-                                st.session_state.sb_filtrar_delegacion_rep = sorted(deles_de_utb_rep)[0]
-                                rep_del_current = sorted(deles_de_utb_rep)[0]
-                                st.session_state.prev_rep_del = rep_del_current
-                    st.session_state.prev_rep_utb = rep_utb_current
 
                 if rep_utb_current != "TODAS" and not df_territorial.empty:
                     delegaciones_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == rep_utb_current]['DELEGACION'].unique().tolist())
@@ -2321,11 +2297,8 @@ else:
                 else:
                     utbs_dispo = ["TODAS"] + (sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else [])
 
-                if rep_del_current not in delegaciones_dispo: rep_del_current = "TODAS"
-                if rep_utb_current not in utbs_dispo: rep_utb_current = "TODAS"
-
-                idx_del = delegaciones_dispo.index(rep_del_current)
-                idx_utb = utbs_dispo.index(rep_utb_current)
+                idx_del = delegaciones_dispo.index(rep_del_current) if rep_del_current in delegaciones_dispo else 0
+                idx_utb = utbs_dispo.index(rep_utb_current) if rep_utb_current in utbs_dispo else 0
                     
                 with c_f2:
                     del_filtro = st.selectbox("2. Filtrar por Delegación Real Aplicada:", delegaciones_dispo, index=idx_del, key="sb_filtrar_delegacion_rep")
@@ -2342,22 +2315,17 @@ else:
                 
                 st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
                 c_m1, c_m2, c_m3 = st.columns(3)
-                c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas/m")
-                c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas/m")
-                c_m3.metric("🔄 Total Devuelto", f"{int(df_filtrado['Devuelto'].sum())} pzas/m")
+                c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas")
+                c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas")
+                c_m3.metric("🔄 Total Devuelto", f"{int(df_filtrado['Devuelto'].sum())} pzas")
                 
                 output_rep = io.BytesIO()
                 with pd.ExcelWriter(output_rep, engine='openpyxl') as writer:
                     df_filtrado.to_excel(writer, index=False, sheet_name='Reporte_Consumos_DAP')
-                st.download_button(
-                    label="📄 DESCARGAR REPORTE FILTRADO EN EXCEL", 
-                    data=output_rep.getvalue(), 
-                    file_name=f"Reporte_Consumos_DAP_{pd.Timestamp.now().strftime('%d-%m-%Y')}.xlsx", 
-                    use_container_width=True
-                )
+                st.download_button(label="📄 DESCARGAR REPORTE FILTRADO EN EXCEL", data=output_rep.getvalue(), file_name=f"Reporte_Consumos_DAP_{pd.Timestamp.now().strftime('%d-%m-%Y')}.xlsx", use_container_width=True)
 
         # ==========================================
-        # --- PESTAÑA 4: GESTIÓN ALMACÉN ---
+        # --- PESTAÑA 4: GESTIÓN ALMACÉN COMPLETA (PIN DAP-2026) ---
         # ==========================================
         with tab_admin:
             df_inv = st.session_state.db_inventario
@@ -2379,137 +2347,116 @@ else:
                 
                 st.divider()
                 
-                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS ---
+                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (ABASTECIMIENTO) ---
                 with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
                     m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist(), key="sb_abastecer")
-                    
                     stock_previo = df_inv.loc[df_inv['Material'] == m_in, 'Stock'].values[0]
                     unidad_medida = df_inv.loc[df_inv['Material'] == m_in, 'Unidad'].values[0]
                     
                     with st.container(border=True):
-                        st.markdown(f"📋 **Material:** {m_in}")
-                        st.markdown(f"📉 **Cantidad Actual en Almacén:** `{stock_previo} {unidad_medida}`")
-                        
+                        st.markdown(f"📋 **Material:** {m_in} | **Cantidad Actual:** `{stock_previo} {unidad_medida}`")
                         c_in = st.number_input("Cantidad a ingresar:", min_value=1, step=1, value=1, key="cant_ingresar_live")
                         
-                        stock_proyectado = stock_previo + c_in
-                        st.markdown(f"📈 **Cantidad Posterior al registro:** :green[{stock_proyectado} {unidad_medida}]")
-                        
-                        st.write("")
                         if st.button("✅ ACTUALIZAR STOCK", use_container_width=True, key="btn_actualizar_stock_live"):
                             idx = df_inv[df_inv['Material'] == m_in].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] += c_in
-                            
                             st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                            
-                            st.success(f"📦 Entrada registrada correctamente. Nuevo stock de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} {unidad_medida}.")
-                            time.sleep(0.6)
+                            st.success(f"📦 Entrada registrada correctamente.")
+                            time.sleep(0.5)
                             st.rerun()
                 
-                # --- APARTADO B: AGREGAR NUEVO ÍTEM AL CATÁLOGO ---
+                # --- APARTADO B: ALTA EN EL CATÁLOGO ---
                 with st.expander("➕ Dar de Alta Nuevo Ítem en el Catálogo Oficial", expanded=False):
                     with st.container(border=True):
-                        nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: TUBO CONDUIT ACERO GALVANIZADO 2\"").upper().strip()
+                        nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: FOTOCELDA MULTIVOLTAJE").upper().strip()
                         c1, c2 = st.columns(2)
-                        nueva_unidad = c1.selectbox("Unidad de Medida:", ["Piezas", "Metros", "Kilos", "Bultos", "Cajas", "Tramos", "Litros", "Botes", "Juegos", "Metro Cúbico"])
+                        nueva_unidad = c1.selectbox("Unidad de Medida:", ["Piezas", "Metros", "Kilos", "Cajas"])
                         stock_inicial_item = c2.number_input("Stock Inicial Físico:", min_value=0, value=100, step=1)
                         minimo_alerta = c2.number_input("Stock Mínimo (Alerta Crítica):", min_value=1, value=10, step=1)
                         
                         if st.button("🚀 REGISTRAR NUEVO MATERIAL INMUEBLE", use_container_width=True):
-                            if not nuevo_nombre:
-                                st.error("⚠️ El nombre del material no puede estar vacío.")
-                            elif nuevo_nombre in df_inv['Material'].tolist():
-                                st.error(f"❌ El material '{nuevo_nombre}' ya existe del catálogo actual.")
-                            else:
-                                num_actual = len(df_inv) + 1
-                                nuevo_id = f"MAT-{num_actual}"
-                                
-                                nuevo_registro = {
-                                    "ID": nuevo_id,
-                                    "Material": nuevo_nombre,
-                                    "Stock": stock_inicial_item,
-                                    "Min": minimo_alerta,
-                                    "Unidad": nueva_unidad
-                                }
-                                
+                            if nuevo_nombre and nuevo_nombre not in df_inv['Material'].tolist():
+                                nuevo_registro = {"ID": f"MAT-{len(df_inv)+1}", "Material": nuevo_nombre, "Stock": stock_inicial_item, "Min": minimo_alerta, "Unidad": nueva_unidad}
                                 st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
-                                
                                 st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                                
-                                st.success(f"✅ Registrado con éxito: {nuevo_id} - {nuevo_nombre}")
+                                st.success("✅ Alta registrada.")
                                 time.sleep(0.5)
-                                st.rerun() # <-- CORREGIDO: Ahora sí cuenta con la referencia st.
+                                st.rerun()
 
-                # --- APARTADO C: ELIMINAR ÍTEM DEL CATÁLOGO ---
+                # --- APARTADO C: BAJA DEL CATÁLOGO ---
                 with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
                     with st.container(border=True):
-                        mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar por completo del sistema:", df_inv['Material'].tolist(), key="del_item_catalog")
-                        st.warning(f"⚠️ Al eliminar '{mat_a_eliminar}', desaparecerá por completo de la tabla de existencias actuales.")
+                        mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar:", df_inv['Material'].tolist(), key="del_item_catalog")
+                        check_seguro_item = st.checkbox("Confirmar que deseo borrar de forma permanente este concepto", key="chk_seguro_item_del")
                         
-                        check_seguro_item = st.checkbox(f"Confirmar que deseo borrar de forma permanente este concepto del almacén", key="chk_seguro_item_del")
-                        
-                        if st.button(f"💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
+                        if st.button("💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
                             st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
-                            
                             st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                            
-                            st.success(f"🗑️ El ítem '{mat_a_eliminar}' ha sido borrado del catálogo oficial.")
+                            st.success("🗑️ El ítem ha sido borrado.")
                             time.sleep(0.5)
                             st.rerun()
                 
+                # --- SECCIÓN DE BÓVEDA HISTÓRICA AUDITABLE ---
                 st.write("")
                 st.markdown("---")
-                
-                # --- SECCIÓN DE BÓVEDA E INSPECCIÓN HISTÓRICA COMPLETA ---
                 st.subheader("🔒 Bóveda de Vales Emitidos (Historial Antirrobos)")
-                st.caption("Registro histórico inmutable de salidas de material de la Dirección de Alumbrado Público.")
-
+                
                 if not st.session_state.vales_historial:
-                    st.info("📂 La bóveda se encuentra vacía. No se han emitido vales oficiales en esta sesión.")
+                    st.info("📂 La bóveda se encuentra vacía.")
                 else:
                     tabla_boveda = []
                     for v in st.session_state.vales_historial:
-                        tabla_boveda.append({
-                            "Folio": v["Folio"],
-                            "Fecha/Hora": v.get("FechaHora", "N/A"),
-                            "Brigada / Destino": v["Brigada"],
-                            "Total Insumos": len(v.get("Materiales", []))
-                        })
+                        tabla_boveda.append({"Folio": v["Folio"], "Fecha/Hora": v.get("FechaHora", "N/A"), "Brigada": v["Brigada"], "Total Insumos": len(v.get("Materiales", []))})
+                    st.dataframe(pd.DataFrame(tabla_boveda), use_container_width=True, hide_index=True)
                     
-                    df_boveda = pd.DataFrame(tabla_boveda)
-                    st.dataframe(df_boveda, use_container_width=True, hide_index=True)
-                    
-                    st.markdown("**🔍 Auditoría e Inspección de Folio**")
-                    folios_disponibles = [v["Folio"] for v in st.session_state.vales_historial]
-                    folio_select = st.selectbox("Seleccione Folio para auditoría interna:", folios_disponibles, key="sb_auditoria_boveda")
-                    
+                    folio_select = st.selectbox("Seleccione Folio para auditoría interna:", [v["Folio"] for v in st.session_state.vales_historial], key="sb_auditoria_boveda")
                     vale_auditado = next(item for item in st.session_state.vales_historial if item["Folio"] == folio_select)
                     
                     with st.container(border=True):
                         st.markdown(f"### 📄 Expediente: {vale_auditado['Folio']}")
-                        st.write(f"**Fecha de Emisión:** {vale_auditado.get('FechaHora', 'N/A')}")
-                        st.write(f"**Asignado a:** {vale_auditado['Brigada']}")
-                        st.write(f"**Ubicación Destino:** {vale_auditado.get('Delegacion', 'N/A')} - {vale_auditado.get('UTB', 'N/A')}")
-                        st.write(f"**Notas de Almacén:** {vale_auditado.get('Observaciones', 'Sin notas registradas')}")
+                        st.write(f"**Asignado a:** {vale_auditado['Brigada']} | **Ubicación:** {vale_auditado.get('Delegacion')} - {vale_auditado.get('UTB')}")
+                        df_mat_auditoria = pd.DataFrame(vale_auditado.get("Materiales", []))
+                        st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
                         
-                        st.write("**Desglose de Material Entregado:**")
-                        lista_materiales = vale_auditado.get("Materiales", [])
-                        if lista_materiales:
-                            df_mat_auditoria = pd.DataFrame(lista_materiales)
-                            st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
-                        else:
-                            st.warning("⚠️ Este vale corresponde a un registro antiguo sin desglose digital de materiales.")
-                        
-                        st.write("")
-                        st.markdown("**🚨 Zona Crítica de Auditoría**")
-                        check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select} de los registros", key=f"chk_del_{folio_select}")
-                        
+                        check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select}", key=f"chk_del_{folio_select}")
                         if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
                             st.session_state.vales_historial = [item for item in st.session_state.vales_historial if item["Folio"] != folio_select]
-                            
                             with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
                                 json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
-                                
-                            st.warning(f"El vale {folio_select} ha sido purgado del historial de Almacén.")
-                            time.sleep(0.4)
+                            st.warning("Vale purgado de la bóveda.")
+                            time.sleep(0.5)
                             st.rerun()
+
+                # ==========================================
+                # --- BOTÓN SECRETO DE REINICIO MASTER (PIN 1827) ---
+                # ==========================================
+                st.write("")
+                st.markdown("---")
+                st.subheader("🚨 Zona de Despliegue Oficial (Pasar a Producción)")
+                st.caption("Usa este panel SOLO cuando termine la presentación para formatear las bases y arrancar en ceros.")
+                
+                pin_produccion = st.text_input("🔑 Ingrese PIN Maestro de Despliegue:", type="password", key="pin_despliegue_oficial")
+                check_reset_total = st.checkbox("Confirmar que deseo borrar toda la simulación y dejar stock en 0", key="chk_reset_total_prod")
+                
+                if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
+                    try:
+                        if os.path.exists('inventario_dap_guardado.csv'):
+                            os.remove('inventario_dap_guardado.csv')
+                        if os.path.exists('vales_historial_guardado.json'):
+                            os.remove('vales_historial_guardado.json')
+                        
+                        # Reconfiguración in-memory inmediata en ceros
+                        df_base = pd.DataFrame(STOCK_INICIAL)
+                        df_base['Stock'] = 0  
+                        df_base['Min'] = 0    
+                        df_base.to_csv('inventario_dap_guardado.csv', index=False)
+                        
+                        st.session_state.db_inventario = df_base
+                        st.session_state.vales_historial = []
+                        st.session_state.maestro_auth = False  # Saca de sesión por seguridad
+                        
+                        st.success("🎉 ¡Formateo Exitoso! El sistema ha sido desplegado a producción real en ceros.")
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"⚠️ Error en formateo: {e}")
