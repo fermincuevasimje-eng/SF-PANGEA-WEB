@@ -1932,7 +1932,7 @@ else:
             st.markdown("### 📝 Control y Notas de Entrega")
             obs_digital = st.text_area(
                 "Observaciones del Responsable de Almacén (Se captura en sistema):", 
-                placeholder="Ej: Material destinado a la rehabilitation de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
+                placeholder="Ej: Material destinado a la rehabilitación de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
                 key="obs_responsable_entrega"
             )
 
@@ -2047,10 +2047,10 @@ else:
                             "Fecha": pd.Timestamp.now().strftime('%Y-%m-%d'),
                             "FechaHora": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
                             "Brigada": bri_sel,
-                            "Delegacion": delegacion_sel,      # Destino Original Planificado
-                            "UTB": utb_sel,                  # UTB Original Planificado
-                            "Delegacion_Real": delegacion_sel, # Por defecto es el mismo
-                            "UTB_Real": utb_sel,             # Por defecto es el mismo
+                            "Delegacion": delegacion_sel,      
+                            "UTB": utb_sel,                  
+                            "Delegacion_Real": delegacion_sel, 
+                            "UTB_Real": utb_sel,             
                             "Estado": "Pendiente",
                             "Materiales": materiales_con_cierres,
                             "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
@@ -2086,12 +2086,12 @@ else:
                     st.rerun()
 
         # ==========================================
-        # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS (REDIRECCIONAMIENTO BLINDADO) ---
+        # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS (FILTRADO INTEGRADO) ---
         # ==========================================
         with tab_seguimiento:
             st.subheader("🎯 Control de Material Aplicado en Campo y Devoluciones")
             
-            # --- PANEL DE CONTROL GLOBAL (SIEMPRE VISIBLE) ---
+            # --- PANEL DE CONTROL GLOBAL ---
             total_vales = len(st.session_state.vales_historial)
             pendientes = sum(1 for v in st.session_state.vales_historial if v.get("Estado", "Pendiente") == "Pendiente")
             redireccionados = sum(1 for v in st.session_state.vales_historial if v.get("Delegacion") != v.get("Delegacion_Real"))
@@ -2126,7 +2126,7 @@ else:
             
             st.write("---")
             
-            # --- LÓGICA DE FILTRADO Y GESTIÓN OPERATIVA ---
+            # --- GESTIÓN OPERATIVA ---
             if not st.session_state.vales_historial:
                 st.info("📂 No hay vales registrados en la Bóveda para darles seguimiento.")
             else:
@@ -2137,27 +2137,57 @@ else:
                 idx_vale = next(i for i, item in enumerate(st.session_state.vales_historial) if item["Folio"] == v_select)
                 vale_obj = st.session_state.vales_historial[idx_vale]
                 
-                # Desplegar alerta visual si el vale ya fue conciliado previamente
                 if vale_obj.get("Estado", "Pendiente") == "Conciliado":
                     st.success(f"✅ Este folio ya se encuentra **CONCILIADO**. Puede volver a guardar para modificar los datos reales.")
                 
-                # --- NUEVA MEJORA: CAPTURA DE UBICACIÓN REAL SI HUBO REDIRECCIONAMIENTO ---
+                # --- MOTOR DE FILTRADO CRUZADO DINÁMICO PARA CONCILIACIÓN (EVITA MEZCLA TERRITORIAL) ---
+                if "sb_rec_delegacion" not in st.session_state:
+                    st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
+                if "sb_rec_utb" not in st.session_state:
+                    st.session_state.sb_rec_utb = vale_obj.get("UTB_Real", vale_obj["UTB"])
+                if "prev_rec_del" not in st.session_state:
+                    st.session_state.prev_rec_del = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
+
+                # Forzar recarga inmediata de estados si el usuario cambia el Folio en el selectbox principal
+                if "current_v_select" not in st.session_state or st.session_state.current_v_select != v_select:
+                    st.session_state.current_v_select = v_select
+                    st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
+                    st.session_state.sb_rec_utb = vale_obj.get("UTB_Real", vale_obj["UTB"])
+                    st.session_state.prev_rec_del = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
+
+                rec_del_current = st.session_state.sb_rec_delegacion
+                rec_utb_current = st.session_state.sb_rec_utb
+
+                # Si cambia la delegación en la conciliación, actualizamos de inmediato la primera UTB válida
+                if rec_del_current != st.session_state.prev_rec_del:
+                    if not df_territorial.empty:
+                        utbs_validas_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist())
+                        if utbs_validas_rec:
+                            st.session_state.sb_rec_utb = utbs_validas_rec[0]
+                            rec_utb_current = utbs_validas_rec[0]
+                    st.session_state.prev_rec_del = rec_del_current
+
+                # Catálogo de Delegaciones completo y catálogo de UTBs estrictamente filtrado
+                delegaciones_dispo_rec = DELEGACIONES_TOLUCA
+                if not df_territorial.empty:
+                    utbs_dispo_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist())
+                else:
+                    utbs_dispo_rec = ["UTB 1", "UTB 2", "UTB 3", "UTB 4", "UTB 5"]
+
+                # Verificaciones de límites de índice por consistencia
+                if rec_del_current not in delegaciones_dispo_rec: rec_del_current = delegaciones_dispo_rec[0]
+                if rec_utb_current not in utbs_dispo_rec: rec_utb_current = utbs_dispo_rec[0]
+
+                idx_del_rec = delegaciones_dispo_rec.index(rec_del_current)
+                idx_utb_rec = utbs_dispo_rec.index(rec_utb_current)
+
                 with st.container(border=True):
                     st.markdown("⚠️ **¿La brigada fue redireccionada a otra ubicación inesperada?**")
                     st.caption(f"Destino original de salida en Almacén: **{vale_obj['Delegacion']} — {vale_obj['UTB']}**")
                     
                     col_re1, col_re2 = st.columns(2)
-                    
-                    # Índices de seguridad por defecto basados en lo que está guardado
-                    try: default_idx_del = DELEGACIONES_TOLUCA.index(vale_obj.get("Delegacion_Real", vale_obj["Delegacion"]))
-                    except ValueError: default_idx_del = 0
-                    
-                    utbs_dispo_reconciliation = sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else ["UTB 1", "UTB 2", "UTB 3", "UTB 4", "UTB 5"]
-                    try: default_idx_utb = utbs_dispo_reconciliation.index(vale_obj.get("UTB_Real", vale_obj["UTB"]))
-                    except ValueError: default_idx_utb = 0
-                    
-                    real_del_sel = col_re1.selectbox("Delegación REAL de aplicación en campo:", DELEGACIONES_TOLUCA, index=default_idx_del, key=f"real_del_widget_{v_select}")
-                    real_utb_sel = col_re2.selectbox("UTB REAL de aplicación en campo:", utbs_dispo_reconciliation, index=default_idx_utb, key=f"real_utb_widget_{v_select}")
+                    real_del_sel = col_re1.selectbox("Delegación REAL de aplicación en campo:", delegaciones_dispo_rec, index=idx_del_rec, key="sb_rec_delegacion")
+                    real_utb_sel = col_re2.selectbox("UTB REAL de aplicación en campo:", utbs_dispo_rec, index=idx_utb_rec, key="sb_rec_utb")
                 
                 st.write("")
                 df_materiales_vale = pd.DataFrame(vale_obj["Materiales"])
@@ -2191,7 +2221,6 @@ else:
                                 idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
                                 st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
                         
-                        # Guardamos materiales, ubicación real validada y cambiamos estado
                         st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
                         st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
                         st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
@@ -2229,7 +2258,6 @@ else:
                     fechas_dispo = sorted(df_reporte_base["Fecha"].unique())
                     fecha_filtro = st.selectbox("1. Filtrar por Fecha Determinante:", ["TODAS"] + fechas_dispo)
                 
-                # El reporte se filtra con base en el lugar REAL de aplicación
                 df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
                 
                 # --- FILTRADO CRUZADO CON DETECCIÓN DE RESETEO PARA REPORTES ---
@@ -2268,7 +2296,6 @@ else:
                                 st.session_state.prev_rep_del = rep_del_current
                     st.session_state.prev_rep_utb = rep_utb_current
 
-                # Catálogos dinámicos
                 if rep_utb_current != "TODAS" and not df_territorial.empty:
                     delegaciones_dispo = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == rep_utb_current]['DELEGACION'].unique().tolist())
                 else:
@@ -2286,21 +2313,10 @@ else:
                 idx_utb = utbs_dispo.index(rep_utb_current)
                     
                 with c_f2:
-                    del_filtro = st.selectbox(
-                        "2. Filtrar por Delegación Real Aplicada:", 
-                        delegaciones_dispo, 
-                        index=idx_del, 
-                        key="sb_filtrar_delegacion_rep"
-                    )
+                    del_filtro = st.selectbox("2. Filtrar por Delegación Real Aplicada:", delegaciones_dispo, index=idx_del, key="sb_filtrar_delegacion_rep")
                 with c_f3:
-                    utb_filtro = st.selectbox(
-                        "3. Filtrar por UTB Real Aplicada:", 
-                        utbs_dispo, 
-                        index=idx_utb, 
-                        key="sb_filtrar_utb_rep"
-                    )
+                    utb_filtro = st.selectbox("3. Filtrar por UTB Real Aplicada:", utbs_dispo, index=idx_utb, key="sb_filtrar_utb_rep")
                 
-                # El filtro cruza por el territorio REAL donde se instaló el insumo
                 if del_filtro != "TODAS":
                     df_filtrado = df_filtrado[df_filtrado["Del. Real (Aplicada)"] == del_filtro]
                 if utb_filtro != "TODAS":
@@ -2348,7 +2364,7 @@ else:
                 
                 st.divider()
                 
-                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (CONTRAÍBLE - DINÁMICO) ---
+                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS ---
                 with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
                     m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist(), key="sb_abastecer")
                     
@@ -2372,7 +2388,7 @@ else:
                             time.sleep(0.6)
                             st.rerun()
                 
-                # --- APARTADO B: AGREGAR NUEVO ÍTEM AL CATÁLOGO (CONTRAÍBLE) ---
+                # --- APARTADO B: AGREGAR NUEVO ÍTEM AL CATÁLOGO ---
                 with st.expander("➕ Dar de Alta Nuevo Ítem en el Catálogo Oficial", expanded=False):
                     with st.container(border=True):
                         nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: TUBO CONDUIT ACERO GALVANIZADO 2\"").upper().strip()
@@ -2403,7 +2419,7 @@ else:
                                 time.sleep(0.5)
                                 st.rerun()
 
-                # --- APARTADO C: ELIMINAR ÍTEM DEL CATÁLOGO (CONTRAÍBLE) ---
+                # --- APARTADO C: ELIMINAR ÍTEM DEL CATÁLOGO ---
                 with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
                     with st.container(border=True):
                         mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar por completo del sistema:", df_inv['Material'].tolist(), key="del_item_catalog")
@@ -2458,7 +2474,7 @@ else:
                             df_mat_auditoria = pd.DataFrame(lista_materiales)
                             st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
                         else:
-                            st.warning("⚠️ Este vale corresponds a un registro antiguo sin desglose digital de materiales.")
+                            st.warning("⚠️ Este vale corresponde a un registro antiguo sin desglose digital de materiales.")
                         
                         st.write("")
                         st.markdown("**🚨 Zona Crítica de Auditoría**")
