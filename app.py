@@ -1818,44 +1818,41 @@ else:
                 unsafe_allow_html=True
             )
             
-            # --- CONTROL DE ESTADOS PARA FILTRADO BI-DIRECCIONAL EN VALES ---
-            if "vale_delegacion" not in st.session_state:
-                st.session_state.vale_delegacion = DELEGACIONES_TOLUCA[0] if DELEGACIONES_TOLUCA else ""
-            if "vale_utb" not in st.session_state:
-                if not df_territorial.empty and st.session_state.vale_delegacion:
-                    init_utbs = sorted(df_territorial[df_territorial['DELEGACION'] == st.session_state.vale_delegacion]['UTB'].unique().tolist())
-                    st.session_state.vale_utb = init_utbs[0] if init_utbs else ""
-                else:
-                    st.session_state.vale_utb = ""
+            # --- MOTOR DE DETECCIÓN LINEAL BI-DIRECCIONAL (ESTILO SEGUIMIENTO) ---
+            utbs_todas_vale = sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else []
+            delegaciones_todas_vale = DELEGACIONES_TOLUCA
 
-            list_deles_vale = DELEGACIONES_TOLUCA
-            list_utbs_vale = sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else []
+            if "prev_vale_del" not in st.session_state:
+                st.session_state.prev_vale_del = delegaciones_todas_vale[0] if delegaciones_todas_vale else ""
+            if "prev_vale_utb" not in st.session_state:
+                st.session_state.prev_vale_utb = utbs_todas_vale[0] if utbs_todas_vale else ""
 
-            # Validaciones de seguridad para evitar saltos de índice
-            if st.session_state.vale_delegacion not in list_deles_vale and list_deles_vale:
-                st.session_state.vale_delegacion = list_deles_vale[0]
-            if st.session_state.vale_utb not in list_utbs_vale and list_utbs_vale:
-                st.session_state.vale_utb = list_utbs_vale[0]
+            # Capturar selecciones actuales de los widgets en tiempo real
+            val_del_current = st.session_state.get("sb_vale_delegacion", st.session_state.prev_vale_del)
+            val_utb_current = st.session_state.get("sb_vale_utb", st.session_state.prev_vale_utb)
 
-            idx_del_vale = list_deles_vale.index(st.session_state.vale_delegacion) if st.session_state.vale_delegacion in list_deles_vale else 0
-            idx_utb_vale = list_utbs_vale.index(st.session_state.vale_utb) if st.session_state.vale_utb in list_utbs_vale else 0
-
-            # Funciones de interconexión instantánea
-            def change_delegacion_vale():
-                chosen_del = st.session_state.widget_del_vale
-                st.session_state.vale_delegacion = chosen_del
+            # Evaluar qué menú movió el usuario y sincronizar el otro de inmediato
+            if val_del_current != st.session_state.prev_vale_del:
+                st.session_state.prev_vale_del = val_del_current
                 if not df_territorial.empty:
-                    valid_utbs = sorted(df_territorial[df_territorial['DELEGACION'] == chosen_del]['UTB'].unique().tolist())
-                    if valid_utbs:
-                        st.session_state.vale_utb = valid_utbs[0]
+                    utbs_validas = sorted(df_territorial[df_territorial['DELEGACION'] == val_del_current]['UTB'].unique().tolist())
+                    if utbs_validas:
+                        st.session_state.sb_vale_utb = utbs_validas[0]
+                        st.session_state.prev_vale_utb = utbs_validas[0]
+                        val_utb_current = utbs_validas[0]
 
-            def change_utb_vale():
-                chosen_utb = st.session_state.widget_utb_vale
-                st.session_state.vale_utb = chosen_utb
+            elif val_utb_current != st.session_state.prev_vale_utb:
+                st.session_state.prev_vale_utb = val_utb_current
                 if not df_territorial.empty:
-                    valid_deles = df_territorial[df_territorial['UTB'] == chosen_utb]['DELEGACION'].unique().tolist()
-                    if st.session_state.vale_delegacion not in valid_deles and valid_deles:
-                        st.session_state.vale_delegacion = sorted(valid_deles)[0]
+                    deles_de_utb = df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist()
+                    if deles_de_utb:
+                        st.session_state.sb_vale_delegacion = sorted(deles_de_utb)[0]
+                        st.session_state.prev_vale_del = sorted(deles_de_utb)[0]
+                        val_del_current = sorted(deles_de_utb)[0]
+
+            # Encontrar los índices exactos para posicionar los selectores
+            idx_del_vale = delegaciones_todas_vale.index(val_del_current) if val_del_current in delegaciones_todas_vale else 0
+            idx_utb_vale = utbs_todas_vale.index(val_utb_current) if val_utb_current in utbs_todas_vale else 0
 
             c_bri1, c_bri2, c_bri3 = st.columns(3)
             with c_bri1:
@@ -1867,18 +1864,16 @@ else:
             with c_bri2:
                 delegacion_sel = st.selectbox(
                     "Delegación Destino:", 
-                    list_deles_vale, 
+                    delegaciones_todas_vale, 
                     index=idx_del_vale, 
-                    key="widget_del_vale", 
-                    on_change=change_delegacion_vale
+                    key="sb_vale_delegacion"
                 )
             with c_bri3:
                 utb_sel = st.selectbox(
                     "UTB Destino:", 
-                    list_utbs_vale, 
+                    utbs_todas_vale, 
                     index=idx_utb_vale, 
-                    key="widget_utb_vale", 
-                    on_change=change_utb_vale
+                    key="sb_vale_utb"
                 )
 
             st.info(f"Folio del Vale en Proceso: **{folio_actual}**")
@@ -2124,19 +2119,16 @@ else:
                 
                 df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
                 
-                # --- ASIGNACIÓN DE ESTADOS INICIALES PARA EL FILTRADO CRUZADO INTELIGENTE ---
                 if "sb_filtrar_delegacion_rep" not in st.session_state:
                     st.session_state.sb_filtrar_delegacion_rep = "TODAS"
                 if "sb_filtrar_utb_rep" not in st.session_state:
                     st.session_state.sb_filtrar_utb_rep = "TODAS"
 
-                # REGLA A: Si se escoge una UTB primero y la delegación está en "TODAS", auto-vincular si es única
                 if st.session_state.sb_filtrar_utb_rep != "TODAS" and st.session_state.sb_filtrar_delegacion_rep == "TODAS" and not df_territorial.empty:
                     deles_asociadas = df_territorial[df_territorial['UTB'] == st.session_state.sb_filtrar_utb_rep]['DELEGACION'].unique().tolist()
                     if len(deles_asociadas) == 1:
                         st.session_state.sb_filtrar_delegacion_rep = deles_asociadas[0]
 
-                # REGLA B: Construir dinámicamente las Delegaciones válidas basadas en la UTB seleccionada
                 if st.session_state.sb_filtrar_utb_rep != "TODAS" and not df_territorial.empty:
                     deles_compatibles = sorted(df_territorial[df_territorial['UTB'] == st.session_state.sb_filtrar_utb_rep]['DELEGACION'].unique().tolist())
                     delegaciones_dispo = ["TODAS"] + deles_compatibles
@@ -2156,7 +2148,6 @@ else:
                         key="sb_filtrar_delegacion_rep"
                     )
                 
-                # REGLA C: Construir dinámicamente las UTBs válidas basadas en la Delegación seleccionada
                 if st.session_state.sb_filtrar_delegacion_rep != "TODAS" and not df_territorial.empty:
                     utbs_compatibles = sorted(df_territorial[df_territorial['DELEGACION'] == st.session_state.sb_filtrar_delegacion_rep]['UTB'].unique().tolist())
                     utbs_dispo = ["TODAS"] + utbs_compatibles
@@ -2176,7 +2167,6 @@ else:
                         key="sb_filtrar_utb_rep"
                     )
                 
-                # Ejecutar filtros sobre la tabla de informes finales
                 if del_filtro != "TODAS":
                     df_filtrado = df_filtrado[df_filtrado["Delegación"] == del_filtro]
                 if utb_filtro != "TODAS":
@@ -2334,7 +2324,7 @@ else:
                             df_mat_auditoria = pd.DataFrame(lista_materiales)
                             st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
                         else:
-                            st.warning("⚠️ Este vale corresponds a un registro antiguo sin desglose digital de materiales.")
+                            st.warning("⚠️ Este vale corresponde a un registro antiguo sin desglose digital de materiales.")
                         
                         st.write("")
                         st.markdown("**🚨 Zona Crítica de Auditoría**")
