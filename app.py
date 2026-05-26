@@ -1698,6 +1698,21 @@ else:
         PIN_ALMACEN = "DAP-2026"
         LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento de Toluca y se genera en la Dirección de Alumbrado Público"
 
+        # Listas oficiales de control territorial para Toluca
+        DELEGACIONES_TOLUCA = [
+            "Centro Histórico", "Barrios Tradicionales", "Árbol de las Manitas", "La Maquinita", 
+            "Independencia", "San Sebastián", "Universidad", "Santa María de las Rosas", 
+            "Del Parque", "Delegación del Parque 18 de Marzo", "Adolfo López Mateos", 
+            "Ciudad Universitaria", "Nueva Oxtotitlán", "San Buenaventura", "Capultitlán", 
+            "Tlacotepec", "San Juan Tilapa", "San Felipe Tlalmimilolpan", "Pino Suárez", 
+            "San Mateo Oxtotitlán", "Santa Cruz Atzcapotzaltongo", "San Pedro Totoltepec", 
+            "San Lorenzo Tepaltitlán", "San Andrés Cuexcontitlán", "San Cristóbal Huichochitlán", 
+            "San Pablo Autopan", "San Juan Autopan", "San Martín Toltepec", "Sauces", 
+            "Calixtlahuaca", "Tecaxic", "San Antonio Buenavista"
+        ]
+        
+        UTBS_TOLUCA = [f"UTB {i}" for i in range(1, 25)]
+
         if "db_inventario" not in st.session_state:
             st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
         if "vales_historial" not in st.session_state:
@@ -1707,7 +1722,13 @@ else:
         if "admin_auth" not in st.session_state:
             st.session_state.admin_auth = False
 
-        tab_inv, tab_vales, tab_admin = st.tabs(["📊 Existencias y Resumen", "🚚 Salida (Vale Oficial)", "⚙️ Gestión Almacén"])
+        # Declaración oficial de las 4 pestañas de operación
+        tab_inv, tab_vales, tab_seguimiento, tab_admin = st.tabs([
+            "📊 Existencias y Resumen", 
+            "🚚 Salida (Vale Oficial)", 
+            "🎯 Seguimiento y Consumos",
+            "⚙️ Gestión Almacén"
+        ])
 
         # ==========================================
         # --- PESTAÑA 1: EXISTENCIAS Y RESUMEN ---
@@ -1767,22 +1788,26 @@ else:
             st.markdown(
                 """
                 <div style='background-color: #eef4f8; padding: 15px; border-left: 6px solid #1f4e78; border-radius: 6px; margin-bottom: 15px;'>
-                    <h4 style='margin:0; color: #1f4e78;'>🚚 ASIGNACIÓN DE UNIDAD / BRIGADA</h4>
-                    <p style='margin:0; font-size:13px; color:#555;'>Seleccione la cuadrilla operativa responsable del traslado y aplicación del material.</p>
+                    <h4 style='margin:0; color: #1f4e78;'>🚚 ASIGNACIÓN DE UNIDAD Y UBICACIÓN DE DESTINO</h4>
+                    <p style='margin:0; font-size:13px; color:#555;'>Asigne la brigada y la delimitación territorial para el seguimiento posterior del material.</p>
                 </div>
                 """, 
                 unsafe_allow_html=True
             )
             
-            col_bri_haz = st.columns([1.5, 2])
-            with col_bri_haz[0]:
+            c_bri1, c_bri2, c_bri3 = st.columns(3)
+            with c_bri1:
                 bri_sel = st.selectbox(
-                    "Seleccione Brigada Asignada:", 
+                    "Brigada Asignada:", 
                     [f"Brigada {i}" for i in range(1, 18)] + ["Personal de Mantenimiento Interno", "Cuadrilla de Alumbrado Especial"],
                     key="brigada_salida_vales"
                 )
-            with col_bri_haz[1]:
-                st.info(f"Folio del Vale en Proceso: **{folio_actual}**")
+            with c_bri2:
+                delegacion_sel = st.selectbox("Delegación Destino:", DELEGACIONES_TOLUCA, key="delegacion_salida_vales")
+            with c_bri3:
+                utb_sel = st.selectbox("UTB Destino:", UTBS_TOLUCA, key="utb_salida_vales")
+
+            st.info(f"Folio del Vale en Proceso: **{folio_actual}**")
 
             with st.container(border=True):
                 st.markdown("**🛒 Adición de Materiales al Lote**")
@@ -1847,6 +1872,7 @@ else:
                 
                 pdf.set_font("Arial", '', 10)
                 pdf.cell(0, 6, f"Fecha y Hora de Emisión: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
+                pdf.cell(0, 6, f"Ubicación Geográfica: {delegacion_sel} - {utb_sel}", ln=True)
                 pdf.set_font("Arial", 'B', 10)
                 pdf.cell(0, 6, f"UNIDAD/BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
                 pdf.ln(4)
@@ -1921,11 +1947,20 @@ else:
                             idx = df_inv[df_inv['Material'] == item['Material']].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
                         
+                        materiales_con_cierres = []
+                        for m_car in st.session_state.carrito_vale:
+                            m_car["Utilizado"] = 0
+                            m_car["Devuelto"] = 0
+                            materiales_con_cierres.append(m_car)
+
                         st.session_state.vales_historial.append({
                             "Folio": folio_actual, 
-                            "Fecha": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
+                            "Fecha": pd.Timestamp.now().strftime('%Y-%m-%d'),
+                            "FechaHora": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
                             "Brigada": bri_sel,
-                            "Materiales": list(st.session_state.carrito_vale),
+                            "Delegacion": delegacion_sel,
+                            "UTB": utb_sel,
+                            "Materiales": materiales_con_cierres,
                             "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
                         })
                         st.session_state.carrito_vale = []
@@ -1934,7 +1969,122 @@ else:
                         st.rerun()
 
         # ==========================================
-        # --- PESTAÑA 3: GESTIÓN ALMACÉN ---
+        # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS ---
+        # ==========================================
+        with tab_seguimiento:
+            st.subheader("🎯 Control de Material Aplicado en Campo y Devoluciones")
+            
+            if not st.session_state.vales_historial:
+                st.info("📂 No hay vales registrados en la Bóveda para darles seguimiento.")
+            else:
+                st.markdown("### 🛠️ 1. Captura de Cierre de Material")
+                folios_dispo = [v["Folio"] for v in st.session_state.vales_historial]
+                v_select = st.selectbox("Seleccione el Folio del Vale a conciliar:", folios_dispo, key="sb_seguimiento_folios")
+                
+                idx_vale = next(i for i, item in enumerate(st.session_state.vales_historial) if item["Folio"] == v_select)
+                vale_obj = st.session_state.vales_historial[idx_vale]
+                
+                st.text(f"📅 Emitido: {vale_obj['FechaHora']} | 🛞 {vale_obj['Brigada']} | 📍 Destino: {vale_obj['Delegacion']} ({vale_obj['UTB']})")
+                
+                df_materiales_vale = pd.DataFrame(vale_obj["Materiales"])
+                st.caption("📝 Modifique ÚNICAMENTE las columnas 'Utilizado' y 'Devuelto' según el reporte de campo:")
+                
+                df_editado = st.data_editor(
+                    df_materiales_vale,
+                    column_config={
+                        "Material": st.column_config.TextColumn("Insumo", disabled=True),
+                        "Cantidad": st.column_config.NumberColumn("Entregado", disabled=True),
+                        "Unidad": st.column_config.TextColumn("Unidad", disabled=True),
+                        "Utilizado": st.column_config.NumberColumn("Utilizado (Instalado)", min_value=0, required=True),
+                        "Devuelto": st.column_config.NumberColumn("Devuelto (A Almacén)", min_value=0, required=True),
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    key=f"editor_live_{v_select}"
+                )
+                
+                if st.button("💾 Guardar Conciliación de Materiales", use_container_width=True, type="primary"):
+                    error_cantidades = False
+                    for index, row in df_editado.iterrows():
+                        if (row["Utilizado"] + row["Devuelto"]) > row["Cantidad"]:
+                            st.error(f"⚠️ Error en {row['Material']}: La suma de Utilizado y Devuelto supera la cantidad entregada original ({row['Cantidad']}).")
+                            error_cantidades = True
+                    
+                    if not error_cantidades:
+                        for index, row in df_editado.iterrows():
+                            dif_devolucion = row["Devuelto"] - df_materiales_vale.loc[index, "Devuelto"]
+                            if dif_devolucion > 0:
+                                idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
+                                st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
+                        
+                        st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
+                        st.success(f"📊 Cantidades de utilización actualizadas correctamente para el folio {v_select}.")
+                        time.sleep(0.5)
+                        st.rerun()
+                
+                st.divider()
+                st.markdown("### 📈 2. Reporte y Filtros Dinámicos de Consumo")
+                
+                datos_reporte_completo = []
+                for v in st.session_state.vales_historial:
+                    for mat in v["Materiales"]:
+                        datos_reporte_completo.append({
+                            "Vale": v["Folio"],
+                            "Fecha": v["Fecha"],
+                            "Delegación": v["Delegacion"],
+                            "UTB": v["UTB"],
+                            "Brigada": v["Brigada"],
+                            "Material": mat["Material"],
+                            "Entregado": mat["Cantidad"],
+                            "Utilizado": mat.get("Utilizado", 0),
+                            "Devuelto": mat.get("Devuelto", 0),
+                            "Unidad": mat["Unidad"]
+                        })
+                
+                df_reporte_base = pd.DataFrame(datos_reporte_completo)
+                
+                c_f1, c_f2, c_f3 = st.columns(3)
+                with c_f1:
+                    fechas_dispo = sorted(df_reporte_base["Fecha"].unique())
+                    fecha_filtro = st.selectbox("1. Filtrar por Fecha Determinante:", ["TODAS"] + fechas_dispo)
+                
+                df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
+                
+                with c_f2:
+                    delegaciones_dispo = sorted(df_filtrado["Delegación"].unique())
+                    del_filtro = st.selectbox("2. Filtrar por Delegación:", ["TODAS"] + delegaciones_dispo)
+                
+                if del_filtro != "TODAS":
+                    df_filtrado = df_filtrado[df_filtrado["Delegación"] == del_filtro]
+                    
+                with c_f3:
+                    utbs_dispo = sorted(df_filtrado["UTB"].unique())
+                    utb_filtro = st.selectbox("3. Filtrar por UTB:", ["TODAS"] + utbs_dispo)
+                    
+                if utb_filtro != "TODAS":
+                    df_filtrado = df_filtrado[df_filtrado["UTB"] == utb_filtro]
+                
+                st.markdown("#### **Informe Resultante**")
+                st.dataframe(df_filtrado[["Vale", "Fecha", "Delegación", "UTB", "Material", "Entregado", "Utilizado", "Devuelto", "Unidad"]], use_container_width=True, hide_index=True)
+                
+                st.markdown("**📊 Totales del Filtro Actual:**")
+                c_m1, c_m2, c_m3 = st.columns(3)
+                c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas/m")
+                c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas/m")
+                c_m3.metric("🔄 Total Devuelto", f"{int(df_filtrado['Devuelto'].sum())} pzas/m")
+                
+                output_rep = io.BytesIO()
+                with pd.ExcelWriter(output_rep, engine='openpyxl') as writer:
+                    df_filtrado.to_excel(writer, index=False, sheet_name='Reporte_Consumos_DAP')
+                st.download_button(
+                    label="📄 DESCARGAR REPORTE FILTRADO EN EXCEL", 
+                    data=output_rep.getvalue(), 
+                    file_name=f"Reporte_Consumos_DAP_{pd.Timestamp.now().strftime('%d-%m-%Y')}.xlsx", 
+                    use_container_width=True
+                )
+
+        # ==========================================
+        # --- PESTAÑA 4: GESTIÓN ALMACÉN ---
         # ==========================================
         with tab_admin:
             df_inv = st.session_state.db_inventario
@@ -1956,22 +2106,19 @@ else:
                 
                 st.divider()
                 
-                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (CONTRAÍBLE) ---
+                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (CONTRAÍBLE - DINÁMICO) ---
                 with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
                     m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist(), key="sb_abastecer")
                     
                     stock_previo = df_inv.loc[df_inv['Material'] == m_in, 'Stock'].values[0]
                     unidad_medida = df_inv.loc[df_inv['Material'] == m_in, 'Unidad'].values[0]
                     
-                    # Contenedor limpio sin st.form para permitir reactividad en tiempo real al digitar
                     with st.container(border=True):
                         st.markdown(f"📋 **Material:** {m_in}")
                         st.markdown(f"📉 **Cantidad Actual en Almacén:** `{stock_previo} {unidad_medida}`")
                         
-                        # Al digitar aquí, Streamlit recalculará el bloque completo al instante
                         c_in = st.number_input("Cantidad a ingresar:", min_value=1, step=1, value=1, key="cant_ingresar_live")
                         
-                        # El cálculo ahora sí es 100% real y dinámico al vuelo
                         stock_proyectado = stock_previo + c_in
                         st.markdown(f"📈 **Cantidad Posterior al registro:** :green[{stock_proyectado} {unidad_medida}]")
                         
@@ -2030,6 +2177,8 @@ else:
                 
                 st.write("")
                 st.markdown("---")
+                
+                # --- SECCIÓN DE BÓVEDA E INSPECCIÓN HISTÓRICA COMPLETA ---
                 st.subheader("🔒 Bóveda de Vales Emitidos (Historial Antirrobos)")
                 st.caption("Registro histórico inmutable de salidas de material de la Dirección de Alumbrado Público.")
 
@@ -2040,7 +2189,7 @@ else:
                     for v in st.session_state.vales_historial:
                         tabla_boveda.append({
                             "Folio": v["Folio"],
-                            "Fecha/Hora": v.get("Fecha", "N/A"),
+                            "Fecha/Hora": v.get("FechaHora", "N/A"),
                             "Brigada / Destino": v["Brigada"],
                             "Total Insumos": len(v.get("Materiales", []))
                         })
@@ -2050,14 +2199,15 @@ else:
                     
                     st.markdown("**🔍 Auditoría e Inspección de Folio**")
                     folios_disponibles = [v["Folio"] for v in st.session_state.vales_historial]
-                    folio_select = st.selectbox("Seleccione Folio para auditoría interna:", folios_disponibles)
+                    folio_select = st.selectbox("Seleccione Folio para auditoría interna:", folios_disponibles, key="sb_auditoria_boveda")
                     
                     vale_auditado = next(item for item in st.session_state.vales_historial if item["Folio"] == folio_select)
                     
                     with st.container(border=True):
                         st.markdown(f"### 📄 Expediente: {vale_auditado['Folio']}")
-                        st.write(f"**Fecha de Emisión:** {vale_auditado.get('Fecha', 'N/A')}")
+                        st.write(f"**Fecha de Emisión:** {vale_auditado.get('FechaHora', 'N/A')}")
                         st.write(f"**Asignado a:** {vale_auditado['Brigada']}")
+                        st.write(f"**Ubicación Destino:** {vale_auditado.get('Delegacion', 'N/A')} - {vale_auditado.get('UTB', 'N/A')}")
                         st.write(f"**Notas de Almacén:** {vale_auditado.get('Observaciones', 'Sin notas registradas')}")
                         
                         st.write("**Desglose de Material Entregado:**")
