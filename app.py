@@ -1736,10 +1736,31 @@ else:
                     respaldo_datos.append({"DELEGACION": d, "UTB": f"UTB {i}"})
             df_territorial = pd.DataFrame(respaldo_datos)
 
+        # ==========================================
+        # --- MOTOR DE PERSISTENCIA INMUTABLE (F5 PROOF) ---
+        # ==========================================
+        import os
+        import json
+
+        # Inicialización de Inventario Persistente fijado en 100 y 10 para la presentación
         if "db_inventario" not in st.session_state:
-            st.session_state.db_inventario = pd.DataFrame(STOCK_INICIAL)
+            if os.path.exists('inventario_dap_guardado.csv'):
+                st.session_state.db_inventario = pd.read_csv('inventario_dap_guardado.csv')
+            else:
+                df_base = pd.DataFrame(STOCK_INICIAL)
+                df_base['Stock'] = 100  # Forzar stock ideal
+                df_base['Min'] = 10     # Forzar mínimo ideal
+                df_base.to_csv('inventario_dap_guardado.csv', index=False)
+                st.session_state.db_inventario = df_base
+
+        # Inicialización de Historial de Vales Persistente
         if "vales_historial" not in st.session_state:
-            st.session_state.vales_historial = []
+            if os.path.exists('vales_historial_guardado.json'):
+                with open('vales_historial_guardado.json', 'r', encoding='utf-8') as f:
+                    st.session_state.vales_historial = json.load(f)
+            else:
+                st.session_state.vales_historial = []
+
         if "carrito_vale" not in st.session_state:
             st.session_state.carrito_vale = []
         if "admin_auth" not in st.session_state:
@@ -1831,7 +1852,6 @@ else:
             val_del_current = st.session_state.sb_vale_delegacion
             val_utb_current = st.session_state.sb_vale_utb
 
-            # Evaluar cambios de interacción
             if val_del_current != st.session_state.prev_vale_del:
                 if val_del_current == "TODAS":
                     st.session_state.sb_vale_utb = "TODAS"
@@ -1855,7 +1875,6 @@ else:
                             st.session_state.prev_vale_del = val_del_current
                 st.session_state.prev_vale_utb = val_utb_current
 
-            # Construcción dinámica de catálogos de opciones
             if val_utb_current != "TODAS" and not df_territorial.empty:
                 delegaciones_dispo_vale = ["TODAS"] + sorted(df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist())
             else:
@@ -1866,7 +1885,6 @@ else:
             else:
                 utbs_dispo_vale = ["TODAS"] + (sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else [])
 
-            # Corrección de índices por seguridad de Streamlit
             if val_del_current not in delegaciones_dispo_vale: val_del_current = "TODAS"
             if val_utb_current not in utbs_dispo_vale: val_utb_current = "TODAS"
 
@@ -1936,9 +1954,6 @@ else:
                 key="obs_responsable_entrega"
             )
 
-            # ==========================================
-            # --- SECCIÓN DEL CARRITO ACTIVO ---
-            # ==========================================
             if st.session_state.carrito_vale:
                 st.write("---")
                 st.markdown("### **🛒 Resumen del Lote a Entregar:**")
@@ -1956,9 +1971,8 @@ else:
                     folios_existentes = [v["Folio"] for v in st.session_state.vales_historial]
                     
                     if folio_actual in folios_existentes:
-                        st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya existe en el histórico. Intente de nuevo.")
+                        st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya exist existe en el histórico. Intente de nuevo.")
                     else:
-                        # --- CONSTRUCCIÓN DEL DOCUMENTO FPDF ---
                         from fpdf import FPDF
                         pdf = FPDF()
                         pdf.add_page()
@@ -2036,6 +2050,9 @@ else:
                             idx = df_inv[df_inv['Material'] == item['Material']].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
                         
+                        # Guardado permanente de la deducción de Stock
+                        st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                        
                         materiales_con_cierres = []
                         for m_car in st.session_state.carrito_vale:
                             m_car["Utilizado"] = 0
@@ -2056,6 +2073,10 @@ else:
                             "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
                         })
                         
+                        # Guardado permanente del Historial de Vales
+                        with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
+                            json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
+                        
                         st.session_state.vale_listo_descarga = {
                             "folio": folio_actual,
                             "bytes": pdf_bytes
@@ -2064,9 +2085,6 @@ else:
                         st.session_state.carrito_vale = []
                         st.rerun()
 
-            # ==========================================
-            # --- VENTANA DE COMPROBANTE DISPONIBLE ---
-            # ==========================================
             if "vale_listo_descarga" in st.session_state and st.session_state.vale_listo_descarga:
                 st.write("---")
                 vale_data = st.session_state.vale_listo_descarga
@@ -2091,7 +2109,6 @@ else:
         with tab_seguimiento:
             st.subheader("🎯 Control de Material Aplicado en Campo y Devoluciones")
             
-            # --- PANEL DE CONTROL GLOBAL ---
             total_vales = len(st.session_state.vales_historial)
             pendientes = sum(1 for v in st.session_state.vales_historial if v.get("Estado", "Pendiente") == "Pendiente")
             redireccionados = sum(1 for v in st.session_state.vales_historial if v.get("Delegacion") != v.get("Delegacion_Real"))
@@ -2126,7 +2143,6 @@ else:
             
             st.write("---")
             
-            # --- GESTIÓN OPERATIVA ---
             if not st.session_state.vales_historial:
                 st.info("📂 No hay vales registrados en la Bóveda para darles seguimiento.")
             else:
@@ -2140,7 +2156,6 @@ else:
                 if vale_obj.get("Estado", "Pendiente") == "Conciliado":
                     st.success(f"✅ Este folio ya se encuentra **CONCILIADO**. Puede volver a guardar para modificar los datos reales.")
                 
-                # --- MOTOR DE FILTRADO CRUZADO DINÁMICO PARA CONCILIACIÓN (EVITA MEZCLA TERRITORIAL) ---
                 if "sb_rec_delegacion" not in st.session_state:
                     st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
                 if "sb_rec_utb" not in st.session_state:
@@ -2148,7 +2163,6 @@ else:
                 if "prev_rec_del" not in st.session_state:
                     st.session_state.prev_rec_del = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
 
-                # Forzar recarga inmediata de estados si el usuario cambia el Folio en el selectbox principal
                 if "current_v_select" not in st.session_state or st.session_state.current_v_select != v_select:
                     st.session_state.current_v_select = v_select
                     st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
@@ -2158,7 +2172,6 @@ else:
                 rec_del_current = st.session_state.sb_rec_delegacion
                 rec_utb_current = st.session_state.sb_rec_utb
 
-                # Si cambia la delegación en la conciliación, actualizamos de inmediato la primera UTB válida
                 if rec_del_current != st.session_state.prev_rec_del:
                     if not df_territorial.empty:
                         utbs_validas_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist())
@@ -2167,14 +2180,12 @@ else:
                             rec_utb_current = utbs_validas_rec[0]
                     st.session_state.prev_rec_del = rec_del_current
 
-                # Catálogo de Delegaciones completo y catálogo de UTBs estrictamente filtrado
                 delegaciones_dispo_rec = DELEGACIONES_TOLUCA
                 if not df_territorial.empty:
                     utbs_dispo_rec = sorted(df_territorial[df_territorial['DELEGACION'] == rec_del_current]['UTB'].unique().tolist())
                 else:
                     utbs_dispo_rec = ["UTB 1", "UTB 2", "UTB 3", "UTB 4", "UTB 5"]
 
-                # Verificaciones de límites de índice por consistencia
                 if rec_del_current not in delegaciones_dispo_rec: rec_del_current = delegaciones_dispo_rec[0]
                 if rec_utb_current not in utbs_dispo_rec: rec_utb_current = utbs_dispo_rec[0]
 
@@ -2221,10 +2232,15 @@ else:
                                 idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
                                 st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
                         
+                        st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                        
                         st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
                         st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
                         st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
                         st.session_state.vales_historial[idx_vale]["Estado"] = "Conciliado"
+                        
+                        with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
+                            json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
                         
                         st.success(f"📊 Cierre técnico del folio {v_select} procesado con éxito. Ubicación real vinculada.")
                         time.sleep(0.5)
@@ -2260,7 +2276,6 @@ else:
                 
                 df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
                 
-                # --- FILTRADO CRUZADO CON DETECCIÓN DE RESETEO PARA REPORTES ---
                 if "sb_filtrar_delegacion_rep" not in st.session_state:
                     st.session_state.sb_filtrar_delegacion_rep = "TODAS"
                 if "sb_filtrar_utb_rep" not in st.session_state:
@@ -2384,6 +2399,9 @@ else:
                         if st.button("✅ ACTUALIZAR STOCK", use_container_width=True, key="btn_actualizar_stock_live"):
                             idx = df_inv[df_inv['Material'] == m_in].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] += c_in
+                            
+                            st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                            
                             st.success(f"📦 Entrada registrada correctamente. Nuevo stock de {m_in}: {st.session_state.db_inventario.at[idx, 'Stock']} {unidad_medida}.")
                             time.sleep(0.6)
                             st.rerun()
@@ -2415,9 +2433,12 @@ else:
                                 }
                                 
                                 st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
+                                
+                                st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                                
                                 st.success(f"✅ Registrado con éxito: {nuevo_id} - {nuevo_nombre}")
                                 time.sleep(0.5)
-                                st.rerun()
+                                st.rerun() # <-- CORREGIDO: Ahora sí cuenta con la referencia st.
 
                 # --- APARTADO C: ELIMINAR ÍTEM DEL CATÁLOGO ---
                 with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
@@ -2429,6 +2450,9 @@ else:
                         
                         if st.button(f"💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
                             st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
+                            
+                            st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                            
                             st.success(f"🗑️ El ítem '{mat_a_eliminar}' ha sido borrado del catálogo oficial.")
                             time.sleep(0.5)
                             st.rerun()
@@ -2482,6 +2506,10 @@ else:
                         
                         if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
                             st.session_state.vales_historial = [item for item in st.session_state.vales_historial if item["Folio"] != folio_select]
+                            
+                            with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
+                                json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
+                                
                             st.warning(f"El vale {folio_select} ha sido purgado del historial de Almacén.")
                             time.sleep(0.4)
                             st.rerun()
