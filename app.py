@@ -1818,41 +1818,29 @@ else:
                 unsafe_allow_html=True
             )
             
-            # --- MOTOR DE DETECCIÓN LINEAL BI-DIRECCIONAL (ESTILO SEGUIMIENTO) ---
-            utbs_todas_vale = sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else []
-            delegaciones_todas_vale = DELEGACIONES_TOLUCA
+            # --- CLONACIÓN EXACTA DEL MOTOR DE SEGUIMIENTO CON LA OPCIÓN "TODAS" ---
+            if "sb_vale_delegacion" not in st.session_state:
+                st.session_state.sb_vale_delegacion = "TODAS"
+            if "sb_vale_utb" not in st.session_state:
+                st.session_state.sb_vale_utb = "TODAS"
 
-            if "prev_vale_del" not in st.session_state:
-                st.session_state.prev_vale_del = delegaciones_todas_vale[0] if delegaciones_todas_vale else ""
-            if "prev_vale_utb" not in st.session_state:
-                st.session_state.prev_vale_utb = utbs_todas_vale[0] if utbs_todas_vale else ""
+            # REGLA A: Auto-vincular delegación si se elige una UTB específica que solo pertenece a una delegación
+            if st.session_state.sb_vale_utb != "TODAS" and st.session_state.sb_vale_delegacion == "TODAS" and not df_territorial.empty:
+                deles_asociadas_vale = df_territorial[df_territorial['UTB'] == st.session_state.sb_vale_utb]['DELEGACION'].unique().tolist()
+                if len(deles_asociadas_vale) == 1:
+                    st.session_state.sb_vale_delegacion = deles_asociadas_vale[0]
 
-            # Capturar selecciones actuales de los widgets en tiempo real
-            val_del_current = st.session_state.get("sb_vale_delegacion", st.session_state.prev_vale_del)
-            val_utb_current = st.session_state.get("sb_vale_utb", st.session_state.prev_vale_utb)
+            # REGLA B: Construir dinámicamente las Delegaciones válidas basadas en la UTB seleccionada
+            if st.session_state.sb_vale_utb != "TODAS" and not df_territorial.empty:
+                deles_compatibles_vale = sorted(df_territorial[df_territorial['UTB'] == st.session_state.sb_vale_utb]['DELEGACION'].unique().tolist())
+                delegaciones_dispo_vale = ["TODAS"] + deles_compatibles_vale
+            else:
+                delegaciones_dispo_vale = ["TODAS"] + DELEGACIONES_TOLUCA
 
-            # Evaluar qué menú movió el usuario y sincronizar el otro de inmediato
-            if val_del_current != st.session_state.prev_vale_del:
-                st.session_state.prev_vale_del = val_del_current
-                if not df_territorial.empty:
-                    utbs_validas = sorted(df_territorial[df_territorial['DELEGACION'] == val_del_current]['UTB'].unique().tolist())
-                    if utbs_validas:
-                        st.session_state.sb_vale_utb = utbs_validas[0]
-                        st.session_state.prev_vale_utb = utbs_validas[0]
-                        val_utb_current = utbs_validas[0]
-
-            elif val_utb_current != st.session_state.prev_vale_utb:
-                st.session_state.prev_vale_utb = val_utb_current
-                if not df_territorial.empty:
-                    deles_de_utb = df_territorial[df_territorial['UTB'] == val_utb_current]['DELEGACION'].unique().tolist()
-                    if deles_de_utb:
-                        st.session_state.sb_vale_delegacion = sorted(deles_de_utb)[0]
-                        st.session_state.prev_vale_del = sorted(deles_de_utb)[0]
-                        val_del_current = sorted(deles_de_utb)[0]
-
-            # Encontrar los índices exactos para posicionar los selectores
-            idx_del_vale = delegaciones_todas_vale.index(val_del_current) if val_del_current in delegaciones_todas_vale else 0
-            idx_utb_vale = utbs_todas_vale.index(val_utb_current) if val_utb_current in utbs_todas_vale else 0
+            if st.session_state.sb_vale_delegacion not in delegaciones_dispo_vale:
+                st.session_state.sb_vale_delegacion = "TODAS"
+            
+            idx_del_vale = delegaciones_dispo_vale.index(st.session_state.sb_vale_delegacion)
 
             c_bri1, c_bri2, c_bri3 = st.columns(3)
             with c_bri1:
@@ -1864,14 +1852,27 @@ else:
             with c_bri2:
                 delegacion_sel = st.selectbox(
                     "Delegación Destino:", 
-                    delegaciones_todas_vale, 
+                    delegaciones_dispo_vale, 
                     index=idx_del_vale, 
                     key="sb_vale_delegacion"
                 )
+            
+            # REGLA C: Construir dinámicamente las UTBs válidas basadas en la Delegación seleccionada
+            if st.session_state.sb_vale_delegacion != "TODAS" and not df_territorial.empty:
+                utbs_compatibles_vale = sorted(df_territorial[df_territorial['DELEGACION'] == st.session_state.sb_vale_delegacion]['UTB'].unique().tolist())
+                utbs_dispo_vale = ["TODAS"] + utbs_compatibles_vale
+            else:
+                utbs_dispo_vale = ["TODAS"] + sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else ["TODAS"]
+
+            if st.session_state.sb_vale_utb not in utbs_dispo_vale:
+                st.session_state.sb_vale_utb = "TODAS"
+            
+            idx_utb_vale = utbs_dispo_vale.index(st.session_state.sb_vale_utb)
+                
             with c_bri3:
                 utb_sel = st.selectbox(
                     "UTB Destino:", 
-                    utbs_todas_vale, 
+                    utbs_dispo_vale, 
                     index=idx_utb_vale, 
                     key="sb_vale_utb"
                 )
