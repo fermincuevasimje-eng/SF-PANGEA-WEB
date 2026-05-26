@@ -1922,9 +1922,7 @@ else:
                                 "Unidad": df_inv.loc[df_inv['Material'] == mat_sel, 'Unidad'].values[0]
                             })
                         
-                        # Al agregar material nuevo se limpia la descarga previa automáticamente
                         st.session_state.vale_listo_descarga = None
-                        
                         st.toast(f"✅ {mat_sel} sumado al vale actual.")
                         time.sleep(0.3)
                         st.rerun()
@@ -1939,7 +1937,7 @@ else:
             )
 
             # ==========================================
-            # --- SECCIÓN DEL CARRITO ACTIVO (SIEMPRE VISIBLE SI TIENE ÍTEMS) ---
+            # --- SECCIÓN DEL CARRITO ACTIVO ---
             # ==========================================
             if st.session_state.carrito_vale:
                 st.write("---")
@@ -2049,8 +2047,11 @@ else:
                             "Fecha": pd.Timestamp.now().strftime('%Y-%m-%d'),
                             "FechaHora": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
                             "Brigada": bri_sel,
-                            "Delegacion": delegacion_sel,
-                            "UTB": utb_sel,
+                            "Delegacion": delegacion_sel,      # Destino Original Planificado
+                            "UTB": utb_sel,                  # UTB Original Planificado
+                            "Delegacion_Real": delegacion_sel, # Por defecto es el mismo
+                            "UTB_Real": utb_sel,             # Por defecto es el mismo
+                            "Estado": "Pendiente",
                             "Materiales": materiales_con_cierres,
                             "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
                         })
@@ -2085,25 +2086,82 @@ else:
                     st.rerun()
 
         # ==========================================
-        # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS ---
+        # --- PESTAÑA 3: SEGUIMIENTO Y CONSUMOS (REDIRECCIONAMIENTO BLINDADO) ---
         # ==========================================
         with tab_seguimiento:
             st.subheader("🎯 Control de Material Aplicado en Campo y Devoluciones")
             
+            # --- PANEL DE CONTROL GLOBAL (SIEMPRE VISIBLE) ---
+            total_vales = len(st.session_state.vales_historial)
+            pendientes = sum(1 for v in st.session_state.vales_historial if v.get("Estado", "Pendiente") == "Pendiente")
+            redireccionados = sum(1 for v in st.session_state.vales_historial if v.get("Delegacion") != v.get("Delegacion_Real"))
+            
+            c_seg1, c_seg2, c_seg3 = st.columns(3)
+            c_seg1.metric("📋 Total Vales Emitidos", total_vales)
+            c_seg2.metric("⏳ Pendientes de Conciliar", pendientes, delta=f"-{total_vales - pendientes} cerrados", delta_color="normal" if pendientes > 0 else "off")
+            c_seg3.metric("⚠️ Cambios de Ruta (Alertas)", redireccionados, delta="Incidencias en campo" if redireccionados > 0 else "Operación Nominal", delta_color="inverse" if redireccionados > 0 else "normal")
+            
+            if total_vales > 0:
+                st.markdown("### 📊 Monitoreo Técnico de Despliegue")
+                st.caption("Estatus operativo inmutable de las brigadas en territorio de Toluca:")
+                
+                tabla_resumen_seguimiento = []
+                for v in st.session_state.vales_historial:
+                    loc_original = f"{v['Delegacion']} ({v['UTB']})"
+                    loc_real = f"{v.get('Delegacion_Real', v['Delegacion'])} ({v.get('UTB_Real', v['UTB'])})"
+                    
+                    status_ruta = "📢 NOMINAL" if v['Delegacion'] == v.get('Delegacion_Real') else "🔄 REDIRECCIONADO"
+                    status_cierre = "🔴 PENDIENTE" if v.get("Estado", "Pendiente") == "Pendiente" else "🟢 CONCILIADO"
+                    
+                    tabla_resumen_seguimiento.append({
+                        "Folio": v["Folio"],
+                        "Brigada": v["Brigada"],
+                        "Destino Almacén": loc_original,
+                        "Destino Real Aplicado": loc_real,
+                        "Ruta": status_ruta,
+                        "Estatus": status_cierre
+                    })
+                
+                st.dataframe(pd.DataFrame(tabla_resumen_seguimiento), use_container_width=True, hide_index=True)
+            
+            st.write("---")
+            
+            # --- LÓGICA DE FILTRADO Y GESTIÓN OPERATIVA ---
             if not st.session_state.vales_historial:
                 st.info("📂 No hay vales registrados en la Bóveda para darles seguimiento.")
             else:
-                st.markdown("### 🛠️ 1. Captura de Cierre de Material")
+                st.markdown("### 🛠️ 1. Captura de Cierre y Redireccionamiento de Material")
                 folios_dispo = [v["Folio"] for v in st.session_state.vales_historial]
                 v_select = st.selectbox("Seleccione el Folio del Vale a conciliar:", folios_dispo, key="sb_seguimiento_folios")
                 
                 idx_vale = next(i for i, item in enumerate(st.session_state.vales_historial) if item["Folio"] == v_select)
                 vale_obj = st.session_state.vales_historial[idx_vale]
                 
-                st.text(f"📅 Emitido: {vale_obj['FechaHora']} | 🛞 {vale_obj['Brigada']} | 📍 Destino: {vale_obj['Delegacion']} ({vale_obj['UTB']})")
+                # Desplegar alerta visual si el vale ya fue conciliado previamente
+                if vale_obj.get("Estado", "Pendiente") == "Conciliado":
+                    st.success(f"✅ Este folio ya se encuentra **CONCILIADO**. Puede volver a guardar para modificar los datos reales.")
                 
+                # --- NUEVA MEJORA: CAPTURA DE UBICACIÓN REAL SI HUBO REDIRECCIONAMIENTO ---
+                with st.container(border=True):
+                    st.markdown("⚠️ **¿La brigada fue redireccionada a otra ubicación inesperada?**")
+                    st.caption(f"Destino original de salida en Almacén: **{vale_obj['Delegacion']} — {vale_obj['UTB']}**")
+                    
+                    col_re1, col_re2 = st.columns(2)
+                    
+                    # Índices de seguridad por defecto basados en lo que está guardado
+                    try: default_idx_del = DELEGACIONES_TOLUCA.index(vale_obj.get("Delegacion_Real", vale_obj["Delegacion"]))
+                    except ValueError: default_idx_del = 0
+                    
+                    utbs_dispo_reconciliation = sorted(df_territorial['UTB'].unique().tolist()) if not df_territorial.empty else ["UTB 1", "UTB 2", "UTB 3", "UTB 4", "UTB 5"]
+                    try: default_idx_utb = utbs_dispo_reconciliation.index(vale_obj.get("UTB_Real", vale_obj["UTB"]))
+                    except ValueError: default_idx_utb = 0
+                    
+                    real_del_sel = col_re1.selectbox("Delegación REAL de aplicación en campo:", DELEGACIONES_TOLUCA, index=default_idx_del, key=f"real_del_widget_{v_select}")
+                    real_utb_sel = col_re2.selectbox("UTB REAL de aplicación en campo:", utbs_dispo_reconciliation, index=default_idx_utb, key=f"real_utb_widget_{v_select}")
+                
+                st.write("")
                 df_materiales_vale = pd.DataFrame(vale_obj["Materiales"])
-                st.caption("📝 Modifique ÚNICAMENTE las columnas 'Utilizado' y 'Devuelto' según el reporte de campo:")
+                st.caption("📝 Modifique las columnas 'Utilizado' y 'Devuelto' según el reporte físico entregado por la brigada:")
                 
                 df_editado = st.data_editor(
                     df_materiales_vale,
@@ -2133,13 +2191,18 @@ else:
                                 idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
                                 st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
                         
+                        # Guardamos materiales, ubicación real validada y cambiamos estado
                         st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
-                        st.success(f"📊 Cantidades de utilización actualizadas correctamente para el folio {v_select}.")
+                        st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
+                        st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
+                        st.session_state.vales_historial[idx_vale]["Estado"] = "Conciliado"
+                        
+                        st.success(f"📊 Cierre técnico del folio {v_select} procesado con éxito. Ubicación real vinculada.")
                         time.sleep(0.5)
                         st.rerun()
                 
                 st.divider()
-                st.markdown("### 📈 2. Reporte y Filtros Dinámicos de Consumo")
+                st.markdown("### 📈 2. Reporte Dinámico de Consumo Real e Histórico")
                 
                 datos_reporte_completo = []
                 for v in st.session_state.vales_historial:
@@ -2147,9 +2210,11 @@ else:
                         datos_reporte_completo.append({
                             "Vale": v["Folio"],
                             "Fecha": v["Fecha"],
-                            "Delegación": v["Delegacion"],
-                            "UTB": v["UTB"],
                             "Brigada": v["Brigada"],
+                            "Del. Programada": v["Delegacion"],
+                            "UTB Programada": v["UTB"],
+                            "Del. Real (Aplicada)": v.get("Delegacion_Real", v["Delegacion"]),
+                            "UTB Real (Aplicada)": v.get("UTB_Real", v["UTB"]),
                             "Material": mat["Material"],
                             "Entregado": mat["Cantidad"],
                             "Utilizado": mat.get("Utilizado", 0),
@@ -2164,6 +2229,7 @@ else:
                     fechas_dispo = sorted(df_reporte_base["Fecha"].unique())
                     fecha_filtro = st.selectbox("1. Filtrar por Fecha Determinante:", ["TODAS"] + fechas_dispo)
                 
+                # El reporte se filtra con base en el lugar REAL de aplicación
                 df_filtrado = df_reporte_base if fecha_filtro == "TODAS" else df_reporte_base[df_reporte_base["Fecha"] == fecha_filtro]
                 
                 # --- FILTRADO CRUZADO CON DETECCIÓN DE RESETEO PARA REPORTES ---
@@ -2221,28 +2287,29 @@ else:
                     
                 with c_f2:
                     del_filtro = st.selectbox(
-                        "2. Filtrar por Delegación:", 
+                        "2. Filtrar por Delegación Real Aplicada:", 
                         delegaciones_dispo, 
                         index=idx_del, 
                         key="sb_filtrar_delegacion_rep"
                     )
                 with c_f3:
                     utb_filtro = st.selectbox(
-                        "3. Filtrar por UTB:", 
+                        "3. Filtrar por UTB Real Aplicada:", 
                         utbs_dispo, 
                         index=idx_utb, 
                         key="sb_filtrar_utb_rep"
                     )
                 
+                # El filtro cruza por el territorio REAL donde se instaló el insumo
                 if del_filtro != "TODAS":
-                    df_filtrado = df_filtrado[df_filtrado["Delegación"] == del_filtro]
+                    df_filtrado = df_filtrado[df_filtrado["Del. Real (Aplicada)"] == del_filtro]
                 if utb_filtro != "TODAS":
-                    df_filtrado = df_filtrado[df_filtrado["UTB"] == utb_filtro]
+                    df_filtrado = df_filtrado[df_filtrado["UTB Real (Aplicada)"] == utb_filtro]
                 
-                st.markdown("#### **Informe Resultante**")
-                st.dataframe(df_filtrado[["Vale", "Fecha", "Delegación", "UTB", "Material", "Entregado", "Utilizado", "Devuelto", "Unidad"]], use_container_width=True, hide_index=True)
+                st.markdown("#### **Informe Resultante de Material en Calle**")
+                st.dataframe(df_filtrado[["Vale", "Fecha", "Brigada", "Del. Programada", "Del. Real (Aplicada)", "UTB Real (Aplicada)", "Material", "Entregado", "Utilizado", "Devuelto", "Unidad"]], use_container_width=True, hide_index=True)
                 
-                st.markdown("**📊 Totales del Filtro Actual:**")
+                st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
                 c_m1, c_m2, c_m3 = st.columns(3)
                 c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas/m")
                 c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas/m")
@@ -2391,7 +2458,7 @@ else:
                             df_mat_auditoria = pd.DataFrame(lista_materiales)
                             st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
                         else:
-                            st.warning("⚠️ Este vale corresponde a un registro antiguo sin desglose digital de materiales.")
+                            st.warning("⚠️ Este vale corresponds a un registro antiguo sin desglose digital de materiales.")
                         
                         st.write("")
                         st.markdown("**🚨 Zona Crítica de Auditoría**")
