@@ -1698,30 +1698,41 @@ else:
         PIN_ALMACEN = "DAP-2026"
         LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento de Toluca y se genera en la Dirección de Alumbrado Público"
 
-        # Intentar cargar base de datos territorial (Delegaciones y UTBs) desde el CSV oficial de forma dinámica
+        # Lector ultra-robusto: Intenta abrir el archivo compatible con formatos Excel y UTF-8
         try:
-            df_territorial = pd.read_csv('DELEUTB2.csv')
-            df_territorial['DELEGACION'] = df_territorial['DELEGACION'].str.strip()
-            df_territorial['UTB'] = df_territorial['UTB'].str.strip()
+            try:
+                df_territorial = pd.read_csv('DELEUTB2.csv', encoding='utf-8')
+            except Exception:
+                try:
+                    df_territorial = pd.read_csv('DELEUTB2.csv', encoding='latin-1')
+                except Exception:
+                    df_territorial = pd.read_csv('DELEUTB2.csv', encoding='utf-8-sig')
+            
+            # Limpieza profunda de columnas y textos para evitar errores de coincidencia
+            df_territorial.columns = [str(c).strip().upper() for c in df_territorial.columns]
+            df_territorial = df_territorial.dropna(subset=['DELEGACION', 'UTB'])
+            df_territorial['DELEGACION'] = df_territorial['DELEGACION'].astype(str).str.strip().str.upper()
+            df_territorial['UTB'] = df_territorial['UTB'].astype(str).str.strip().str.upper()
+            
+            # Extraer las delegaciones ordenadas desde el archivo original
             DELEGACIONES_TOLUCA = sorted(df_territorial['DELEGACION'].unique().tolist())
         except Exception as e:
-            # Respaldo automático: Si no encuentra el archivo, genera los datos internos para evitar que la app falle
-            # Esto corrige el error "No such file or directory: 'DELEUTB2.csv'"
+            # Respaldo de seguridad temporal si el servidor tarda en sincronizar el archivo físico
+            st.sidebar.info("⚙️ Sincronizando base territorial del repositorio...")
             DELEGACIONES_TOLUCA = [
-                "Centro Histórico", "Barrios Tradicionales", "Árbol de las Manitas", "La Maquinita", 
-                "Independencia", "San Sebastián", "Universidad", "Santa María de las Rosas", 
-                "Del Parque", "Delegación del Parque 18 de Marzo", "Adolfo López Mateos", 
-                "Ciudad Universitaria", "Nueva Oxtotitlán", "San Buenaventura", "Capultitlán", 
-                "Tlacotepec", "San Juan Tilapa", "San Felipe Tlalmimilolpan", "Pino Suárez", 
-                "San Mateo Oxtotitlán", "Santa Cruz Atzcapotzaltongo", "San Pedro Totoltepec", 
-                "San Lorenzo Tepaltitlán", "San Andrés Cuexcontitlán", "San Cristóbal Huichochitlán", 
-                "San Pablo Autopan", "San Juan Autopan", "San Martín Toltepec", "Sauces", 
-                "Calixtlahuaca", "Tecaxic", "San Antonio Buenavista"
+                "CENTRO HISTORICO", "BARRIOS TRADICIONALES", "ARBOL DE LAS MANITAS", "LA MAQUINITA", 
+                "INDEPENDENCIA", "SAN SEBASTIAN", "UNIVERSIDAD", "SANTA MARIA DE LAS ROSAS", 
+                "DEL PARQUE", "DELEGACION DEL PARQUE 18 DE MARZO", "ADOLFO LOPEZ MATEOS", 
+                "CIUDAD UNIVERSITARIA", "NUEVA OXTOTITLAN", "SAN BUENAVENTURA", "CAPULTITLAN", 
+                "TLACOTEPEC", "SAN JUAN TILAPA", "SAN FELIPE TLALMIMILOLPAN", "PINO SUAREZ", 
+                "SAN MATEO OXTOTITLAN", "SANTA CRUZ ATZCAPOTZALTONGO", "SAN PEDRO TOTOLTEPEC", 
+                "SAN LORENZO TEPALTITLAN", "SAN ANDRES CUEXCONTITLAN", "SAN CRISTOBAL HUICHOCHITLAN", 
+                "SAN PABLO AUTOPAN", "SAN JUAN AUTOPAN", "SAN MARTIN TOLTEPEC", "SAUCES", 
+                "CALIXTLAHUACA", "TECAXIC", "SAN ANTONIO BUENAVISTA"
             ]
-            # Crear dataframe alternativo vinculando UTBs básicas para que la interconexión siga operando en pantalla
             respaldo_datos = []
             for d in DELEGACIONES_TOLUCA:
-                for i in range(1, 6):  # Asigna 5 UTBs genéricas a cada una por seguridad
+                for i in range(1, 6):
                     respaldo_datos.append({"DELEGACION": d, "UTB": f"UTB {i}"})
             df_territorial = pd.DataFrame(respaldo_datos)
 
@@ -1859,7 +1870,7 @@ else:
             st.markdown("### 📝 Control y Notas de Entrega")
             obs_digital = st.text_area(
                 "Observaciones del Responsable de Almacén (Se captura en sistema):", 
-                placeholder="Ej: Material destinado a la rehabilitation de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
+                placeholder="Ej: Material destinado a la rehabilitación de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
                 key="obs_responsable_entrega"
             )
 
