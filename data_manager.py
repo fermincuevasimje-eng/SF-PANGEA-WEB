@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import json
 import config
@@ -23,3 +24,9 @@ def cargar_vales():
 def guardar_vales(lista_vales):
     with open(config.ARCHIVO_VALES, 'w', encoding='utf-8') as f:
         json.dump(lista_vales, f, ensure_ascii=False, indent=4)
+
+def reiniciar_sistema():
+    if os.path.exists(config.ARCHIVO_INVENTARIO):
+        os.remove(config.ARCHIVO_INVENTARIO)
+    if os.path.exists(config.ARCHIVO_VALES):
+        os.remove(config.ARCHIVO_VALES)
