@@ -1695,6 +1695,27 @@ else:
                 st.error("No se detectaron coordenadas válidas en los archivos.")
 
     elif st.session_state.menu == "SF6":
+        # ==========================================
+        # --- FILTRO 1: INICIO MAESTRO DEL SISTEMA (PIN 1827) ---
+        # ==========================================
+        if "maestro_auth" not in st.session_state:
+            st.session_state.maestro_auth = False
+
+        if not st.session_state.maestro_auth:
+            st.title("🔒 SF6 - Suite de Gestión Municipal (DAP)")
+            st.markdown("### **Control de Acceso Institucional**")
+            st.caption("Por seguridad de la Dirección de Alumbrado Público, ingrese el PIN Maestro para inicializar el módulo.")
+            
+            pass_maestro = st.text_input("🔑 Ingrese PIN Maestro:", type="password", key="pass_maestro_root")
+            if st.button("🔓 Inicializar Sistema", use_container_width=True, type="primary"):
+                if pass_maestro == "1827":
+                    st.session_state.maestro_auth = True
+                    st.success("🎉 Acceso Maestro concedido. Inicializando entorno...")
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.error("❌ PIN Maestro incorrecto. Acceso denegado al módulo SF6.")
+            st.stop()
         # --- El sistema continúa con todo su poder si el PIN Maestro es correcto ---
         st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
         
