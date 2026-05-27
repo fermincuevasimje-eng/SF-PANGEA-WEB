@@ -2439,22 +2439,27 @@ else:
                 
                 if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
                     try:
-                        if os.path.exists('inventario_dap_guardado.csv'):
-                            os.remove('inventario_dap_guardado.csv')
-                        if os.path.exists('vales_historial_guardado.json'):
-                            os.remove('vales_historial_guardado.json')
-                        
-                        # Reconfiguración in-memory inmediata en ceros
-                        df_base = pd.DataFrame(STOCK_INICIAL)
+                        # --- MODIFICACIÓN: Preservar el catálogo actual (Altas/Bajas) y solo resetear cantidades ---
+                        if "db_inventario" in st.session_state:
+                            df_base = st.session_state.db_inventario.copy()
+                        else:
+                            df_base = pd.DataFrame(STOCK_INICIAL)
+                            
                         df_base['Stock'] = 0  
                         df_base['Min'] = 0    
                         df_base.to_csv('inventario_dap_guardado.csv', index=False)
                         
                         st.session_state.db_inventario = df_base
-                        st.session_state.vales_historial = []
-                        st.session_state.maestro_auth = False  # Saca de sesión por seguridad
                         
-                        st.success("🎉 ¡Formateo Exitoso! El sistema ha sido desplegado a producción real en ceros.")
+                        # Limpiar solo el historial de vales de simulación
+                        if os.path.exists('vales_historial_guardado.json'):
+                            os.remove('vales_historial_guardado.json')
+                        st.session_state.vales_historial = []
+                        
+                        if "maestro_auth" in st.session_state:
+                            st.session_state.maestro_auth = False  # Saca de sesión por seguridad
+                        
+                        st.success("🎉 ¡Formateo Exitoso! El sistema ha sido desplegado a producción real conservando tu catálogo personalizado.")
                         time.sleep(1.5)
                         st.rerun()
                     except Exception as e:
