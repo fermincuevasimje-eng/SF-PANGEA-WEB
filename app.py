@@ -5,6 +5,7 @@ from scipy.spatial.distance import cdist
 import re, unicodedata, simplekml, io, requests, time, os, json, base64
 from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
+import config
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
 st.set_page_config(page_title="SF PANGEA V24", layout="wide")
@@ -1718,7 +1719,7 @@ else:
         # --- El sistema continúa con todo su poder si el PIN Maestro es correcto ---
         st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
         
-        PIN_ALMACEN = "DAP-2026"
+        #PIN_ALMACEN = "DAP-2026"
         LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento de Toluca y se genera en la Dirección de Alumbrado Público"
 
         # Lector ultra-robusto: Intenta abrir el archivo compatible con formatos Excel y UTF-8
@@ -2341,7 +2342,7 @@ else:
                 st.warning("🔒 Este apartado requiere clave de acceso de Almacén.")
                 pass_in = st.text_input("🔑 Ingrese PIN de Almacén:", type="password")
                 if st.button("🔓 Conceder Acceso"):
-                    if pass_in == PIN_ALMACEN:
+                    if pass_in == config.PIN_ALMACEN:
                         st.session_state.admin_auth = True
                         st.rerun()
                     else:
