@@ -2382,11 +2382,14 @@ else:
                                 st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
                                 try:
                                 st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                                st.success("✅ Alta registrada.")
-                            except Exception as e:
-                                st.error(f"❌ Error al guardar archivo: {e}")
-                            time.sleep(0.5)
-                            st.rerun()
+                                # --- BLOQUE CORREGIDO CON LA INDENTACIÓN CORRECTA ---
+                        try:
+                            st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                            st.success(f"📦 Entrada registrada correctamente.")
+                        except Exception as e:
+                            st.error(f"❌ Error al guardar archivo: {e}")
+                        
+                        st.rerun()
 
                 # --- APARTADO C: BAJA DEL CATÁLOGO ---
                 with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
