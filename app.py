@@ -2379,17 +2379,21 @@ else:
                         if st.button("🚀 REGISTRAR NUEVO MATERIAL INMUEBLE", use_container_width=True):
                             if nuevo_nombre and nuevo_nombre not in df_inv['Material'].tolist():
                                 nuevo_registro = {"ID": f"MAT-{len(df_inv)+1}", "Material": nuevo_nombre, "Stock": stock_inicial_item, "Min": minimo_alerta, "Unidad": nueva_unidad}
+                                
+                                # Actualizamos en memoria
                                 st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
+                                
+                                # Guardamos con protección de errores
                                 try:
-                                st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                                # --- BLOQUE CORREGIDO CON LA INDENTACIÓN CORRECTA ---
-                        try:
-                            st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                            st.success(f"📦 Entrada registrada correctamente.")
-                        except Exception as e:
-                            st.error(f"❌ Error al guardar archivo: {e}")
-                        
-                        st.rerun()
+                                    st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                                    st.success("✅ Alta registrada.")
+                                except Exception as e:
+                                    st.error(f"❌ Error al guardar archivo: {e}")
+                                
+                                time.sleep(0.5)
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ Nombre vacío o el material ya existe.")
 
                 # --- APARTADO C: BAJA DEL CATÁLOGO ---
                 with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
