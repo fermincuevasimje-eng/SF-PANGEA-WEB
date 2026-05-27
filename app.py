@@ -2360,9 +2360,11 @@ else:
                         if st.button("✅ ACTUALIZAR STOCK", use_container_width=True, key="btn_actualizar_stock_live"):
                             idx = df_inv[df_inv['Material'] == m_in].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] += c_in
-                            st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                            st.success(f"📦 Entrada registrada correctamente.")
-                            time.sleep(0.5)
+                            try:
+                                st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                                st.success(f"📦 Entrada registrada correctamente.")
+                            except Exception as e:
+                                st.error(f"❌ Error al guardar archivo: {e}")
                             st.rerun()
                 
                 # --- APARTADO B: ALTA EN EL CATÁLOGO ---
