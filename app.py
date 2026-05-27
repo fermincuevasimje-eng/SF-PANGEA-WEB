@@ -2369,7 +2369,7 @@ else:
                             idx = df_inv[df_inv['Material'] == m_in].index[0]
                             st.session_state.db_inventario.at[idx, 'Stock'] += c_in
                             try:
-                                st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                                data_manager.guardar_inventario(st.session_state.db_inventario)
                                 st.success(f"📦 Entrada registrada correctamente.")
                             except Exception as e:
                                 st.error(f"❌ Error al guardar archivo: {e}")
@@ -2393,7 +2393,7 @@ else:
                                 
                                 # Guardamos con protección de errores
                                 try:
-                                    st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                                    data_manager.guardar_inventario(st.session_state.db_inventario)
                                     st.success("✅ Alta registrada.")
                                 except Exception as e:
                                     st.error(f"❌ Error al guardar archivo: {e}")
@@ -2413,7 +2413,7 @@ else:
                             st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
                             
                             try:
-                                st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                                data_manager.guardar_inventario(st.session_state.db_inventario)
                                 st.success("🗑️ El ítem ha sido borrado.")
                             except Exception as e:
                                 st.error(f"❌ Error al guardar archivo: {e}")
