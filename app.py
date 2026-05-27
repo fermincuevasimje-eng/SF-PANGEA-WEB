@@ -2299,7 +2299,7 @@ else:
                 st.markdown("#### **Informe Resultante de Material en Calle**")
                 st.dataframe(df_filtrado[["Vale", "Fecha", "Brigada", "Del. Programada", "Del. Real (Aplicada)", "UTB Real (Aplicada)", "Material", "Entregado", "Utilizado", "Devuelto", "Unidad"]], use_container_width=True, hide_index=True)
                 
-                st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
+               st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
                 c_m1, c_m2, c_m3 = st.columns(3)
                 c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas")
                 c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas")
@@ -2307,17 +2307,6 @@ else:
                 
                 # --- MODIFICACIÓN: Blindaje de la librería io para el reporte de Excel ---
                 import io
-                output_rep = io.BytesIO()
-                with pd.ExcelWriter(output_rep, engine='openpyxl') as writer:
-                    df_filtrado.to_excel(writer, index=False, sheet_name='Reporte_Consumos_DAP')
-                st.download_button(label="📄 DESCARGAR REPORTE FILTRADO EN EXCEL", data=output_rep.getvalue(), file_name=f"Reporte_Consumos_DAP_{pd.Timestamp.now().strftime('%d-%m-%Y')}.xlsx", use_container_width=True)
-                
-                st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
-                c_m1, c_m2, c_m3 = st.columns(3)
-                c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas")
-                c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas")
-                c_m3.metric("🔄 Total Devuelto", f"{int(df_filtrado['Devuelto'].sum())} pzas")
-                
                 output_rep = io.BytesIO()
                 with pd.ExcelWriter(output_rep, engine='openpyxl') as writer:
                     df_filtrado.to_excel(writer, index=False, sheet_name='Reporte_Consumos_DAP')
