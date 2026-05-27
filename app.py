@@ -2465,20 +2465,18 @@ else:
                 
                 if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
                     try:
-                        if os.path.exists('inventario_dap_guardado.csv'):
-                            os.remove('inventario_dap_guardado.csv')
-                        if os.path.exists('vales_historial_guardado.json'):
-                            os.remove('vales_historial_guardado.json')
+                        # Usamos nuestro encargado de almacén
+                        data_manager.reiniciar_sistema()
                         
-                        # Reconfiguración in-memory inmediata en ceros
+                        # Reconfiguración in-memory
                         df_base = pd.DataFrame(STOCK_INICIAL)
                         df_base['Stock'] = 0  
                         df_base['Min'] = 0    
-                        df_base.to_csv('inventario_dap_guardado.csv', index=False)
+                        data_manager.guardar_inventario(df_base)
                         
                         st.session_state.db_inventario = df_base
                         st.session_state.vales_historial = []
-                        st.session_state.maestro_auth = False  # Saca de sesión por seguridad
+                        st.session_state.maestro_auth = False 
                         
                         st.success("🎉 ¡Formateo Exitoso! El sistema ha sido desplegado a producción real en ceros.")
                         time.sleep(1.5)
