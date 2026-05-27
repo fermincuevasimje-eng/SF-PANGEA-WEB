@@ -1991,7 +1991,7 @@ else:
                     st.session_state.carrito_vale = []
                     st.rerun()
                 
-                iif col_v2.button(f"🚀 PROCESAR Y EMITIR VALE ({folio_actual})", type="primary", use_container_width=True):
+                if col_v2.button(f"🚀 PROCESAR Y EMITIR VALE ({folio_actual})", type="primary", use_container_width=True):
                     folios_existentes = [v["Folio"] for v in st.session_state.vales_historial]
                     
                     if folio_actual in folios_existentes:
