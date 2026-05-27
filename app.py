@@ -2403,8 +2403,13 @@ else:
                         
                         if st.button("💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
                             st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
-                            st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                            st.success("🗑️ El ítem ha sido borrado.")
+                            
+                            try:
+                                st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                                st.success("🗑️ El ítem ha sido borrado.")
+                            except Exception as e:
+                                st.error(f"❌ Error al guardar archivo: {e}")
+                            
                             time.sleep(0.5)
                             st.rerun()
                 
