@@ -2230,26 +2230,33 @@ else:
                     error_cantidades = False
                     for index, row in df_editado.iterrows():
                         if (row["Utilizado"] + row["Devuelto"]) > row["Cantidad"]:
-                            st.error(f"⚠️ Error en {row['Material']}: La suma supera la cantidad entregada original ({row['Cantidad']}).")
+                            st.error(f"⚠️ Error en {row['Material']}: La suma supera lo entregado.")
                             error_cantidades = True
                     
                     if not error_cantidades:
-                        for index, row in df_editado.iterrows():
-                            dif_devolucion = row["Devuelto"] - df_materiales_vale.loc[index, "Devuelto"]
-                            if dif_devolucion > 0:
-                                idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
-                                st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
+                        try:
+                            # 1. Actualización de inventario
+                            for index, row in df_editado.iterrows():
+                                dif_devolucion = row["Devuelto"] - df_materiales_vale.loc[index, "Devuelto"]
+                                if dif_devolucion > 0:
+                                    idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
+                                    st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
+                            
+                            # 2. Persistencia (CSV e Historial)
+                            st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
+                            st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
+                            st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
+                            st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
+                            st.session_state.vales_historial[idx_vale]["Estado"] = "Conciliado"
+                            
+                            with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
+                                json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
+                            
+                            st.success(f"📊 Cierre técnico procesado con éxito.")
                         
-                        st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
-                        st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
-                        st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
-                        st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
-                        st.session_state.vales_historial[idx_vale]["Estado"] = "Conciliado"
+                        except Exception as e:
+                            st.error(f"❌ Error al guardar la conciliación: {e}")
                         
-                        with open('vales_historial_guardado.json', 'w', encoding='utf-8') as f:
-                            json.dump(st.session_state.vales_historial, f, ensure_ascii=False, indent=4)
-                        
-                        st.success(f"📊 Cierre técnico del folio {v_select} procesado con éxito.")
                         time.sleep(0.5)
                         st.rerun()
                 
