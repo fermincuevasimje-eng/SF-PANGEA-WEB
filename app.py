@@ -1692,7 +1692,29 @@ else:
             else:
                 st.error("No se detectaron coordenadas válidas en los archivos.")
 
-    elif st.session_state.menu == "SF6":      
+    elif st.session_state.menu == "SF6":
+        # ==========================================
+        # --- FILTRO 1: INICIO MAESTRO DEL SISTEMA (PIN 1827) ---
+        # ==========================================
+        if "maestro_auth" not in st.session_state:
+            st.session_state.maestro_auth = False
+
+        if not st.session_state.maestro_auth:
+            st.title("🔒 SF6 - Suite de Gestión Municipal (DAP)")
+            st.markdown("### **Control de Acceso Institucional**")
+            st.caption("Por seguridad de la Dirección de Alumbrado Público, ingrese el PIN Maestro para inicializar el módulo.")
+            
+            pass_maestro = st.text_input("🔑 Ingrese PIN Maestro:", type="password", key="pass_maestro_root")
+            if st.button("🔓 Inicializar Sistema", use_container_width=True, type="primary"):
+                if pass_maestro == "1827":
+                    st.session_state.maestro_auth = True
+                    st.success("🎉 Acceso Maestro concedido. Inicializando entorno...")
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.error("❌ PIN Maestro incorrecto. Acceso denegado al módulo SF6.")
+            st.stop()
+
         # --- El sistema continúa con todo su poder si el PIN Maestro es correcto ---
         st.title("📦 SF6 - Sistema de Gestión de Almacén (DAP)")
         
@@ -1977,57 +1999,53 @@ else:
                     else:
                         # --- CONSTRUCCIÓN COMPLETA DEL DOCUMENTO FPDF ---
                         from fpdf import FPDF
-                        
-                        def safe_text(text):
-                            return str(text).encode('latin-1', 'replace').decode('latin-1')
-                            
                         pdf = FPDF()
                         pdf.add_page()
                         
                         pdf.set_font("Arial", 'B', 14)
-                        pdf.cell(0, 10, safe_text("AYUNTAMIENTO DE TOLUCA"), ln=True, align='C')
+                        pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
                         pdf.set_font("Arial", 'B', 12)
-                        pdf.cell(0, 8, safe_text("DIRECCIÓN DE ALUMBRADO PÚBLICO"), ln=True, align='C')
-                        pdf.cell(0, 8, safe_text(f"VALE OFICIAL DE SALIDA: {folio_actual}"), ln=True, align='C')
+                        pdf.cell(0, 8, "DIRECCION DE ALUMBRADO PUBLICO", ln=True, align='C')
+                        pdf.cell(0, 8, f"VALE OFICIAL DE SALIDA: {folio_actual}", ln=True, align='C')
                         pdf.ln(8)
                         
                         pdf.set_font("Arial", '', 10)
-                        pdf.cell(0, 6, safe_text(f"Fecha y Hora de Emisión: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}"), ln=True)
-                        pdf.cell(0, 6, safe_text(f"Ubicación Geográfica: {delegacion_sel} - {utb_sel}"), ln=True)
+                        pdf.cell(0, 6, f"Fecha y Hora de Emision: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
+                        pdf.cell(0, 6, f"Ubicacion Geografica: {delegacion_sel} - {utb_sel}", ln=True)
                         pdf.set_font("Arial", 'B', 10)
-                        pdf.cell(0, 6, safe_text(f"UNIDAD / BRIGADA DESTINO: {bri_sel.upper()}"), ln=True)
+                        pdf.cell(0, 6, f"UNIDAD / BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
                         pdf.ln(4)
                         
                         pdf.set_fill_color(230, 235, 240)
                         pdf.set_font("Arial", 'B', 10)
-                        pdf.cell(110, 8, safe_text(" Descripción del Material / Insumo"), 1, 0, 'L', True)
-                        pdf.cell(36, 8, safe_text("Entregado"), 1, 0, 'C', True)
-                        pdf.cell(22, 8, safe_text("Utilizado"), 1, 0, 'C', True)
-                        pdf.cell(22, 8, safe_text("Devuelto"), 1, 1, 'C', True)
+                        pdf.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
+                        pdf.cell(36, 8, "Entregado", 1, 0, 'C', True)
+                        pdf.cell(22, 8, "Utilizado", 1, 0, 'C', True)
+                        pdf.cell(22, 8, "Devuelto", 1, 1, 'C', True)
                         
                         pdf.set_font("Arial", '', 10)
                         for it in st.session_state.carrito_vale:
-                            pdf.cell(110, 8, safe_text(f" {it['Material']}"), 1, 0, 'L')
-                            pdf.cell(36, 8, safe_text(f"{it['Cantidad']} {it['Unidad']}"), 1, 0, 'C')
+                            pdf.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
+                            pdf.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
                             pdf.cell(22, 8, "", 1, 0, 'C')
                             pdf.cell(22, 8, "", 1, 1, 'C')
                         pdf.ln(6)
                         
                         pdf.set_font("Arial", 'B', 10)
-                        pdf.cell(0, 6, safe_text("Observaciones del Responsable de Almacén (Sistema):"), ln=True)
+                        pdf.cell(0, 6, "Observaciones del Responsable de Almacen (Sistema):", ln=True)
                         pdf.set_font("Arial", 'I', 9)
                         msg_obs = obs_digital if obs_digital.strip() else "Ninguna anotada en sistema al momento de la salida."
-                        pdf.multi_cell(0, 5, safe_text(msg_obs), 1)
+                        pdf.multi_cell(0, 5, msg_obs.encode('latin-1', 'replace').decode('latin-1'), 1)
                         pdf.ln(4)
                         
                         pdf.set_font("Arial", 'B', 10)
-                        pdf.cell(0, 6, safe_text("Observaciones de la Brigada al Recibir (Llenar en Físico a Mano):"), ln=True)
+                        pdf.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Fisico a Mano):", ln=True)
                         pdf.set_fill_color(255, 255, 255)
                         pdf.cell(0, 15, "", 1, ln=True, fill=True)
                         pdf.ln(10)
                         
                         pdf.set_font("Arial", 'I', 9)
-                        pdf.multi_cell(0, 5, safe_text(LEYENDA_OFICIAL), align='C')
+                        pdf.multi_cell(0, 5, LEYENDA_OFICIAL.encode('latin-1', 'replace').decode('latin-1'), align='C')
                         pdf.ln(12)
                         
                         y_pos_firmas = pdf.get_y()
@@ -2036,25 +2054,22 @@ else:
                         pdf.set_xy(15, y_pos_firmas)
                         pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
                         pdf.set_xy(15, y_pos_firmas + 4)
-                        pdf.cell(75, 4, safe_text("RESPONSABLE DE ENTREGA DE MATERIAL"), ln=False, align='C')
+                        pdf.cell(75, 4, "RESPONSABLE DE ENTREGA DE MATERIAL", ln=False, align='C')
                         pdf.set_xy(15, y_pos_firmas + 8)
                         pdf.set_font("Arial", '', 7)
-                        pdf.cell(75, 4, safe_text("(Firma y Sello de Almacén DAP)"), ln=False, align='C')
+                        pdf.cell(75, 4, "(Firma y Sello de Almacen DAP)", ln=False, align='C')
                         
                         pdf.set_font("Arial", 'B', 8)
                         pdf.set_xy(115, y_pos_firmas)
                         pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
                         pdf.set_xy(115, y_pos_firmas + 4)
-                        pdf.cell(75, 4, safe_text("RESPONSABLE QUE RECIBE MATERIAL"), ln=False, align='C')
+                        pdf.cell(75, 4, "RESPONSABLE QUE RECIBE MATERIAL", ln=False, align='C')
                         pdf.set_xy(115, y_pos_firmas + 8)
                         pdf.set_font("Arial", '', 7)
-                        pdf.cell(75, 4, safe_text(f"({bri_sel.upper()})"), ln=False, align='C')
+                        pdf.cell(75, 4, f"({bri_sel.upper()})", ln=False, align='C')
                         
                         pdf_output = pdf.output(dest='S')
-                        if type(pdf_output) is bytearray:
-                            pdf_bytes = bytes(pdf_output)
-                        else:
-                            pdf_bytes = str(pdf_output).encode('latin-1', 'replace')
+                        pdf_bytes = pdf_output.encode('latin-1', 'replace') if isinstance(pdf_output, str) else pdf_output
                         
                         for item in st.session_state.carrito_vale:
                             idx = df_inv[df_inv['Material'] == item['Material']].index[0]
@@ -2221,8 +2236,7 @@ else:
                     if not error_cantidades:
                         for index, row in df_editado.iterrows():
                             dif_devolucion = row["Devuelto"] - df_materiales_vale.loc[index, "Devuelto"]
-                            # --- MODIFICACIÓN: Ahora soporta devoluciones y correcciones negativas sin descuadrar el stock ---
-                            if dif_devolucion != 0:
+                            if dif_devolucion > 0:
                                 idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == row['Material']].index[0]
                                 st.session_state.db_inventario.at[idx_inv, 'Stock'] += dif_devolucion
                         
@@ -2299,14 +2313,12 @@ else:
                 st.markdown("#### **Informe Resultante de Material en Calle**")
                 st.dataframe(df_filtrado[["Vale", "Fecha", "Brigada", "Del. Programada", "Del. Real (Aplicada)", "UTB Real (Aplicada)", "Material", "Entregado", "Utilizado", "Devuelto", "Unidad"]], use_container_width=True, hide_index=True)
                 
-               st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
+                st.markdown("**📊 Totales del Filtro de Aplicación Física:**")
                 c_m1, c_m2, c_m3 = st.columns(3)
                 c_m1.metric("📦 Total Entregado", f"{int(df_filtrado['Entregado'].sum())} pzas")
                 c_m2.metric("✅ Total Utilizado", f"{int(df_filtrado['Utilizado'].sum())} pzas")
                 c_m3.metric("🔄 Total Devuelto", f"{int(df_filtrado['Devuelto'].sum())} pzas")
                 
-                # --- MODIFICACIÓN: Blindaje de la librería io para el reporte de Excel ---
-                import io
                 output_rep = io.BytesIO()
                 with pd.ExcelWriter(output_rep, engine='openpyxl') as writer:
                     df_filtrado.to_excel(writer, index=False, sheet_name='Reporte_Consumos_DAP')
@@ -2428,27 +2440,22 @@ else:
                 
                 if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
                     try:
-                        # --- MODIFICACIÓN: Preservar el catálogo actual (Altas/Bajas) y solo resetear cantidades ---
-                        if "db_inventario" in st.session_state:
-                            df_base = st.session_state.db_inventario.copy()
-                        else:
-                            df_base = pd.DataFrame(STOCK_INICIAL)
-                            
+                        if os.path.exists('inventario_dap_guardado.csv'):
+                            os.remove('inventario_dap_guardado.csv')
+                        if os.path.exists('vales_historial_guardado.json'):
+                            os.remove('vales_historial_guardado.json')
+                        
+                        # Reconfiguración in-memory inmediata en ceros
+                        df_base = pd.DataFrame(STOCK_INICIAL)
                         df_base['Stock'] = 0  
                         df_base['Min'] = 0    
                         df_base.to_csv('inventario_dap_guardado.csv', index=False)
                         
                         st.session_state.db_inventario = df_base
-                        
-                        # Limpiar solo el historial de vales de simulación
-                        if os.path.exists('vales_historial_guardado.json'):
-                            os.remove('vales_historial_guardado.json')
                         st.session_state.vales_historial = []
+                        st.session_state.maestro_auth = False  # Saca de sesión por seguridad
                         
-                        if "maestro_auth" in st.session_state:
-                            st.session_state.maestro_auth = False  # Saca de sesión por seguridad
-                        
-                        st.success("🎉 ¡Formateo Exitoso! El sistema ha sido desplegado a producción real conservando tu catálogo personalizado.")
+                        st.success("🎉 ¡Formateo Exitoso! El sistema ha sido desplegado a producción real en ceros.")
                         time.sleep(1.5)
                         st.rerun()
                     except Exception as e:
