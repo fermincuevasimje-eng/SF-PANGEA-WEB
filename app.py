@@ -1768,24 +1768,23 @@ else:
         import json
 
         # Inicialización de Inventario Persistente fijado en 100 y 10 para la presentación
+        # Inicialización de Inventario (usa data_manager)
         if "db_inventario" not in st.session_state:
-            if os.path.exists('inventario_dap_guardado.csv'):
-                st.session_state.db_inventario = pd.read_csv('inventario_dap_guardado.csv')
+            inv_datos = data_manager.cargar_inventario()
+            if inv_datos is not None:
+                st.session_state.db_inventario = inv_datos
             else:
                 df_base = pd.DataFrame(STOCK_INICIAL)
-                df_base['Stock'] = 100  # Forzar stock ideal de presentación
-                df_base['Min'] = 10     # Forzar mínimo ideal de presentación
-                df_base.to_csv('inventario_dap_guardado.csv', index=False)
+                df_base['Stock'] = 100 
+                df_base['Min'] = 10    
+                data_manager.guardar_inventario(df_base)
                 st.session_state.db_inventario = df_base
 
-        # Inicialización de Historial de Vales Persistente
+        # Inicialización de Vales (usa data_manager)
         if "vales_historial" not in st.session_state:
-            if os.path.exists('vales_historial_guardado.json'):
-                with open('vales_historial_guardado.json', 'r', encoding='utf-8') as f:
-                    st.session_state.vales_historial = json.load(f)
-            else:
-                st.session_state.vales_historial = []
+            st.session_state.vales_historial = data_manager.cargar_vales()
 
+        # Variables de estado (se mantienen aquí porque son internas de la pantalla)
         if "carrito_vale" not in st.session_state:
             st.session_state.carrito_vale = []
         if "admin_auth" not in st.session_state:
