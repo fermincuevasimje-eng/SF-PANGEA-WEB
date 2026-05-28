@@ -886,7 +886,7 @@ else:
                             mc6.metric("⏱️ Tiempo Est.", t_estimado)
 
                             df_export_c = pd.DataFrame(ruta_ordenada)
-                            cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
+                            cols_vits = ['Ruta_Asignada', 'No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                             columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada']]
                             df_export_c = df_export_c[columnas_finales]
 
@@ -933,41 +933,57 @@ else:
                             csv_buffer.write(f"Tiempo Estimado:,{t_estimado}\n")
                             cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True)
 
-                            # --- KML LIMPIO Y BOTÓN CON KEY ÚNICO ---
-                        kml_c = simplekml.Kml()
-                        folder_c = kml_c.newfolder(name=f"🚚 Ruta Clásica")
-                        
-                        # Definimos qué columnas NO queremos en el KML
-                        columnas_prohibidas = ['lat_aux', 'lon_aux', 'Ruta_Asignada', 'Maps', 'ï»¿No_Ruta']
-                        
-                        for p in ruta_ordenada:
-                            # 1. Nombre en el mapa: Solo el nombre del ID (limpio)
-                            pnt = folder_c.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                            kml_c = simplekml.Kml()
+                            folder_c = kml_c.newfolder(name=f"🚚 Ruta Única Clásica ({len(ruta_ordenada)} Pts)")
                             
-                            h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
-                            h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
-                            
-                            # 2. Iteramos columnas filtrando las prohibidas
-                            for col in cols_orig:
-                                if col not in columnas_prohibidas:
+                            for p in ruta_ordenada:
+                                pnt = folder_c.newpoint(name=f"[Ruta_Unica-#{p['No_Ruta']}] {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                                h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
+                                h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
+                                for col in cols_orig:
                                     val = str(p.get(col, '')).strip()
                                     if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                            
-                            h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOSE OPERATIVO</b></td></tr>"
-                            h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
-                            h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
-                            h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                            h += "</table>]]>"
-                            pnt.description = h
+                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOSE OPERATIVO</b></td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
+                                h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
+                                h += f"<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>--- RESUMEN OPERATIVO DINÁMICO ---</b></td></tr>"
+                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ruta_ordenada)}</td></tr>"
+                                h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{tot_lums}</td></tr>"
+                                h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{tot_postes}</td></tr>"
+                                h += f"<tr><td><b>Total Cable Ruta:</b></td><td>{tot_cable} m</td></tr>"
+                                h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{t_estimado}</td></tr>"
+                                h += "</table>]]>"
+                                pnt.description = h
 
-                        # 3. Descarga con KEY ÚNICO para evitar el error de ID
-                        cc3.download_button(
-                            "🗺️ KML Maestro Clásico", 
-                            kml_c.kml(), 
-                            file_name=f"SF_CLASICA_{up_name}.kml", 
-                            use_container_width=True, 
-                            key="btn_c_kml_final"
-                        )
+                            if geo_trazo:
+                                ls = folder_c.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
+                                ls.coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls.style.linestyle.width = 6
+                                ls.style.linestyle.color = 'ff0000ff'
+                            else:
+                                ls = folder_c.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
+                                ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
+                                ls.style.linestyle.width = 4
+                                ls.style.linestyle.color = 'ff00ffff'
+
+                            cc3.download_button("🗺️ KML Maestro Clásico", kml_c.kml(), file_name=f"SF_CLASICA_{up_name}.kml", use_container_width=True)
+                            cc4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
+
+                            if st.button("💾 REGISTRAR RUTA CLÁSICA EN BITÁCORA", use_container_width=True, key="reg_c"):
+                                try:
+                                    conn = st.connection("gsheets", type=GSheetsConnection)
+                                    hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    info_j = f"Modo: Clásico, Pts: {len(ruta_ordenada)}, Lums: {tot_lums}, Cab: {tot_cable}m, Dist: {round(dist_real_km,1)}km"
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"CLASICA_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
+                                    st.balloons(); st.success("¡Bitácora actualizada!")
+                                except Exception as e: st.error(f"Error GSheets: {e}")
+                        else:
+                            st.error("No se pudieron extraer coordenadas válidas en Modo Clásico.")
+                    except Exception as e: st.error(f"Error en Motor Clásico: {e}")
 
         # ==========================================
         # PESTAÑA 2: NUEVO MOTOR MULTI-RUTA (PRO)
