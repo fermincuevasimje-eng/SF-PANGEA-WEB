@@ -925,11 +925,21 @@ else:
                                 ws.cell(row=res_row+6, column=1, value="Tiempo Estimado:")
                                 ws.cell(row=res_row+6, column=2, value=f'=INT({f_calc}/60) & " h " & MOD({f_calc},60) & " m"')
                                 
+                                # --- CORRECCIÓN DE SEGURIDAD PARA COLORES ---
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
+                                
                                 for r in range(2, last_row + 1):
-                                    if int(df_export_c.iloc[r-2]['Cant_Postes']) > 0:
+                                    # Obtenemos los valores de forma segura
+                                    val_postes = df_export_c.iloc[r-2]['Cant_Postes']
+                                    val_cable = df_export_c.iloc[r-2]['Cant_Cable_m']
+                                    
+                                    # Convertimos a float, si es NaN o texto vacío, lo convertimos a 0.0
+                                    p_val = float(val_postes) if pd.notnull(val_postes) and str(val_postes).strip() != '' else 0.0
+                                    c_val = float(val_cable) if pd.notnull(val_cable) and str(val_cable).strip() != '' else 0.0
+                                    
+                                    if p_val > 0:
                                         for cell in ws[r]: cell.fill = fg
-                                    elif int(df_export_c.iloc[r-2]['Cant_Cable_m']) > 0:
+                                    elif c_val > 0:
                                         for cell in ws[r]: cell.fill = fa
 
                             cc1.download_button("📗 Excel Pro Dinámico", buf_xlsx_c.getvalue(), file_name=f"SF_CLASICA_{up_name}.xlsx", use_container_width=True)
