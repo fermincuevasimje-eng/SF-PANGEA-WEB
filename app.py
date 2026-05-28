@@ -886,7 +886,7 @@ else:
                             mc6.metric("⏱️ Tiempo Est.", t_estimado)
 
                             df_export_c = pd.DataFrame(ruta_ordenada)
-                            cols_vits = ['Ruta_Asignada', 'No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
+                            cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
                             columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada']]
                             df_export_c = df_export_c[columnas_finales]
 
@@ -948,13 +948,6 @@ else:
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                h += f"<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>--- RESUMEN OPERATIVO DINÁMICO ---</b></td></tr>"
-                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ruta_ordenada)}</td></tr>"
-                                h += f"<tr><td><b>Total Luminarias Ruta:</b></td><td>{tot_lums}</td></tr>"
-                                h += f"<tr><td><b>Total Postes Ruta:</b></td><td>{tot_postes}</td></tr>"
-                                h += f"<tr><td><b>Total Cable Ruta:</b></td><td>{tot_cable} m</td></tr>"
-                                h += f"<tr><td><b>Distancia Total:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
-                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{t_estimado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
 
