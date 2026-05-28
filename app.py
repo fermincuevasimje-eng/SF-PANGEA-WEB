@@ -860,27 +860,31 @@ else:
                             tot_lums, tot_postes, tot_cable = 0, 0, 0
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
                             
-                            # Asegúrate de que el 'for' empiece alineado a la izquierda según tu archivo
-                            for idx_r, p in enumerate(ruta_ordenada, 1):
-                                p['Ruta_Asignada'] = "Ruta_Unica"
-                                p['No_Ruta'] = idx_r
-                                p['ID_Pangea_Nombre'] = p[id_col]
-                                
-                                # Conversión segura a número para evitar errores de texto
-                                lum_val = float(p['Cant_Luminarias']) if str(p['Cant_Luminarias']).replace('.','',1).isdigit() else 0
-                                post_val = float(p['Cant_Postes']) if str(p['Cant_Postes']).replace('.','',1).isdigit() else 0
-                                cable_val = float(p['Cant_Cable_m']) if str(p['Cant_Cable_m']).replace('.','',1).isdigit() else 0
-                                
-                                p['Cant_Luminarias'] = lum_val
-                                p['Cant_Postes'] = post_val
-                                p['Cant_Cable_m'] = cable_val
-                                
-                                p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
-                                
-                                tot_lums += lum_val
-                                tot_postes += post_val
-                                tot_cable += cable_val
-                            # -----------------------------
+                            # --- INICIO DEL CICLO REFORZADO ---
+                        for idx_r, p in enumerate(ruta_ordenada, 1):
+                            p['Ruta_Asignada'] = "Ruta_Unica"
+                            p['No_Ruta'] = idx_r
+                            p['ID_Pangea_Nombre'] = p.get(id_col, "Sin ID")
+                            
+                            # 1. Obtenemos datos de forma segura (usando .get para evitar KeyError)
+                            # Si no encuentra el valor, devuelve 0
+                            raw_lum = extraer_carga_robusta(p, 'lum') if 'extraer_carga_robusta' in globals() else 0
+                            raw_post = extraer_carga_robusta(p, 'poste') if 'extraer_carga_robusta' in globals() else 0
+                            raw_cable = extraer_carga_robusta(p, 'cable') if 'extraer_carga_robusta' in globals() else 0
+                            
+                            # 2. Convertimos a números limpios
+                            p['Cant_Luminarias'] = float(raw_lum) if str(raw_lum).replace('.','',1).isdigit() else (1 if raw_post==0 and raw_cable==0 else 0)
+                            p['Cant_Postes'] = float(raw_post) if str(raw_post).replace('.','',1).isdigit() else 0
+                            p['Cant_Cable_m'] = float(raw_cable) if str(raw_cable).replace('.','',1).isdigit() else 0
+                            
+                            # 3. Asignamos Maps
+                            p['Maps'] = f"https://www.google.com/maps?q={p.get('lat_aux', 0)},{p.get('lon_aux', 0)}"
+                            
+                            # 4. Sumamos a los totales
+                            tot_lums += p['Cant_Luminarias']
+                            tot_postes += p['Cant_Postes']
+                            tot_cable += p['Cant_Cable_m']
+                        # --- FIN DEL CICLO ---
 
                             p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
                             
