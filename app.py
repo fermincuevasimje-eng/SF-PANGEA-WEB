@@ -1600,9 +1600,9 @@ else:
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
-        # --- MOTOR DE PROCESAMIENTO REFORZADO ---
+        # --- MOTOR DE PROCESAMIENTO ---
         def motor_sf5(df_total):
-            # Aseguramos que todo sea texto para evitar errores de tipo
+            # Limpieza segura para evitar errores de tipo
             df_total = df_total.astype(str).fillna("")
             
             def motor_gps_v25(fila):
@@ -1611,18 +1611,18 @@ else:
                 if len(numeros) >= 2: return float(numeros[0]), float(numeros[1])
                 return None, None
 
-            # Extraemos coordenadas de forma segura
             coords = df_total.apply(motor_gps_v25, axis=1)
             df_total['lat_aux'] = [c[0] for c in coords]
             df_total['lon_aux'] = [c[1] for c in coords]
+            df_total = df_total.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
+            df_total['Grupo_Duplicado'] = 0
             
-            df_analisis = df_total.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
-            if df_analisis.empty: return None, None, None
+            if df_total.empty: return None, None, None
 
             # Algoritmo de 3 metros
             umbral = 3 / 111111.0
-            coords_arr = df_analisis[['lat_aux', 'lon_aux']].values
-            marcador = [0] * len(df_analisis)
+            coords_arr = df_total[['lat_aux', 'lon_aux']].values
+            marcador = [0] * len(df_total)
             color_id = 1
             for i in range(len(coords_arr)):
                 if marcador[i] != 0: continue
@@ -1635,12 +1635,11 @@ else:
                     marcador[i] = color_id
                     color_id += 1
             
-            df_analisis['Grupo_Duplicado'] = marcador
-            indices_h1 = [idx for idx, row in df_analisis.iterrows() if row['Grupo_Duplicado'] == 0 or row['Grupo_Duplicado'] not in {r['Grupo_Duplicado'] for i, r in df_analisis.iloc[:idx].iterrows()}]
-            
-            return df_analisis, df_analisis.loc[indices_h1].copy(), df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
+            df_total['Grupo_Duplicado'] = marcador
+            indices_h1 = [idx for idx, row in df_total.iterrows() if row['Grupo_Duplicado'] == 0 or row['Grupo_Duplicado'] not in {r['Grupo_Duplicado'] for i, r in df_total.iloc[:idx].iterrows()}]
+            return df_total, df_total.loc[indices_h1].copy(), df_total[df_total['Grupo_Duplicado'] > 0].copy()
 
-        # --- DASHBOARD Y BOTONES (RESTORED) ---
+        # --- INTERFAZ ---
         def renderizar_interfaz(da, h1, h2, suffix):
             st.markdown("### 📈 Dashboard de Depuración SF5")
             m_cols = st.columns(5)
@@ -1655,8 +1654,16 @@ else:
                 col.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {colr};'><b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{val}</span></div>", unsafe_allow_html=True)
 
             out = io.BytesIO()
+            from openpyxl.styles import PatternFill
+            yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+
             with pd.ExcelWriter(out, engine='openpyxl') as w:
-                h1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'], errors='ignore').to_excel(w, index=False, sheet_name='PARA_MODULO_1')
+                h1.to_excel(w, index=False, sheet_name='PARA_MODULO_1')
+                ws = w.sheets['PARA_MODULO_1']
+                # Aplicamos color amarillo a duplicados
+                for row_num, (index, row) in enumerate(h1.iterrows(), 2):
+                    if row['Grupo_Duplicado'] > 0:
+                        for cell in ws[row_num]: cell.fill = yellow_fill
                 h2.to_excel(w, index=False, sheet_name='REPORTE_DUPLICADOS')
             
             st.write("---")
@@ -1672,13 +1679,18 @@ else:
         with tab_multi:
             f_in = st.file_uploader("📂 Archivos", accept_multiple_files=True, key="m_in_sf5")
             if f_in:
-                dfs = [pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str) for f in f_in]
+                dfs = []
+                for f in f_in:
+                    df = pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str)
+                    df['ARCHIVO_ORIGEN'] = f.name
+                    dfs.append(df)
                 da, h1, h2 = motor_sf5(pd.concat(dfs, ignore_index=True))
                 if da is not None: renderizar_interfaz(da, h1, h2, "multi")
         with tab_auditoria:
             f_in = st.file_uploader("📂 Archivo", accept_multiple_files=False, key="s_in_sf5")
             if f_in:
                 df = pd.read_excel(f_in, dtype=str) if f_in.name.endswith('.xlsx') else pd.read_csv(f_in, dtype=str)
+                df['ARCHIVO_ORIGEN'] = f_in.name
                 da, h1, h2 = motor_sf5(df)
                 if da is not None: renderizar_interfaz(da, h1, h2, "audit")
     elif st.session_state.menu == "SF6":
