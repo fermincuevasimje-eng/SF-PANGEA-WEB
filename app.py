@@ -1577,15 +1577,14 @@ else:
                     st.success("✅ Bóveda Actualizada."); time.sleep(1); st.rerun()
 
                 if motor_pdf_listo:
-                    if motor_pdf_listo:
                     # Inicialización con formato carta y márgenes (en mm)
                     # set_margins(left, top, right) -> 30mm, 25mm, 20mm
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf.set_margins(30, 25, 20)
-                    pdf.set_auto_page_break(auto=True, margin=25) # 25mm = 2.5cm inferior
+                    pdf.set_auto_page_break(auto=True, margin=25) 
                     pdf.add_page()
                     
-                    # Espaciado si hay membrete (ajustado para los nuevos márgenes)
+                    # Espaciado si hay membrete
                     if h_membrete: 
                         pdf.ln(15)
                     pdf.set_font("Arial", 'B', 11)
