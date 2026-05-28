@@ -1645,8 +1645,8 @@ else:
             
             return df_analisis, df_analisis.loc[indices_hoja1].copy(), df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
 
-        # --- DASHBOARD Y BOTONES ORIGINALES ---
-        def renderizar_interfaz(df_analisis, df_hoja1, df_hoja2):
+        # --- DASHBOARD Y BOTONES CON KEYS ÚNICOS ---
+        def renderizar_interfaz(df_analisis, df_hoja1, df_hoja2, suffix): # <--- AÑADIMOS 'suffix'
             st.markdown("### 📈 Dashboard de Depuración SF5")
             m_cols = st.columns(5)
             cant_procesados, cant_en_conflicto = len(df_analisis), len(df_hoja2)
@@ -1669,20 +1669,24 @@ else:
                 df_hoja2.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
 
             st.write("---")
-            st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
+            # AÑADIMOS KEY ÚNICO AQUÍ
+            st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True, key=f"dl_{suffix}")
 
-            if st.button("➡️ ENVIAR DATOS LIMPIOS AL GENERADOR DE RUTAS (SF1)", use_container_width=True, type="primary"):
+            # AÑADIMOS KEY ÚNICO AQUÍ
+            if st.button("➡️ ENVIAR DATOS LIMPIOS AL GENERADOR DE RUTAS (SF1)", use_container_width=True, type="primary", key=f"btn_{suffix}"):
                 st.session_state.df_transferido = df_hoja1.copy()
                 st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
                 st.session_state.menu = "SF1"
                 st.rerun()
 
-        # --- ESTRUCTURA DE PESTAÑAS ---
+        # --- ESTRUCTURA DE PESTAÑAS (LLAMADAS ACTUALIZADAS) ---
         tab_multi, tab_auditoria = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (Un archivo)"])
 
         with tab_multi:
+            # ... (código de subida de archivos igual) ...
             files_sf5 = st.file_uploader("📂 Cargar archivos de reportes", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v25")
             if files_sf5:
+                # ... (código de lógica igual) ...
                 dfs = []
                 for f in files_sf5:
                     df_f = pd.read_excel(f, dtype=str).fillna("") if f.name.endswith('.xlsx') else pd.read_csv(f, encoding='latin-1', dtype=str).fillna("")
@@ -1690,16 +1694,15 @@ else:
                     dfs.append(df_f)
                 df_total = pd.concat(dfs, ignore_index=True)
                 da, h1, h2 = motor_sf5(df_total)
-                if da is not None: renderizar_interfaz(da, h1, h2)
-                else: st.error("No se detectaron coordenadas.")
+                if da is not None: renderizar_interfaz(da, h1, h2, suffix="multi") # <--- AÑADIMOS SUFFIX
 
         with tab_auditoria:
+            # ... (código de subida de archivo igual) ...
             file_unico = st.file_uploader("📂 Cargar archivo único", type=["csv", "xlsx"], accept_multiple_files=False, key="single_sf5_v25")
             if file_unico:
                 df_f = pd.read_excel(file_unico, dtype=str).fillna("") if file_unico.name.endswith('.xlsx') else pd.read_csv(file_unico, encoding='latin-1', dtype=str).fillna("")
                 da, h1, h2 = motor_sf5(df_f)
-                if da is not None: renderizar_interfaz(da, h1, h2)
-                else: st.error("No se detectaron coordenadas.")
+                if da is not None: renderizar_interfaz(da, h1, h2, suffix="auditoria") # <--- AÑADIMOS SUFFIX
 
     elif st.session_state.menu == "SF6":
         # ==========================================
