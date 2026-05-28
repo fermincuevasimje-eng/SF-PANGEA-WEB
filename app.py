@@ -861,17 +861,26 @@ else:
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
                             
                             for idx_r, p in enumerate(ruta_ordenada, 1):
-                                p['Ruta_Asignada'] = "Ruta_Unica"
-                                p['No_Ruta'] = idx_r
-                                p['ID_Pangea_Nombre'] = p[id_col]
-                                p['Cant_Luminarias'] = extraer_carga_robusta(p, 'lum') or (1 if extraer_carga_robusta(p, 'poste')==0 and extraer_carga_robusta(p, 'cable')==0 else 0)
-                                p['Cant_Postes'] = extraer_carga_robusta(p, 'poste')
-                                p['Cant_Cable_m'] = extraer_carga_robusta(p, 'cable')
-                                p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
-                                
-                                tot_lums += p['Cant_Luminarias']
-                                tot_postes += p['Cant_Postes']
-                                tot_cable += p['Cant_Cable_m']
+                            p['Ruta_Asignada'] = "Ruta_Unica"
+                            p['No_Ruta'] = idx_r
+                            p['ID_Pangea_Nombre'] = p[id_col]
+                            
+                            # --- AQUÍ ESTÁ LA SOLUCIÓN ---
+                            # Convertimos a número antes de sumar, manejando posibles vacíos
+                            lum_val = float(p['Cant_Luminarias']) if str(p['Cant_Luminarias']).replace('.','',1).isdigit() else 0
+                            post_val = float(p['Cant_Postes']) if str(p['Cant_Postes']).replace('.','',1).isdigit() else 0
+                            cable_val = float(p['Cant_Cable_m']) if str(p['Cant_Cable_m']).replace('.','',1).isdigit() else 0
+                            
+                            p['Cant_Luminarias'] = lum_val
+                            p['Cant_Postes'] = post_val
+                            p['Cant_Cable_m'] = cable_val
+                            # -----------------------------
+
+                            p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
+                            
+                            tot_lums += lum_val
+                            tot_postes += post_val
+                            tot_cable += cable_val
 
                             min_totales = ((tot_lums + tot_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
                             t_estimado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
