@@ -1600,9 +1600,8 @@ else:
     elif st.session_state.menu == "SF5":
     st.title("🛡️ SF5 - Centro de Depuración Inteligente")
     
-    # 1. Definimos el motor como función para reutilizarlo en ambas pestañas
+    # 1. Motor matemático encapsulado
     def procesar_datos_sf5(df_total):
-        # Motor GPS (Limpia y extrae)
         def motor_gps_v25(fila_texto):
             texto = str(fila_texto).lower()
             numeros = re.findall(r'-?\d+\.\d{4,}', texto)
@@ -1621,7 +1620,6 @@ else:
         
         if df_analisis.empty: return None, None, None
 
-        # Lógica de 3 metros
         umbral = 3 / 111111.0
         coords = df_analisis[['lat_aux', 'lon_aux']].values
         marcador_duplicados = [0] * len(df_analisis) 
@@ -1638,7 +1636,6 @@ else:
                 color_id += 1
 
         df_analisis['Grupo_Duplicado'] = marcador_duplicados
-        
         indices_hoja1 = []
         grupos_ya_agregados = set()
         for idx, row in df_analisis.iterrows():
@@ -1651,9 +1648,7 @@ else:
         df_hoja2 = df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
         return df_analisis, df_hoja1, df_hoja2
 
-    # 2. Creamos las pestañas
-    tab_multi, tab_auditoria = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (1 archivo)"])
-
+    # 2. Función de renderizado para ambas pestañas
     def renderizar_resultados(df_analisis, df_hoja1, df_hoja2):
         st.markdown("### 📈 Dashboard de Depuración")
         m_cols = st.columns(5)
@@ -1667,7 +1662,6 @@ else:
             ("✅ ÚNICOS (H1)", cant_unicos, "#28a745"),
             ("⏱️ AHORRO EST.", f"{cant_eliminados * 5} min", "#dc3545")
         ]
-
         for col, (label, value, color) in zip(m_cols, metricas):
             col.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {color};'><b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{value}</span></div>", unsafe_allow_html=True)
 
@@ -1686,9 +1680,11 @@ else:
             st.session_state.menu = "SF1"
             st.rerun()
 
-    # Logica de Pestaña 1
+    # 3. Estructura de pestañas
+    tab_multi, tab_auditoria = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (1 archivo)"])
+
     with tab_multi:
-        files = st.file_uploader("📂 Cargar varios archivos", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_up")
+        files = st.file_uploader("📂 Cargar varios archivos", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_up_sf5")
         if files:
             dfs = []
             for f in files:
@@ -1700,9 +1696,8 @@ else:
             if da is not None: renderizar_resultados(da, h1, h2)
             else: st.error("No se detectaron coordenadas.")
 
-    # Logica de Pestaña 2
     with tab_auditoria:
-        file = st.file_uploader("📂 Cargar archivo único para auditoría", type=["csv", "xlsx"], accept_multiple_files=False, key="single_up")
+        file = st.file_uploader("📂 Cargar archivo único para auditoría", type=["csv", "xlsx"], accept_multiple_files=False, key="single_up_sf5")
         if file:
             df_single = pd.read_excel(file, dtype=str).fillna("") if file.name.endswith('.xlsx') else pd.read_csv(file, encoding='latin-1', dtype=str).fillna("")
             da, h1, h2 = procesar_datos_sf5(df_single)
