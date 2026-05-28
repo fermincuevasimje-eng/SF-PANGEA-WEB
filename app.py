@@ -948,6 +948,13 @@ else:
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
                                 h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
+                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>--- RESUMEN OPERATIVO DINÁMICO ---</b></td></tr>"
+                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ruta_ordenada)}</td></tr>"
+                                h += f"<tr><td><b>Total Luminarias:</b></td><td>{tot_lums}</td></tr>"
+                                h += f"<tr><td><b>Total Postes:</b></td><td>{tot_postes}</td></tr>"
+                                h += f"<tr><td><b>Total Cable:</b></td><td>{tot_cable} m</td></tr>"
+                                h += f"<tr><td><b>Distancia:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
+                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{t_estimado}</td></tr>"
                                 h += "</table>]]>"
                                 pnt.description = h
 
