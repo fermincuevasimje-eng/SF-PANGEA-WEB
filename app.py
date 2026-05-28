@@ -1600,8 +1600,8 @@ else:
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
-        # --- FUNCIÓN REUTILIZABLE PARA NO REPETIR CÓDIGO ---
-        def ejecutar_procesamiento(df_total):
+        # --- MOTOR DE PROCESAMIENTO (LA LÓGICA QUE YA TENÍAS) ---
+        def motor_sf5(df_total):
             def motor_gps_v25(fila_texto):
                 texto = str(fila_texto).lower()
                 numeros = re.findall(r'-?\d+\.\d{4,}', texto)
@@ -1610,17 +1610,18 @@ else:
 
             resultados = df_total.apply(lambda r: motor_gps_v25(" ".join(r.astype(str))), axis=1)
             col_gps = next((c for c in df_total.columns if any(p in str(c).lower() for p in ['gps', 'ubicacion', 'coord', 'lat'])), df_total.columns[0])
+            
             df_total[col_gps] = [r[0] for r in resultados]
             df_total['lat_aux'] = [r[1] for r in resultados]
             df_total['lon_aux'] = [r[2] for r in resultados]
             df_total['Grupo_Duplicado'] = 0
-            df_analisis = df_total.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
             
+            df_analisis = df_total.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
             if df_analisis.empty: return None, None, None
 
             umbral = 3 / 111111.0
             coords = df_analisis[['lat_aux', 'lon_aux']].values
-            marcador_duplicados = [0] * len(df_analisis)
+            marcador_duplicados = [0] * len(df_analisis) 
             color_id = 1
             for i in range(len(coords)):
                 if marcador_duplicados[i] != 0: continue
@@ -1632,6 +1633,7 @@ else:
                 if encontrado:
                     marcador_duplicados[i] = color_id
                     color_id += 1
+
             df_analisis['Grupo_Duplicado'] = marcador_duplicados
             indices_hoja1 = []
             grupos_ya_agregados = set()
@@ -1640,13 +1642,46 @@ else:
                 if g_id == 0 or g_id not in grupos_ya_agregados:
                     indices_hoja1.append(idx)
                     if g_id > 0: grupos_ya_agregados.add(g_id)
-            return df_analisis.loc[indices_hoja1].copy(), df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy(), len(df_analisis)
+            
+            return df_analisis, df_analisis.loc[indices_hoja1].copy(), df_analisis[df_analisis['Grupo_Duplicado'] > 0].copy()
+
+        # --- DASHBOARD Y BOTONES ORIGINALES ---
+        def renderizar_interfaz(df_analisis, df_hoja1, df_hoja2):
+            st.markdown("### 📈 Dashboard de Depuración SF5")
+            m_cols = st.columns(5)
+            cant_procesados, cant_en_conflicto = len(df_analisis), len(df_hoja2)
+            cant_eliminados, cant_unicos = cant_procesados - len(df_hoja1), len(df_hoja1)
+            
+            metricas = [
+                ("🔍 PROCESADOS", cant_procesados, "#1f4e78"),
+                ("🚨 EN CONFLICTO", cant_en_conflicto, "#e67e22"),
+                ("🗑️ ELIMINADOS", cant_eliminados, "#95a5a6"),
+                ("✅ ÚNICOS (H1)", cant_unicos, "#28a745"),
+                ("⏱️ AHORRO EST.", f"{cant_eliminados * 5} min", "#dc3545")
+            ]
+            for col, (label, value, color) in zip(m_cols, metricas):
+                col.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {color};'><b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{value}</span></div>", unsafe_allow_html=True)
+
+            output_sf5 = io.BytesIO()
+            with pd.ExcelWriter(output_sf5, engine='openpyxl') as writer:
+                df_h1_final = df_hoja1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'])
+                df_h1_final.to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
+                df_hoja2.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
+
+            st.write("---")
+            st.download_button(label="🚀 DESCARGAR PRODUCTO FINAL v25", data=output_sf5.getvalue(), file_name="SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
+
+            if st.button("➡️ ENVIAR DATOS LIMPIOS AL GENERADOR DE RUTAS (SF1)", use_container_width=True, type="primary"):
+                st.session_state.df_transferido = df_hoja1.copy()
+                st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
+                st.session_state.menu = "SF1"
+                st.rerun()
 
         # --- ESTRUCTURA DE PESTAÑAS ---
-        tab1, tab2 = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (Un solo archivo)"])
+        tab_multi, tab_auditoria = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (Un archivo)"])
 
-        with tab1:
-            files_sf5 = st.file_uploader("📂 Cargar varios archivos", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v25")
+        with tab_multi:
+            files_sf5 = st.file_uploader("📂 Cargar archivos de reportes", type=["csv", "xlsx"], accept_multiple_files=True, key="multi_sf5_v25")
             if files_sf5:
                 dfs = []
                 for f in files_sf5:
@@ -1654,28 +1689,17 @@ else:
                     df_f['ARCHIVO_ORIGEN'] = f.name
                     dfs.append(df_f)
                 df_total = pd.concat(dfs, ignore_index=True)
-                df_h1, df_h2, total = ejecutar_procesamiento(df_total)
-                if df_h1 is not None:
-                    # (Aquí va tu lógica de dashboard y descarga que ya tenías)
-                    st.write(f"Procesados: {total} | Unicos: {len(df_h1)} | Duplicados: {len(df_h2)}")
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df_h1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado']).to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
-                        df_h2.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
-                    st.download_button("🚀 DESCARGAR PRODUCTO FINAL", output.getvalue(), "SF_PANGEA_DEPURADO.xlsx", use_container_width=True)
+                da, h1, h2 = motor_sf5(df_total)
+                if da is not None: renderizar_interfaz(da, h1, h2)
+                else: st.error("No se detectaron coordenadas.")
 
-        with tab2:
+        with tab_auditoria:
             file_unico = st.file_uploader("📂 Cargar archivo único", type=["csv", "xlsx"], accept_multiple_files=False, key="single_sf5_v25")
             if file_unico:
                 df_f = pd.read_excel(file_unico, dtype=str).fillna("") if file_unico.name.endswith('.xlsx') else pd.read_csv(file_unico, encoding='latin-1', dtype=str).fillna("")
-                df_h1, df_h2, total = ejecutar_procesamiento(df_f)
-                if df_h1 is not None:
-                    st.write(f"Procesados: {total} | Unicos: {len(df_h1)} | Duplicados: {len(df_h2)}")
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df_h1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado']).to_excel(writer, index=False, sheet_name='PARA_MODULO_1')
-                        df_h2.to_excel(writer, index=False, sheet_name='REPORTE_DUPLICADOS')
-                    st.download_button("🚀 DESCARGAR PRODUCTO FINAL", output.getvalue(), "SF_PANGEA_AUDITORIA.xlsx", use_container_width=True)
+                da, h1, h2 = motor_sf5(df_f)
+                if da is not None: renderizar_interfaz(da, h1, h2)
+                else: st.error("No se detectaron coordenadas.")
 
     elif st.session_state.menu == "SF6":
         # ==========================================
