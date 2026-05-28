@@ -920,7 +920,7 @@ else:
                                     elif int(df_export_c.iloc[r-2]['Cant_Cable_m']) > 0:
                                         for cell in ws[r]: cell.fill = fa
 
-                            cc1.download_button("📗 Excel Pro Dinámico", buf_xlsx_c.getvalue(), file_name=f"SF_CLASICA_{up_name}.xlsx", use_container_width=True)
+                            cc1.download_button("📗 Excel Pro Dinámico", buf_xlsx_c.getvalue(), file_name=f"SF_CLASICA_{up_name}.xlsx", use_container_width=True, key="btn_c_excel")
                             
                             csv_buffer = io.StringIO()
                             df_export_c.to_csv(csv_buffer, index=False)
@@ -931,7 +931,7 @@ else:
                             csv_buffer.write(f"Total Cable:,{tot_cable} m\n")
                             csv_buffer.write(f"Distancia Total:,{round(dist_real_km,2)} km\n")
                             csv_buffer.write(f"Tiempo Estimado:,{t_estimado}\n")
-                            cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True)
+                            cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True, key="btn_c_csv")
 
                             # --- KML CORREGIDO: Sidebar y Descripción limpios ---
                         kml_c = simplekml.Kml()
@@ -964,7 +964,7 @@ else:
                                 ls.style.linestyle.width = 4
                                 ls.style.linestyle.color = 'ff00ffff'
 
-                            cc3.download_button("🗺️ KML Maestro Clásico", kml_c.kml(), file_name=f"SF_CLASICA_{up_name}.kml", use_container_width=True)
+                            cc3.download_button("🗺️ KML Maestro Clásico", kml_c.kml(), file_name=f"SF_CLASICA_{up_name}.kml", use_container_width=True, key="btn_c_kml")
                             cc4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR RUTA CLÁSICA EN BITÁCORA", use_container_width=True, key="reg_c"):
