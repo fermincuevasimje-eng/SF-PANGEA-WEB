@@ -860,37 +860,30 @@ else:
                             tot_lums, tot_postes, tot_cable = 0, 0, 0
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
                             
-                            # --- INICIO DEL CICLO REFORZADO ---
+                            # --- CICLO ÚNICO DE PROCESAMIENTO ---
                         for idx_r, p in enumerate(ruta_ordenada, 1):
                             p['Ruta_Asignada'] = "Ruta_Unica"
                             p['No_Ruta'] = idx_r
                             p['ID_Pangea_Nombre'] = p.get(id_col, "Sin ID")
                             
-                            # 1. Obtenemos datos de forma segura (usando .get para evitar KeyError)
-                            # Si no encuentra el valor, devuelve 0
+                            # Obtenemos valores robustos usando tu función
                             raw_lum = extraer_carga_robusta(p, 'lum') if 'extraer_carga_robusta' in globals() else 0
                             raw_post = extraer_carga_robusta(p, 'poste') if 'extraer_carga_robusta' in globals() else 0
                             raw_cable = extraer_carga_robusta(p, 'cable') if 'extraer_carga_robusta' in globals() else 0
                             
-                            # 2. Convertimos a números limpios
+                            # Convertimos a números limpios
                             p['Cant_Luminarias'] = float(raw_lum) if str(raw_lum).replace('.','',1).isdigit() else (1 if raw_post==0 and raw_cable==0 else 0)
                             p['Cant_Postes'] = float(raw_post) if str(raw_post).replace('.','',1).isdigit() else 0
                             p['Cant_Cable_m'] = float(raw_cable) if str(raw_cable).replace('.','',1).isdigit() else 0
                             
-                            # 3. Asignamos Maps
+                            # Asignamos Maps
                             p['Maps'] = f"https://www.google.com/maps?q={p.get('lat_aux', 0)},{p.get('lon_aux', 0)}"
                             
-                            # 4. Sumamos a los totales
+                            # Acumulamos para el resumen
                             tot_lums += p['Cant_Luminarias']
                             tot_postes += p['Cant_Postes']
                             tot_cable += p['Cant_Cable_m']
-                        # --- FIN DEL CICLO ---
-
-                            p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
-                            
-                            tot_lums += lum_val
-                            tot_postes += post_val
-                            tot_cable += cable_val
+                        # --- FIN DEL CICLO ÚNICO ---
 
                             min_totales = ((tot_lums + tot_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
                             t_estimado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
