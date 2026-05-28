@@ -937,7 +937,7 @@ else:
                             folder_c = kml_c.newfolder(name=f"🚚 Ruta Única Clásica ({len(ruta_ordenada)} Pts)")
                             
                             for p in ruta_ordenada:
-                                pnt = folder_c.newpoint(name=f"[Ruta_Unica-#{p['No_Ruta']}] {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
+                                pnt = folder_c.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
                                 h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
                                 for col in cols_orig:
