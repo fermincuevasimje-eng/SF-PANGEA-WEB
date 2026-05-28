@@ -787,7 +787,7 @@ else:
         ])
 
         # ==========================================
-        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (V23 PRO - CORREGIDO)
+        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (COMPLETO)
         # ==========================================
         with tab1:
             if st.session_state.perfil == "CONSULTA":
@@ -805,6 +805,7 @@ else:
 
                 if up_c:
                     try:
+                        # CARGA Y NORMALIZACIÓN
                         if datos_vienen_de_sf5:
                             df_raw = st.session_state.df_transferido.copy()
                             up_name = st.session_state.nombre_archivo_transferido
@@ -812,7 +813,6 @@ else:
                             df_raw = pd.read_excel(up_c, dtype=str).fillna("") if up_c.name.endswith('.xlsx') else pd.read_csv(up_c, encoding='latin-1', dtype=str).fillna("")
                             up_name = up_c.name
 
-                        # Normalización de coordenadas
                         if 'lat_aux' in df_raw.columns and 'lon_aux' in df_raw.columns and df_raw['lat_aux'].notna().any():
                             df_raw['lat_aux'] = pd.to_numeric(df_raw['lat_aux'], errors='coerce')
                             df_raw['lon_aux'] = pd.to_numeric(df_raw['lon_aux'], errors='coerce')
@@ -821,8 +821,7 @@ else:
                             def limpiar_y_extraer_coordenadas(valor):
                                 texto = str(valor).lower().replace("latitude:", "").replace("longitude:", "")
                                 numeros = re.findall(r'(-?\d+\.\d+)', texto)
-                                if len(numeros) >= 2: return float(numeros[0]), float(numeros[1])
-                                return None, None
+                                return (float(numeros[0]), float(numeros[1])) if len(numeros) >= 2 else (None, None)
                             res_coor = df_raw[col_coor].apply(limpiar_y_extraer_coordenadas)
                             df_raw['lat_aux'] = [r[0] for r in res_coor]
                             df_raw['lon_aux'] = [r[1] for r in res_coor]
@@ -831,10 +830,9 @@ else:
                         df_v = df_raw.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
 
                         if not df_v.empty:
+                            # ORDENAMIENTO (TSP SIMPLIFICADO)
                             pts = df_v.to_dict('records')
                             coords_base = np.array([BASE_COORDS])
-                            
-                            # Ordenamiento
                             coords_puntos = np.array([[float(p['lat_aux']), float(p['lon_aux'])] for p in pts])
                             distancias_a_base = cdist(coords_base, coords_puntos)[0]
                             idx_mas_lejano = np.argmax(distancias_a_base)
@@ -852,24 +850,22 @@ else:
                                 ruta_ordenada.append(proximo_punto)
                                 last_coord = (float(proximo_punto['lat_aux']), float(proximo_punto['lon_aux']))
 
-                            # Procesamiento de Ruta
+                            # PROCESAMIENTO Y CÁLCULOS
                             tot_lums, tot_postes, tot_cable = 0.0, 0.0, 0.0
                             for idx_r, p in enumerate(ruta_ordenada, 1):
-                                # Asignaciones Seguras
                                 p['Ruta_Asignada'] = "Ruta_Unica"
                                 p['No_Ruta'] = idx_r
                                 p['ID_Pangea_Nombre'] = str(p.get(id_col, "Sin ID"))
                                 
-                                # Extracción y Conversión
                                 r_lum = extraer_carga_robusta(p, 'lum') if 'extraer_carga_robusta' in globals() else p.get('Cant_Luminarias', 0)
                                 r_post = extraer_carga_robusta(p, 'poste') if 'extraer_carga_robusta' in globals() else p.get('Cant_Postes', 0)
                                 r_cable = extraer_carga_robusta(p, 'cable') if 'extraer_carga_robusta' in globals() else p.get('Cant_Cable_m', 0)
                                 
-                                p['Cant_Luminarias'] = float(r_lum) if str(r_lum).replace('.','',1).isdigit() else (1 if r_post==0 and r_cable==0 else 0)
-                                p['Cant_Postes'] = float(r_post) if str(r_post).replace('.','',1).isdigit() else 0
-                                p['Cant_Cable_m'] = float(r_cable) if str(r_cable).replace('.','',1).isdigit() else 0
-                                
+                                p['Cant_Luminarias'] = float(r_lum) if str(r_lum).replace('.','',1).replace('-','').isdigit() else 0.0
+                                p['Cant_Postes'] = float(r_post) if str(r_post).replace('.','',1).replace('-','').isdigit() else 0.0
+                                p['Cant_Cable_m'] = float(r_cable) if str(r_cable).replace('.','',1).replace('-','').isdigit() else 0.0
                                 p['Maps'] = f"https://www.google.com/maps?q={p.get('lat_aux', 0)},{p.get('lon_aux', 0)}"
+                                
                                 tot_lums += p['Cant_Luminarias']
                                 tot_postes += p['Cant_Postes']
                                 tot_cable += p['Cant_Cable_m']
@@ -877,72 +873,71 @@ else:
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ruta_ordenada] + [BASE_COORDS]
                             geo_trazo, dist_real_km = get_real_route(route_coords)
                             if not dist_real_km: dist_real_km = (len(ruta_ordenada) + 1) * 1.3
+                            
+                            t_estimado = f"{int(((tot_lums + tot_postes) * t_por_punto + (dist_real_km / v_promedio * 60)) // 60)} h {int(((tot_lums + tot_postes) * t_por_punto + (dist_real_km / v_promedio * 60)) % 60)} m"
 
-                            min_totales = ((tot_lums + tot_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
-                            t_estimado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
-
-                            # UI
+                            # UI Y TABLAS
                             st.subheader("📊 Resumen de Ruta Única (Clásica)")
                             mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
-                            mc1.metric("📍 Puntos", len(ruta_ordenada)); mc2.metric("💡 Luminarias", tot_lums)
+                            mc1.metric("📍 Puntos", len(ruta_ordenada)); mc2.metric("💡 Lums", tot_lums)
                             mc3.metric("🏗️ Postes", tot_postes); mc4.metric("🧶 Cable", f"{tot_cable} m")
-                            mc5.metric("🛣️ Distancia", f"{round(dist_real_km, 2)} km"); mc6.metric("⏱️ Tiempo Est.", t_estimado)
+                            mc5.metric("🛣️ Dist", f"{round(dist_real_km, 2)} km"); mc6.metric("⏱️ Tiempo", t_estimado)
 
                             df_export_c = pd.DataFrame(ruta_ordenada)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
-                            columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada', 'ID_Pangea_Nombre', 'No_Ruta', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m']]
-                            df_export_c = df_export_c[columnas_finales]
+                            df_export_c = df_export_c[cols_vits + [c for c in df_raw.columns if c not in cols_vits + ['lat_aux', 'lon_aux', 'Ruta_Asignada']]]
                             st.dataframe(df_export_c, use_container_width=True, hide_index=True)
 
-                            # Exportaciones
-                            cc1, cc2, cc3, cc4 = st.columns(4)
+                            # EXPORTACIONES (EXCEL, CSV, KML)
+                            c1, c2, c3, c4 = st.columns(4)
+                            # Excel
                             buf_xlsx_c = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx_c, engine='openpyxl') as writer:
-                                df_export_c.to_excel(writer, index=False, sheet_name='Ruta_Clasica_SF')
-                                ws = writer.sheets['Ruta_Clasica_SF']
+                                df_export_c.to_excel(writer, index=False, sheet_name='Ruta')
+                                ws = writer.sheets['Ruta']
                                 last_row = len(ruta_ordenada) + 1
-                                res_row = last_row + 2
-                                ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
-                                ws.cell(row=res_row+1, column=1, value="Total Puntos:"); ws.cell(row=res_row+1, column=2, value=len(ruta_ordenada))
-                                ws.cell(row=res_row+2, column=1, value="Total Luminarias:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(C2:C{last_row})")
-                                ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(D2:D{last_row})")
-                                ws.cell(row=res_row+4, column=1, value="Total Cable:"); ws.cell(row=res_row+4, column=2, value=f"=SUM(E2:E{last_row})")
-                                ws.cell(row=res_row+5, column=1, value="Distancia:"); ws.cell(row=res_row+5, column=2, value=f"{round(dist_real_km,2)} km")
-                                
-                                fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
-                                for r in range(2, last_row + 1):
-                                    v_p = float(df_export_c.iloc[r-2]['Cant_Postes']) if pd.notnull(df_export_c.iloc[r-2]['Cant_Postes']) else 0
-                                    v_c = float(df_export_c.iloc[r-2]['Cant_Cable_m']) if pd.notnull(df_export_c.iloc[r-2]['Cant_Cable_m']) else 0
-                                    if v_p > 0:
-                                        for cell in ws[r]: cell.fill = fg
-                                    elif v_c > 0:
-                                        for cell in ws[r]: cell.fill = fa
+                                ws.append(["", "", "", "RESUMEN", "TOTALES"])
+                                ws.append(["", "", "", "Luminarias", f"=SUM(C2:C{last_row})"])
+                                ws.append(["", "", "", "Postes", f"=SUM(D2:D{last_row})"])
+                                ws.append(["", "", "", "Cable (m)", f"=SUM(E2:E{last_row})"])
+                            c1.download_button("📗 Excel Pro", buf_xlsx_c.getvalue(), file_name=f"SF_Ruta_{up_name}.xlsx", use_container_width=True)
 
-                            cc1.download_button("📗 Excel Pro Dinámico", buf_xlsx_c.getvalue(), file_name=f"SF_CLASICA_{up_name}.xlsx", use_container_width=True)
-                            
-                            # (CSV y KML siguen aquí...)
+                            # CSV
                             csv_buffer = io.StringIO()
                             df_export_c.to_csv(csv_buffer, index=False)
-                            cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True)
+                            c2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_Ruta_{up_name}.csv", use_container_width=True)
 
+                            # KML CON DESCRIPCIÓN
                             kml_c = simplekml.Kml()
-                            folder_c = kml_c.newfolder(name=f"🚚 Ruta Única")
+                            fol = kml_c.newfolder(name="🚚 Puntos de Ruta")
                             for p in ruta_ordenada:
-                                pnt = folder_c.newpoint(name=str(p.get('ID_Pangea_Nombre', 'N/A')), coords=[(p['lon_aux'], p['lat_aux'])])
-                            cc3.download_button("🗺️ KML Maestro", kml_c.kml(), file_name=f"SF_CLASICA_{up_name}.kml", use_container_width=True)
+                                pnt = fol.newpoint(name=str(p.get('ID_Pangea_Nombre', 'N/A')), coords=[(p['lon_aux'], p['lat_aux'])])
+                                h = "<table border='1' style='border-collapse:collapse;'>"
+                                for col in df_export_c.columns:
+                                    h += f"<tr><td><b>{col}</b></td><td>{p.get(col, '')}</td></tr>"
+                                h += "</table>"
+                                pnt.description = h
                             
-                            # Bitacora
-                            if st.button("💾 REGISTRAR RUTA CLÁSICA EN BITÁCORA", use_container_width=True, key="reg_c"):
+                            if geo_trazo:
+                                ls = kml_c.newlinestring(name="Trayecto")
+                                ls.coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
+                                ls.style.linestyle.width = 6; ls.style.linestyle.color = 'ff0000ff'
+                            c3.download_button("🗺️ KML Maestro", kml_c.kml(), file_name=f"SF_Ruta_{up_name}.kml", use_container_width=True)
+                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
+
+                            # BITÁCORA
+                            if st.button("💾 REGISTRAR EN BITÁCORA", use_container_width=True):
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
-                                    hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"CLASICA_{up_name}", "Datos_JSON": f"Pts: {len(ruta_ordenada)}"}])
-                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
+                                    df_hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    new_row = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y"), "Nombre_Ruta": up_name, "Datos": len(ruta_ordenada)}])
+                                    conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([df_hist, new_row], ignore_index=True))
                                     st.success("¡Bitácora actualizada!")
-                                except Exception as e: st.error(f"Error GSheets: {e}")
+                                except Exception as e: st.error(f"Error: {e}")
                         else:
-                            st.error("No se pudieron extraer coordenadas.")
-                    except Exception as e: st.error(f"Error en Motor: {e}")
+                            st.error("No se detectaron coordenadas válidas en el archivo.")
+                    except Exception as e: 
+                        st.error(f"Error en procesamiento de ruta: {e}")
 
         # ==========================================
         # PESTAÑA 2: NUEVO MOTOR MULTI-RUTA (PRO)
