@@ -1600,10 +1600,11 @@ else:
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
-        # --- MOTOR DE PROCESAMIENTO ---
+        # --- MOTOR DE PROCESAMIENTO REFINADO ---
         def motor_sf5(df_total):
             df_total = df_total.astype(str).fillna("")
             
+            # Extract GPS
             def motor_gps_v25(fila):
                 texto = " ".join(fila.values).lower()
                 numeros = re.findall(r'-?\d+\.\d{4,}', texto)
@@ -1618,6 +1619,7 @@ else:
             
             if df_total.empty: return None, None, None
 
+            # Cluster detection (3 meters)
             umbral = 3 / 111111.0
             coords_arr = df_total[['lat_aux', 'lon_aux']].values
             marcador = [0] * len(df_total)
@@ -1634,20 +1636,34 @@ else:
                     color_id += 1
             
             df_total['Grupo_Duplicado'] = marcador
-            # h1: representantes unicos, h2: duplicados
-            indices_h1 = [idx for idx, row in df_total.iterrows() if row['Grupo_Duplicado'] == 0 or row['Grupo_Duplicado'] not in {r['Grupo_Duplicado'] for i, r in df_total.iloc[:idx].iterrows()}]
-            return df_total, df_total.loc[indices_h1].copy(), df_total[df_total['Grupo_Duplicado'] > 0].copy()
+            
+            # --- SEPARATION LOGIC ---
+            # Indices of the first occurrence (representatives)
+            indices_reps = []
+            seen_groups = set()
+            for idx, row in df_total.iterrows():
+                gid = row['Grupo_Duplicado']
+                if gid == 0 or gid not in seen_groups:
+                    indices_reps.append(idx)
+                    if gid > 0: seen_groups.add(gid)
+            
+            # h1: Representatives + Unique items
+            h1 = df_total.loc[indices_reps].copy()
+            # h2: Duplicates (All rows with group ID > 0 EXCEPT the representative)
+            h2 = df_total[(df_total['Grupo_Duplicado'] > 0) & (~df_total.index.isin(indices_reps))].copy()
+            
+            return df_total, h1, h2
 
-        # --- INTERFAZ ---
+        # --- INTERFACE ---
         def renderizar_interfaz(da, h1, h2, suffix):
             st.markdown("### 📈 Dashboard de Depuración SF5")
             m_cols = st.columns(5)
             metricas = [
                 ("🔍 PROCESADOS", len(da), "#1f4e78"),
-                ("🚨 CONFLICTO", len(h2), "#e67e22"),
-                ("🗑️ ELIMINADOS", len(da) - len(h1), "#95a5a6"),
-                ("✅ ÚNICOS", len(h1), "#28a745"),
-                ("⏱️ AHORRO", f"{(len(da) - len(h1)) * 5} min", "#dc3545")
+                ("🚨 DUPLICADOS", len(h2), "#e67e22"),
+                ("🗑️ REMOVIDOS", len(h2), "#95a5a6"),
+                ("✅ ÚNICOS (H1)", len(h1), "#28a745"),
+                ("⏱️ AHORRO", f"{len(h2) * 5} min", "#dc3545")
             ]
             for col, (label, val, colr) in zip(m_cols, metricas):
                 col.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {colr};'><b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{val}</span></div>", unsafe_allow_html=True)
@@ -1657,16 +1673,13 @@ else:
             yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
             with pd.ExcelWriter(out, engine='openpyxl') as w:
-                # Hoja 1: Únicos
                 h1.to_excel(w, index=False, sheet_name='PARA_MODULO_1')
                 ws = w.sheets['PARA_MODULO_1']
-                # Marcamos en amarillo duplicados en la hoja de únicos
-                grupo_idx = h1.columns.get_loc("Grupo_Duplicado") + 1
+                # Yellow highlight for representatives that have duplicates
                 for r_num, (_, row) in enumerate(h1.iterrows(), 2):
                     if int(row['Grupo_Duplicado']) > 0:
                         for cell in ws[r_num]: cell.fill = yellow_fill
                 
-                # Hoja 2: Solo duplicados
                 h2.to_excel(w, index=False, sheet_name='REPORTE_DUPLICADOS')
             
             st.write("---")
@@ -1677,7 +1690,7 @@ else:
                 st.session_state.menu = "SF1"
                 st.rerun()
 
-        # --- PESTAÑAS ---
+        # --- TABS ---
         tab_multi, tab_auditoria = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (1 archivo)"])
         with tab_multi:
             f_in = st.file_uploader("📂 Archivos", accept_multiple_files=True, key="m_in_sf5")
@@ -1685,17 +1698,15 @@ else:
                 dfs = []
                 for f in f_in:
                     df = pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str)
-                    df.rename(columns={'ARCHIVO_ORIGEN': 'archivo'}, inplace=True) # Estandarizamos
-                    if 'archivo' not in df.columns: df['archivo'] = f.name
+                    df['archivo'] = f.name # Traceability column
                     dfs.append(df)
                 da, h1, h2 = motor_sf5(pd.concat(dfs, ignore_index=True))
                 if da is not None: renderizar_interfaz(da, h1, h2, "multi")
         with tab_auditoria:
             f_in = st.file_uploader("📂 Archivo", accept_multiple_files=False, key="s_in_sf5")
             if f_in:
-                df = pd.read_excel(f_in, dtype=str) if f_in.name.endswith('.xlsx') else pd.read_csv(f_in, dtype=str)
-                df.rename(columns={'ARCHIVO_ORIGEN': 'archivo'}, inplace=True)
-                if 'archivo' not in df.columns: df['archivo'] = f_in.name
+                df = pd.read_excel(f_in, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f_in, dtype=str)
+                df['archivo'] = f_in.name # Traceability column
                 da, h1, h2 = motor_sf5(df)
                 if da is not None: renderizar_interfaz(da, h1, h2, "audit")
     elif st.session_state.menu == "SF6":
