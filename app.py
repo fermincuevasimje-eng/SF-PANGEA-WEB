@@ -1600,45 +1600,60 @@ else:
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
-        # --- MOTOR DE PROCESAMIENTO (LA LÓGICA DE 3 METROS) ---
-        def motor_sf5(df_total):
-            def motor_gps_v25(fila_texto):
-                texto = str(fila_texto).lower()
+        # --- MOTOR QUE EXTRAE GPS INDIVIDUALMENTE ---
+        def extraer_gps_de_df(df):
+            def motor_gps_v25(fila):
+                texto = " ".join(fila.astype(str)).lower()
                 numeros = re.findall(r'-?\d+\.\d{4,}', texto)
                 if len(numeros) >= 2: return float(numeros[0]), float(numeros[1])
                 return None, None
-
-            # Procesamos coordenadas
-            coords = df_total.apply(lambda r: motor_gps_v25(" ".join(r.astype(str))), axis=1)
-            df_total['lat_aux'] = [c[0] for c in coords]
-            df_total['lon_aux'] = [c[1] for c in coords]
-            df_total = df_total.dropna(subset=['lat_aux', 'lon_aux']).reset_index(drop=True)
-            df_total['Grupo_Duplicado'] = 0
             
-            if df_total.empty: return None, None, None
+            # Extraemos coordenadas fila por fila
+            coords = df.apply(motor_gps_v25, axis=1)
+            df['lat_aux'] = [c[0] for c in coords]
+            df['lon_aux'] = [c[1] for c in coords]
+            # Solo nos quedamos con los que tienen GPS real
+            return df.dropna(subset=['lat_aux', 'lon_aux'])
 
+        # --- LÓGICA DE PROCESAMIENTO ---
+        def procesar_sf5_completo(lista_dfs):
+            procesados = []
+            for df in lista_dfs:
+                # Limpiamos cada archivo por separado
+                df_limpio = extraer_gps_de_df(df)
+                procesados.append(df_limpio)
+            
+            # Ahora unimos solo los datos ya limpios
+            df_total = pd.concat(procesados, ignore_index=True)
+            
             # Algoritmo de 3 metros
             umbral = 3 / 111111.0
             coords = df_total[['lat_aux', 'lon_aux']].values
-            marcador = [0] * len(df_total)
+            marcador_duplicados = [0] * len(df_total)
             color_id = 1
             for i in range(len(coords)):
-                if marcador[i] != 0: continue
+                if marcador_duplicados[i] != 0: continue
                 encontrado = False
                 for j in range(i + 1, len(coords)):
                     if np.linalg.norm(coords[i] - coords[j]) < umbral:
-                        marcador[j] = color_id
+                        marcador_duplicados[j] = color_id
                         encontrado = True
                 if encontrado:
-                    marcador[i] = color_id
+                    marcador_duplicados[i] = color_id
                     color_id += 1
             
-            df_total['Grupo_Duplicado'] = marcador
-            indices_h1 = [idx for idx, row in df_total.iterrows() if row['Grupo_Duplicado'] == 0 or row['Grupo_Duplicado'] not in {r['Grupo_Duplicado'] for i, r in df_total.iloc[:idx].iterrows()}]
+            df_total['Grupo_Duplicado'] = marcador_duplicados
+            indices_hoja1 = []
+            grupos_ya_agregados = set()
+            for idx, row in df_total.iterrows():
+                g_id = row['Grupo_Duplicado']
+                if g_id == 0 or g_id not in grupos_ya_agregados:
+                    indices_hoja1.append(idx)
+                    if g_id > 0: grupos_ya_agregados.add(g_id)
             
-            return df_total, df_total.loc[indices_h1].copy(), df_total[df_total['Grupo_Duplicado'] > 0].copy()
+            return df_total, df_total.loc[indices_hoja1].copy(), df_total[df_total['Grupo_Duplicado'] > 0].copy()
 
-        # --- INTERFAZ (METRICAS Y BOTONES CON KEYS ÚNICOS) ---
+        # --- INTERFAZ (BOTONES Y MÉTRICAS) ---
         def renderizar_interfaz(da, h1, h2, suffix):
             st.markdown("### 📈 Dashboard de Depuración SF5")
             m_cols = st.columns(5)
@@ -1649,36 +1664,34 @@ else:
                 ("✅ ÚNICOS", len(h1), "#28a745"),
                 ("⏱️ AHORRO", f"{(len(da) - len(h1)) * 5} min", "#dc3545")
             ]
-            for col, (label, val, colr) in zip(m_cols, metricas):
-                col.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {colr};'><b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{val}</span></div>", unsafe_allow_html=True)
+            for col, (label, value, color) in zip(m_cols, metricas):
+                col.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {color};'><b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{value}</span></div>", unsafe_allow_html=True)
 
             out = io.BytesIO()
             with pd.ExcelWriter(out, engine='openpyxl') as w:
                 h1.drop(columns=['lat_aux', 'lon_aux', 'Grupo_Duplicado'], errors='ignore').to_excel(w, index=False, sheet_name='PARA_MODULO_1')
                 h2.to_excel(w, index=False, sheet_name='REPORTE_DUPLICADOS')
             
-            st.download_button("🚀 DESCARGAR PRODUCTO FINAL v25", out.getvalue(), "SF_PANGEA_DEPURADO.xlsx", use_container_width=True, key=f"dl_{suffix}")
+            st.download_button("🚀 DESCARGAR PRODUCTO FINAL", out.getvalue(), "SF_PANGEA_DEPURADO.xlsx", use_container_width=True, key=f"dl_{suffix}")
             if st.button("➡️ ENVIAR AL GENERADOR (SF1)", use_container_width=True, type="primary", key=f"btn_{suffix}"):
                 st.session_state.df_transferido = h1.copy()
                 st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
                 st.session_state.menu = "SF1"
                 st.rerun()
 
-        # --- PESTAÑAS ---
-        tab_multi, tab_auditoria = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (1 archivo)"])
-        with tab_multi:
-            f_in = st.file_uploader("📂 Archivos", accept_multiple_files=True, key="m_in")
-            if f_in:
-                dfs = [pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str) for f in f_in]
-                da, h1, h2 = motor_sf5(pd.concat(dfs, ignore_index=True))
-                if da is not None: renderizar_interfaz(da, h1, h2, "multi")
-        with tab_auditoria:
-            f_in = st.file_uploader("📂 Archivo", accept_multiple_files=False, key="s_in")
-            if f_in:
-                df = pd.read_excel(f_in, dtype=str) if f_in.name.endswith('.xlsx') else pd.read_csv(f_in, dtype=str)
-                da, h1, h2 = motor_sf5(df)
-                if da is not None: renderizar_interfaz(da, h1, h2, "audit")
-
+        tab1, tab2 = st.tabs(["🔄 Comparar Varios", "🔍 Auditoría Interna"])
+        with tab1:
+            files = st.file_uploader("📂 Cargar archivos", accept_multiple_files=True, key="m_up")
+            if files:
+                dfs = [pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str) for f in files]
+                da, h1, h2 = procesar_sf5_completo(dfs)
+                renderizar_interfaz(da, h1, h2, "multi")
+        with tab2:
+            f = st.file_uploader("📂 Cargar archivo", accept_multiple_files=False, key="s_up")
+            if f:
+                df = pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str)
+                da, h1, h2 = procesar_sf5_completo([df])
+                renderizar_interfaz(da, h1, h2, "audit")
     elif st.session_state.menu == "SF6":
         # ==========================================
         # --- FILTRO 1: INICIO MAESTRO DEL SISTEMA (PIN 1827) ---
