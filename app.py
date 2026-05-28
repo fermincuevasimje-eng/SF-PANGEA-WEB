@@ -933,23 +933,25 @@ else:
                             csv_buffer.write(f"Tiempo Estimado:,{t_estimado}\n")
                             cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True)
 
-                            kml_c = simplekml.Kml()
-                            folder_c = kml_c.newfolder(name=f"🚚 Ruta Única Clásica ({len(ruta_ordenada)} Pts)")
+                            # --- KML CORREGIDO: Sidebar y Descripción limpios ---
+                        kml_c = simplekml.Kml()
+                        folder_c = kml_c.newfolder(name=f"🚚 Ruta Clásica ({len(ruta_ordenada)} Pts)")
+                        
+                        for p in ruta_ordenada:
+                            # CAMBIO AQUÍ: Eliminamos el prefijo [Ruta_Unica-#] del nombre lateral
+                            pnt = folder_c.newpoint(name=f"Punto #{p['No_Ruta']} - {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                             
-                            for p in ruta_ordenada:
-                                pnt = folder_c.newpoint(name=f"[Ruta_Unica-#{p['No_Ruta']}] {p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
-                                h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
-                                for col in cols_orig:
-                                    val = str(p.get(col, '')).strip()
-                                    if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOSE OPERATIVO</b></td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                h += "</table>]]>"
-                                pnt.description = h
+                            h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
+                            h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
+                            for col in cols_orig:
+                                val = str(p.get(col, '')).strip()
+                                if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
+                            h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOSE OPERATIVO</b></td></tr>"
+                            h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
+                            h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
+                            h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
+                            h += "</table>]]>"
+                            pnt.description = h
 
                             if geo_trazo:
                                 ls = folder_c.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
