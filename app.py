@@ -787,7 +787,7 @@ else:
         ])
 
         # ==========================================
-        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (V23 PRO)
+        # PESTAÑA 1: GENERADOR DE RUTA CLÁSICO (V23 PRO - CORREGIDO)
         # ==========================================
         with tab1:
             if st.session_state.perfil == "CONSULTA":
@@ -812,6 +812,7 @@ else:
                             df_raw = pd.read_excel(up_c, dtype=str).fillna("") if up_c.name.endswith('.xlsx') else pd.read_csv(up_c, encoding='latin-1', dtype=str).fillna("")
                             up_name = up_c.name
 
+                        # Normalización de coordenadas
                         if 'lat_aux' in df_raw.columns and 'lon_aux' in df_raw.columns and df_raw['lat_aux'].notna().any():
                             df_raw['lat_aux'] = pd.to_numeric(df_raw['lat_aux'], errors='coerce')
                             df_raw['lon_aux'] = pd.to_numeric(df_raw['lon_aux'], errors='coerce')
@@ -832,182 +833,116 @@ else:
                         if not df_v.empty:
                             pts = df_v.to_dict('records')
                             coords_base = np.array([BASE_COORDS])
-                            coords_puntos = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
-                            distancias_a_base = cdist(coords_base, coords_puntos)[0]
                             
+                            # Ordenamiento
+                            coords_puntos = np.array([[float(p['lat_aux']), float(p['lon_aux'])] for p in pts])
+                            distancias_a_base = cdist(coords_base, coords_puntos)[0]
                             idx_mas_lejano = np.argmax(distancias_a_base)
                             punto_inicial = pts.pop(idx_mas_lejano)
                             ruta_ordenada = [punto_inicial]
-                            last_coord = (punto_inicial['lat_aux'], punto_inicial['lon_aux'])
+                            last_coord = (float(punto_inicial['lat_aux']), float(punto_inicial['lon_aux']))
 
                             while pts:
-                                rest_coords = np.array([[p['lat_aux'], p['lon_aux']] for p in pts])
+                                rest_coords = np.array([[float(p['lat_aux']), float(p['lon_aux'])] for p in pts])
                                 dist_al_ultimo = cdist([last_coord], rest_coords)[0]
                                 dist_a_base = cdist(coords_base, rest_coords)[0]
                                 puntuacion_ruta = dist_al_ultimo + (dist_a_base * 0.2)
-                                
                                 idx_proximo = np.argmin(puntuacion_ruta)
                                 proximo_punto = pts.pop(idx_proximo)
                                 ruta_ordenada.append(proximo_punto)
-                                last_coord = (proximo_punto['lat_aux'], proximo_punto['lon_aux'])
+                                last_coord = (float(proximo_punto['lat_aux']), float(proximo_punto['lon_aux']))
+
+                            # Procesamiento de Ruta
+                            tot_lums, tot_postes, tot_cable = 0.0, 0.0, 0.0
+                            for idx_r, p in enumerate(ruta_ordenada, 1):
+                                # Asignaciones Seguras
+                                p['Ruta_Asignada'] = "Ruta_Unica"
+                                p['No_Ruta'] = idx_r
+                                p['ID_Pangea_Nombre'] = str(p.get(id_col, "Sin ID"))
+                                
+                                # Extracción y Conversión
+                                r_lum = extraer_carga_robusta(p, 'lum') if 'extraer_carga_robusta' in globals() else p.get('Cant_Luminarias', 0)
+                                r_post = extraer_carga_robusta(p, 'poste') if 'extraer_carga_robusta' in globals() else p.get('Cant_Postes', 0)
+                                r_cable = extraer_carga_robusta(p, 'cable') if 'extraer_carga_robusta' in globals() else p.get('Cant_Cable_m', 0)
+                                
+                                p['Cant_Luminarias'] = float(r_lum) if str(r_lum).replace('.','',1).isdigit() else (1 if r_post==0 and r_cable==0 else 0)
+                                p['Cant_Postes'] = float(r_post) if str(r_post).replace('.','',1).isdigit() else 0
+                                p['Cant_Cable_m'] = float(r_cable) if str(r_cable).replace('.','',1).isdigit() else 0
+                                
+                                p['Maps'] = f"https://www.google.com/maps?q={p.get('lat_aux', 0)},{p.get('lon_aux', 0)}"
+                                tot_lums += p['Cant_Luminarias']
+                                tot_postes += p['Cant_Postes']
+                                tot_cable += p['Cant_Cable_m']
 
                             route_coords = [BASE_COORDS] + [(p['lat_aux'], p['lon_aux']) for p in ruta_ordenada] + [BASE_COORDS]
                             geo_trazo, dist_real_km = get_real_route(route_coords)
-                            if not dist_real_km: 
-                                dist_real_km = (len(ruta_ordenada) + 1) * 1.3
-                                st.warning("🛰️ Servidor de rutas fuera de línea. El KML usará trazo directo.")
-
-                            # --- CICLO ÚNICO Y DEFINITIVO ---
-                        tot_lums, tot_postes, tot_cable = 0, 0, 0
-                        cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
-                        
-                        for idx_r, p in enumerate(ruta_ordenada, 1):
-                            # 1. Asignaciones base
-                            p['Ruta_Asignada'] = "Ruta_Unica"
-                            p['No_Ruta'] = idx_r
-                            p['ID_Pangea_Nombre'] = p.get(id_col, "Sin ID")
-                            
-                            # 2. Extracción segura (usando get para evitar KeyError)
-                            raw_lum = extraer_carga_robusta(p, 'lum') if 'extraer_carga_robusta' in globals() else p.get('Cant_Luminarias', 0)
-                            raw_post = extraer_carga_robusta(p, 'poste') if 'extraer_carga_robusta' in globals() else p.get('Cant_Postes', 0)
-                            raw_cable = extraer_carga_robusta(p, 'cable') if 'extraer_carga_robusta' in globals() else p.get('Cant_Cable_m', 0)
-                            
-                            # 3. Conversión numérica segura
-                            p['Cant_Luminarias'] = float(raw_lum) if str(raw_lum).replace('.','',1).replace('-','').isdigit() else (1 if raw_post==0 and raw_cable==0 else 0)
-                            p['Cant_Postes'] = float(raw_post) if str(raw_post).replace('.','',1).replace('-','').isdigit() else 0
-                            p['Cant_Cable_m'] = float(raw_cable) if str(raw_cable).replace('.','',1).replace('-','').isdigit() else 0
-                            
-                            # 4. Maps
-                            p['Maps'] = f"https://www.google.com/maps?q={p.get('lat_aux', 0)},{p.get('lon_aux', 0)}"
-                            
-                            # 5. Acumulamos totales
-                            tot_lums += p['Cant_Luminarias']
-                            tot_postes += p['Cant_Postes']
-                            tot_cable += p['Cant_Cable_m']
-                        # --- FIN DEL CICLO ÚNICO ---
-                        # --- FIN DEL CICLO ÚNICO ---
+                            if not dist_real_km: dist_real_km = (len(ruta_ordenada) + 1) * 1.3
 
                             min_totales = ((tot_lums + tot_postes) * t_por_punto) + (dist_real_km / v_promedio * 60)
                             t_estimado = f"{int(min_totales // 60)} h {int(min_totales % 60)} m"
 
+                            # UI
                             st.subheader("📊 Resumen de Ruta Única (Clásica)")
                             mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
-                            mc1.metric("📍 Puntos", len(ruta_ordenada))
-                            mc2.metric("💡 Luminarias", tot_lums)
-                            mc3.metric("🏗️ Postes", tot_postes)
-                            mc4.metric("🧶 Cable", f"{tot_cable} m")
-                            mc5.metric("🛣️ Distancia", f"{round(dist_real_km, 2)} km")
-                            mc6.metric("⏱️ Tiempo Est.", t_estimado)
+                            mc1.metric("📍 Puntos", len(ruta_ordenada)); mc2.metric("💡 Luminarias", tot_lums)
+                            mc3.metric("🏗️ Postes", tot_postes); mc4.metric("🧶 Cable", f"{tot_cable} m")
+                            mc5.metric("🛣️ Distancia", f"{round(dist_real_km, 2)} km"); mc6.metric("⏱️ Tiempo Est.", t_estimado)
 
                             df_export_c = pd.DataFrame(ruta_ordenada)
                             cols_vits = ['No_Ruta', 'ID_Pangea_Nombre', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m', 'Maps']
-                            columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada']]
+                            columnas_finales = cols_vits + [c for c in df_raw.columns if c != id_col and c not in ['lat_aux', 'lon_aux', 'ï»¿No_Ruta', 'Maps', 'Ruta_Asignada', 'ID_Pangea_Nombre', 'No_Ruta', 'Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m']]
                             df_export_c = df_export_c[columnas_finales]
-
                             st.dataframe(df_export_c, use_container_width=True, hide_index=True)
 
-                            st.write("---")
+                            # Exportaciones
                             cc1, cc2, cc3, cc4 = st.columns(4)
-                            
                             buf_xlsx_c = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx_c, engine='openpyxl') as writer:
                                 df_export_c.to_excel(writer, index=False, sheet_name='Ruta_Clasica_SF')
                                 ws = writer.sheets['Ruta_Clasica_SF']
                                 last_row = len(ruta_ordenada) + 1
                                 res_row = last_row + 2
-                                
                                 ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
                                 ws.cell(row=res_row+1, column=1, value="Total Puntos:"); ws.cell(row=res_row+1, column=2, value=len(ruta_ordenada))
-                                ws.cell(row=res_row+2, column=1, value="Total Luminarias:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(D2:D{last_row})")
-                                ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(E2:E{last_row})")
-                                ws.cell(row=res_row+4, column=1, value="Total Cable:"); ws.cell(row=res_row+4, column=2, value=f"=SUM(F2:F{last_row})")
+                                ws.cell(row=res_row+2, column=1, value="Total Luminarias:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(C2:C{last_row})")
+                                ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(D2:D{last_row})")
+                                ws.cell(row=res_row+4, column=1, value="Total Cable:"); ws.cell(row=res_row+4, column=2, value=f"=SUM(E2:E{last_row})")
                                 ws.cell(row=res_row+5, column=1, value="Distancia:"); ws.cell(row=res_row+5, column=2, value=f"{round(dist_real_km,2)} km")
                                 
-                                f_calc = f"ROUND(((B{res_row+2}+B{res_row+3})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
-                                ws.cell(row=res_row+6, column=1, value="Tiempo Estimado:")
-                                ws.cell(row=res_row+6, column=2, value=f'=INT({f_calc}/60) & " h " & MOD({f_calc},60) & " m"')
-                                
-                                # --- CORRECCIÓN DE SEGURIDAD PARA COLORES ---
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
-                                
                                 for r in range(2, last_row + 1):
-                                    # Obtenemos los valores de forma segura
-                                    val_postes = df_export_c.iloc[r-2]['Cant_Postes']
-                                    val_cable = df_export_c.iloc[r-2]['Cant_Cable_m']
-                                    
-                                    # Convertimos a float, si es NaN o texto vacío, lo convertimos a 0.0
-                                    p_val = float(val_postes) if pd.notnull(val_postes) and str(val_postes).strip() != '' else 0.0
-                                    c_val = float(val_cable) if pd.notnull(val_cable) and str(val_cable).strip() != '' else 0.0
-                                    
-                                    if p_val > 0:
+                                    v_p = float(df_export_c.iloc[r-2]['Cant_Postes']) if pd.notnull(df_export_c.iloc[r-2]['Cant_Postes']) else 0
+                                    v_c = float(df_export_c.iloc[r-2]['Cant_Cable_m']) if pd.notnull(df_export_c.iloc[r-2]['Cant_Cable_m']) else 0
+                                    if v_p > 0:
                                         for cell in ws[r]: cell.fill = fg
-                                    elif c_val > 0:
+                                    elif v_c > 0:
                                         for cell in ws[r]: cell.fill = fa
 
                             cc1.download_button("📗 Excel Pro Dinámico", buf_xlsx_c.getvalue(), file_name=f"SF_CLASICA_{up_name}.xlsx", use_container_width=True)
                             
+                            # (CSV y KML siguen aquí...)
                             csv_buffer = io.StringIO()
                             df_export_c.to_csv(csv_buffer, index=False)
-                            csv_buffer.write(f"\n--- RESUMEN OPERATIVO DINÁMICO ---\n")
-                            csv_buffer.write(f"Total Puntos:,{len(ruta_ordenada)}\n")
-                            csv_buffer.write(f"Total Luminarias:,{tot_lums}\n")
-                            csv_buffer.write(f"Total Postes:,{tot_postes}\n")
-                            csv_buffer.write(f"Total Cable:,{tot_cable} m\n")
-                            csv_buffer.write(f"Distancia Total:,{round(dist_real_km,2)} km\n")
-                            csv_buffer.write(f"Tiempo Estimado:,{t_estimado}\n")
                             cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True)
 
                             kml_c = simplekml.Kml()
-                            folder_c = kml_c.newfolder(name=f"🚚 Ruta Única Clásica ({len(ruta_ordenada)} Pts)")
-                            
+                            folder_c = kml_c.newfolder(name=f"🚚 Ruta Única")
                             for p in ruta_ordenada:
-                                pnt = folder_c.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
-                                h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
-                                h += "<tr><td bgcolor='#767171' colspan='2' align='center'><b style='color:white;'>DATOS DEL REPORTE</b></td></tr>"
-                                for col in cols_orig:
-                                    val = str(p.get(col, '')).strip()
-                                    if val: h += f"<tr><td bgcolor='#F2F2F2'><b>{col}:</b></td><td>{val}</td></tr>"
-                                h += "<tr><td bgcolor='#1F4E78' colspan='2' align='center'><b style='color:white;'>DESGLOSE OPERATIVO</b></td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Punto de Ruta:</b></td><td>{p['No_Ruta']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Luminarias:</b></td><td>{p['Cant_Luminarias']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Postes:</b></td><td>{p['Cant_Postes']}</td></tr>"
-                                h += f"<tr><td bgcolor='#D9EAD3'><b>Cable:</b></td><td>{p['Cant_Cable_m']} m</td></tr>"
-                                h += "<tr><td bgcolor='#C00000' colspan='2' align='center'><b style='color:white;'>--- RESUMEN OPERATIVO DINÁMICO ---</b></td></tr>"
-                                h += f"<tr><td><b>Total Puntos:</b></td><td>{len(ruta_ordenada)}</td></tr>"
-                                h += f"<tr><td><b>Total Luminarias:</b></td><td>{tot_lums}</td></tr>"
-                                h += f"<tr><td><b>Total Postes:</b></td><td>{tot_postes}</td></tr>"
-                                h += f"<tr><td><b>Total Cable:</b></td><td>{tot_cable} m</td></tr>"
-                                h += f"<tr><td><b>Distancia:</b></td><td>{round(dist_real_km,2)} km</td></tr>"
-                                h += f"<tr><td><b>Tiempo Est.:</b></td><td>{t_estimado}</td></tr>"
-                                h += "</table>]]>"
-                                pnt.description = h
-
-                            if geo_trazo:
-                                ls = folder_c.newlinestring(name="TRAYECTO VIAL COMPLETO (BASE-RUTA-BASE)")
-                                ls.coords = [(float(c[0]), float(c[1])) for c in geo_trazo]
-                                ls.style.linestyle.width = 6
-                                ls.style.linestyle.color = 'ff0000ff'
-                            else:
-                                ls = folder_c.newlinestring(name="TRAYECTO DIRECTO (SIN CALLES)")
-                                ls.coords = [(float(c[1]), float(c[0])) for c in route_coords]
-                                ls.style.linestyle.width = 4
-                                ls.style.linestyle.color = 'ff00ffff'
-
-                            cc3.download_button("🗺️ KML Maestro Clásico", kml_c.kml(), file_name=f"SF_CLASICA_{up_name}.kml", use_container_width=True)
-                            cc4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
-
+                                pnt = folder_c.newpoint(name=str(p.get('ID_Pangea_Nombre', 'N/A')), coords=[(p['lon_aux'], p['lat_aux'])])
+                            cc3.download_button("🗺️ KML Maestro", kml_c.kml(), file_name=f"SF_CLASICA_{up_name}.kml", use_container_width=True)
+                            
+                            # Bitacora
                             if st.button("💾 REGISTRAR RUTA CLÁSICA EN BITÁCORA", use_container_width=True, key="reg_c"):
                                 try:
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
-                                    info_j = f"Modo: Clásico, Pts: {len(ruta_ordenada)}, Lums: {tot_lums}, Cab: {tot_cable}m, Dist: {round(dist_real_km,1)}km"
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"CLASICA_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"CLASICA_{up_name}", "Datos_JSON": f"Pts: {len(ruta_ordenada)}"}])
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                    st.balloons(); st.success("¡Bitácora actualizada!")
+                                    st.success("¡Bitácora actualizada!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
                         else:
-                            st.error("No se pudieron extraer coordenadas válidas en Modo Clásico.")
-                    except Exception as e: st.error(f"Error en Motor Clásico: {e}")
+                            st.error("No se pudieron extraer coordenadas.")
+                    except Exception as e: st.error(f"Error en Motor: {e}")
 
         # ==========================================
         # PESTAÑA 2: NUEVO MOTOR MULTI-RUTA (PRO)
