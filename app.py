@@ -1597,7 +1597,7 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
 
-elif st.session_state.menu == "SF5":
+if st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
         
         # 1. Motor matemático encapsulado
