@@ -392,7 +392,7 @@ else:
         if st.button("📊 SF3-Captura y Métricas", use_container_width=True): st.session_state.menu = "SF3"
         if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): st.session_state.menu = "SF4"
         if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): st.session_state.menu = "SF5"
-        if st.button("📦 -Almacén e Inventario", use_container_width=True): st.session_state.menu = "SF6"
+        if st.button("📦 SF6-Almacén e Inventario", use_container_width=True): st.session_state.menu = "SF6"
         st.write("---")
         if st.session_state.menu == "SF1":
             st.subheader("📊 Ajustes GdR Multi-Ruta")
