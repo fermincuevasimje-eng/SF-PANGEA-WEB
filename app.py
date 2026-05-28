@@ -860,20 +860,26 @@ else:
                             tot_lums, tot_postes, tot_cable = 0, 0, 0
                             cols_orig = [c for c in df_raw.columns if c not in ['lat_aux', 'lon_aux']]
                             
+                            # Asegúrate de que el 'for' empiece alineado a la izquierda según tu archivo
                             for idx_r, p in enumerate(ruta_ordenada, 1):
-                            p['Ruta_Asignada'] = "Ruta_Unica"
-                            p['No_Ruta'] = idx_r
-                            p['ID_Pangea_Nombre'] = p[id_col]
-                            
-                            # --- AQUÍ ESTÁ LA SOLUCIÓN ---
-                            # Convertimos a número antes de sumar, manejando posibles vacíos
-                            lum_val = float(p['Cant_Luminarias']) if str(p['Cant_Luminarias']).replace('.','',1).isdigit() else 0
-                            post_val = float(p['Cant_Postes']) if str(p['Cant_Postes']).replace('.','',1).isdigit() else 0
-                            cable_val = float(p['Cant_Cable_m']) if str(p['Cant_Cable_m']).replace('.','',1).isdigit() else 0
-                            
-                            p['Cant_Luminarias'] = lum_val
-                            p['Cant_Postes'] = post_val
-                            p['Cant_Cable_m'] = cable_val
+                                p['Ruta_Asignada'] = "Ruta_Unica"
+                                p['No_Ruta'] = idx_r
+                                p['ID_Pangea_Nombre'] = p[id_col]
+                                
+                                # Conversión segura a número para evitar errores de texto
+                                lum_val = float(p['Cant_Luminarias']) if str(p['Cant_Luminarias']).replace('.','',1).isdigit() else 0
+                                post_val = float(p['Cant_Postes']) if str(p['Cant_Postes']).replace('.','',1).isdigit() else 0
+                                cable_val = float(p['Cant_Cable_m']) if str(p['Cant_Cable_m']).replace('.','',1).isdigit() else 0
+                                
+                                p['Cant_Luminarias'] = lum_val
+                                p['Cant_Postes'] = post_val
+                                p['Cant_Cable_m'] = cable_val
+                                
+                                p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
+                                
+                                tot_lums += lum_val
+                                tot_postes += post_val
+                                tot_cable += cable_val
                             # -----------------------------
 
                             p['Maps'] = f"https://www.google.com/maps?q={p['lat_aux']},{p['lon_aux']}"
