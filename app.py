@@ -999,7 +999,6 @@ else:
             if st.session_state.perfil == "CONSULTA":
                 st.warning("⚠️ Modo Consulta activo.")
             else:
-                max_puntos_ruta = 30  
                 datos_vienen_de_sf5 = "df_transferido" in st.session_state and st.session_state.df_transferido is not None
                 if datos_vienen_de_sf5:
                     st.info(f"📦 Usando datos procesados de: {st.session_state.nombre_archivo_transferido}")
