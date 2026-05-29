@@ -895,9 +895,14 @@ else:
                             st.write("---")
                             cc1, cc2, cc3, cc4 = st.columns(4)
                             
+                           # Convertir columnas críticas a numéricas para permitir sumatorias en Excel
+                            df_export_excel = df_export_c.copy()
+                            for col_num in ['Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m']:
+                                df_export_excel[col_num] = pd.to_numeric(df_export_excel[col_num], errors='coerce').fillna(0).astype(int)
+
                             buf_xlsx_c = io.BytesIO()
                             with pd.ExcelWriter(buf_xlsx_c, engine='openpyxl') as writer:
-                                df_export_c.to_excel(writer, index=False, sheet_name='Ruta_Clasica_SF')
+                                df_export_excel.to_excel(writer, index=False, sheet_name='Ruta_Clasica_SF')
                                 ws = writer.sheets['Ruta_Clasica_SF']
                                 last_row = len(ruta_ordenada) + 1
                                 res_row = last_row + 2
