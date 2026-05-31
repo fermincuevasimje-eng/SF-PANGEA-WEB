@@ -1563,17 +1563,17 @@ else:
                     c1, c2 = st.columns(2)
                     n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"))
                     f_oficio = c2.date_input("Fecha:", value=pd.to_datetime(data_previa.get("fecha")).date() if data_previa.get("fecha") else pd.Timestamp.now().date())
-                    dest = st.text_area("Destinatario:", value=data_previa.get("dest", ""), height=70)
+                    dest = st.text_area("Destinatario:", value=data_previa.get("dest", ""), height=70, kwargs={"spellcheck": "true"})
                     cargo = st.text_input("Cargo:", value=data_previa.get("cargo", "P R E S E N T E"))
                     f_ref = st.text_input("Folio Ref:", value=data_previa.get("folio", ""))
 
                 with st.container(border=True):
                     st.markdown("**📝 Mensaje**")
                     v_cuerpo = data_previa.get("cuerpo", plantillas_maestras[tipo_p])
-                    cuerpo_txt = st.text_area("Cuerpo:", value=v_cuerpo, height=150)
+                    cuerpo_txt = st.text_area("Cuerpo:", value=v_cuerpo, height=150, kwargs={"spellcheck": "true"})
                     firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"))
                     cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"))
-                    ccp = st.text_input("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."))
+                    ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."), height=65, kwargs={"spellcheck": "true"})
 
                 h_membrete = st.toggle("🛰️ Modo Hoja Membretada", value=False)
 
@@ -1589,7 +1589,7 @@ else:
                     <div style="text-align: left; font-weight: bold; white-space: pre-line;">{dest.upper()}<br>{cargo.upper()}</div><br>
                     <div style="text-align: justify;"> {c_final} </div><br><br>
                     <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br>{cargo_firm.upper()}</div>
-                    <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px;">C.c.p. {ccp}</div>
+                    <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px; white-space: pre-line;">C.c.p. {ccp}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
