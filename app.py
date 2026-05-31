@@ -1563,7 +1563,7 @@ else:
                     c1, c2 = st.columns(2)
                     n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"))
                     f_oficio = c2.date_input("Fecha:", value=pd.to_datetime(data_previa.get("fecha")).date() if data_previa.get("fecha") else pd.Timestamp.now().date())
-                    dest = st.text_input("Destinatario:", value=data_previa.get("dest", ""))
+                    dest = st.text_area("Destinatario:", value=data_previa.get("dest", ""), height=70)
                     cargo = st.text_input("Cargo:", value=data_previa.get("cargo", "P R E S E N T E"))
                     f_ref = st.text_input("Folio Ref:", value=data_previa.get("folio", ""))
 
@@ -1586,7 +1586,7 @@ else:
                 <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.6; min-height: 550px;">
                     <div style="height: {e_sup};"></div>
                     <div style="text-align: right; font-weight: bold;">Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}<br>Oficio: {n_oficio}</div><br>
-                    <div style="text-align: left; font-weight: bold;">{dest.upper()}<br>{cargo.upper()}</div><br>
+                    <div style="text-align: left; font-weight: bold; white-space: pre-line;">{dest.upper()}<br>{cargo.upper()}</div><br>
                     <div style="text-align: justify;"> {c_final} </div><br><br>
                     <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br>{cargo_firm.upper()}</div>
                     <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px;">C.c.p. {ccp}</div>
