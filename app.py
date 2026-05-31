@@ -1640,6 +1640,22 @@ else:
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
+        # === ANCLAJE FÍSICO Y CARGA GLOBAL DE BÓVEDA (SF5) ===
+        PATH_DEPURACION_DB = "boveda_depuracion.json"
+        if "db_depuracion" not in st.session_state:
+            if os.path.exists(PATH_DEPURACION_DB):
+                with open(PATH_DEPURACION_DB, "r", encoding="utf-8") as f:
+                    st.session_state.db_depuracion = json.load(f)
+            else:
+                st.session_state.db_depuracion = {}
+
+        # Inicialización de variables de sesión para la mesa de trabajo actual
+        if "da_actual" not in st.session_state: st.session_state.da_actual = None
+        if "h1_actual" not in st.session_state: st.session_state.h1_actual = None
+        if "h2_actual" not in st.session_state: st.session_state.h2_actual = None
+        if "tipo_depuracion_actual" not in st.session_state: st.session_state.tipo_depuracion_actual = ""
+        # ======================================================
+
         # --- MOTOR DE PROCESAMIENTO REFINADO ---
         def motor_sf5(df_total):
             df_total = df_total.astype(str).fillna("")
@@ -1678,7 +1694,6 @@ else:
             df_total['Grupo_Duplicado'] = marcador
             
             # --- SEPARATION LOGIC ---
-            # Indices of the first occurrence (representatives)
             indices_reps = []
             seen_groups = set()
             for idx, row in df_total.iterrows():
@@ -1687,14 +1702,12 @@ else:
                     indices_reps.append(idx)
                     if gid > 0: seen_groups.add(gid)
             
-            # h1: Representatives + Unique items
             h1 = df_total.loc[indices_reps].copy()
-            # h2: Duplicates (All rows with group ID > 0 EXCEPT the representative)
             h2 = df_total[(df_total['Grupo_Duplicado'] > 0) & (~df_total.index.isin(indices_reps))].copy()
             
             return df_total, h1, h2
 
-        # --- INTERFACE ---
+        # --- INTERFACE DE DASHBOARD Y PRODUCTO FINAL ---
         def renderizar_interfaz(da, h1, h2, suffix):
             st.markdown("### 📈 Dashboard de Depuración SF5")
             m_cols = st.columns(5)
@@ -1715,40 +1728,156 @@ else:
             with pd.ExcelWriter(out, engine='openpyxl') as w:
                 h1.to_excel(w, index=False, sheet_name='PARA_MODULO_1')
                 ws = w.sheets['PARA_MODULO_1']
-                # Yellow highlight for representatives that have duplicates
                 for r_num, (_, row) in enumerate(h1.iterrows(), 2):
                     if int(row['Grupo_Duplicado']) > 0:
                         for cell in ws[r_num]: cell.fill = yellow_fill
                 
                 h2.to_excel(w, index=False, sheet_name='REPORTE_DUPLICADOS')
             
+            excel_data = out.getvalue()
+            
             st.write("---")
-            st.download_button("🚀 DESCARGAR PRODUCTO FINAL v25", out.getvalue(), "SF_PANGEA_DEPURADO.xlsx", use_container_width=True, key=f"dl_{suffix}")
-            if st.button("➡️ ENVIAR AL GENERADOR (SF1)", use_container_width=True, type="primary", key=f"btn_{suffix}"):
+            c_down, c_trans = st.columns(2)
+            c_down.download_button("🚀 DESCARGAR PRODUCTO FINAL v25", excel_data, "SF_PANGEA_DEPURADO.xlsx", use_container_width=True, key=f"dl_{suffix}")
+            
+            if c_trans.button("➡️ ENVIAR AL GENERADOR (SF1)", use_container_width=True, type="primary", key=f"btn_{suffix}"):
                 st.session_state.df_transferido = h1.copy()
                 st.session_state.nombre_archivo_transferido = "DEPURADO_SF5.xlsx"
                 st.session_state.menu = "SF1"
                 st.rerun()
 
-        # --- TABS ---
-        tab_multi, tab_auditoria = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (1 archivo)"])
+            st.write("---")
+            st.subheader("💾 Guardado en Bóveda Histórica")
+            col_txt_nom, col_btn_json = st.columns([2.5, 1.5])
+            nombre_depuracion = col_txt_nom.text_input("Asigna un nombre a esta depuración para tu archivo permanente:", placeholder="Ej: Depuración Oriente 01/06", key=f"txt_save_{suffix}")
+            
+            if col_btn_json.button("📁 Guardar en Historial", use_container_width=True, key=f"save_bov_{suffix}"):
+                if nombre_depuracion.strip():
+                    id_dep = f"DEP-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
+                    st.session_state.db_depuracion[id_dep] = {
+                        "nombre": nombre_depuracion.strip(),
+                        "fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        "tipo": st.session_state.tipo_depuracion_actual,
+                        "procesados": len(da),
+                        "duplicados": len(h2),
+                        "unicos": len(h1),
+                        "da_json": da.to_json(orient='split'),
+                        "h1_json": h1.to_json(orient='split'),
+                        "h2_json": h2.to_json(orient='split')
+                    }
+                    with open(PATH_DEPURACION_DB, "w", encoding="utf-8") as f:
+                        json.dump(st.session_state.db_depuracion, f, indent=4, ensure_ascii=False)
+                    st.success(f"✅ Depuración guardada con éxito. ID: {id_dep}")
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Ingresa un nombre para poder guardar el reporte físico.")
+
+        # --- ARQUITECTURA DE PESTAÑAS (TABS) ---
+        tab_multi, tab_auditoria, tab_boveda = st.tabs(["🔄 Comparar Varios Archivos", "🔍 Auditoría Interna (1 archivo)", "🗄️ Bóveda de Historial Permanente"])
+        
         with tab_multi:
             f_in = st.file_uploader("📂 Archivos", accept_multiple_files=True, key="m_in_sf5")
             if f_in:
-                dfs = []
-                for f in f_in:
-                    df = pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str)
-                    df['archivo'] = f.name # Traceability column
-                    dfs.append(df)
-                da, h1, h2 = motor_sf5(pd.concat(dfs, ignore_index=True))
-                if da is not None: renderizar_interfaz(da, h1, h2, "multi")
+                if st.button("⚡ Ejecutar Depuración Masiva", use_container_width=True, type="primary"):
+                    try:
+                        dfs = []
+                        for f in f_in:
+                            df = pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str)
+                            df['archivo_origen'] = f.name
+                            dfs.append(df)
+                        da, h1, h2 = motor_sf5(pd.concat(dfs, ignore_index=True))
+                        if da is not None:
+                            st.session_state.da_actual = da
+                            st.session_state.h1_actual = h1
+                            st.session_state.h2_actual = h2
+                            st.session_state.tipo_depuracion_actual = "Masiva (Varios Archivos)"
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al procesar archivos masivos: {e}")
+
         with tab_auditoria:
-            f_in = st.file_uploader("📂 Archivo", accept_multiple_files=False, key="s_in_sf5")
-            if f_in:
-                df = pd.read_excel(f_in, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f_in, dtype=str)
-                df['archivo'] = f_in.name # Traceability column
-                da, h1, h2 = motor_sf5(df)
-                if da is not None: renderizar_interfaz(da, h1, h2, "audit")
+            f_in_s = st.file_uploader("📂 Archivo Único", accept_multiple_files=False, key="s_in_sf5")
+            if f_in_s:
+                if st.button("⚡ Ejecutar Auditoría Única", use_container_width=True, type="primary"):
+                    try:
+                        df = pd.read_excel(f_in_s, dtype=str) if f_in_s.name.endswith('.xlsx') else pd.read_csv(f_in_s, dtype=str)
+                        df['archivo_origen'] = f_in_s.name
+                        da, h1, h2 = motor_sf5(df)
+                        if da is not None:
+                            st.session_state.da_actual = da
+                            st.session_state.h1_actual = h1
+                            st.session_state.h2_actual = h2
+                            st.session_state.tipo_depuracion_actual = "Individual (Auditoría Única)"
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al procesar archivo único: {e}")
+
+        with tab_boveda:
+            st.subheader("🗄️ Historial de Reportes de Depuración")
+            if st.session_state.db_depuracion:
+                lista_boveda_dep = []
+                for k, v in st.session_state.db_depuracion.items():
+                    lista_boveda_dep.append({
+                        "ID Registro": k,
+                        "Nombre": v["nombre"],
+                        "Fecha": v["fecha"],
+                        "Tipo": v["tipo"],
+                        "Total Mapeado": v["procesados"],
+                        "Duplicados": v["duplicados"],
+                        "Únicos": v["unicos"]
+                    })
+                df_bov_vista = pd.DataFrame(lista_boveda_dep)
+                st.dataframe(df_bov_vista.sort_values(by="ID Registro", ascending=False), use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                col_rec, col_el = st.columns([2.5, 1.5])
+                
+                with col_rec:
+                    st.write("🔍 **Cargar del Historial:**")
+                    id_recuperar = st.selectbox("Selecciona Depuración:", list(st.session_state.db_depuracion.keys())[::-1], key="sb_rec_dep")
+                    if id_recuperar:
+                        if st.button("🔄 Recuperar a Mesa de Trabajo", use_container_width=True):
+                            data_h = st.session_state.db_depuracion[id_recuperar]
+                            st.session_state.da_actual = pd.read_json(data_h["da_json"], orient='split')
+                            st.session_state.h1_actual = pd.read_json(data_h["h1_json"], orient='split')
+                            st.session_state.h2_actual = pd.read_json(data_h["h2_json"], orient='split')
+                            st.session_state.tipo_depuracion_actual = data_h["tipo"]
+                            st.toast(f"Reporte {id_recuperar} cargado en pantalla", icon="🔄")
+                            time.sleep(0.3)
+                            st.rerun()
+                
+                with col_el:
+                    st.write("🚨 **Zona Crítica:**")
+                    seguro_borrado_f = st.checkbox("🔐 Confirmar eliminación física", key="chk_seg_bov_dep")
+                    if st.button("🗑️ BORRAR DE BÓVEDA", use_container_width=True, type="secondary", disabled=not seguro_borrado_f):
+                        if id_recuperar:
+                            del st.session_state.db_depuracion[id_recuperar]
+                            with open(PATH_DEPURACION_DB, "w", encoding="utf-8") as f:
+                                json.dump(st.session_state.db_depuracion, f, indent=4, ensure_ascii=False)
+                            st.warning(f"Reporte {id_recuperar} eliminado permanentemente.")
+                            time.sleep(0.5)
+                            st.rerun()
+            else:
+                st.info("La bóveda histórica de depuración está vacía.")
+
+        # --- DESPLIEGUE CONTINUO DE LA MESA DE TRABAJO ACTUAL ---
+        if st.session_state.da_actual is not None:
+            st.write("---")
+            st.markdown(f"### 📍 MESA DE TRABAJO EN OPERACIÓN: **{st.session_state.tipo_depuracion_actual}**")
+            renderizar_interfaz(st.session_state.da_actual, st.session_state.h1_actual, st.session_state.h2_actual, "mesa")
+            
+            st.write("---")
+            st.write("⚠️ **Zona de Peligro Interna**")
+            seguro_limpieza_mesa = st.checkbox("🔐 Confirmar vaciado completo de la mesa de trabajo actual", key="chk_seg_mesa")
+            if st.button("🗑️ LIMPIAR MESA DE TRABAJO (Reiniciar)", use_container_width=True, type="secondary", disabled=not seguro_limpieza_mesa):
+                st.session_state.da_actual = None
+                st.session_state.h1_actual = None
+                st.session_state.h2_actual = None
+                st.session_state.tipo_depuracion_actual = ""
+                st.toast("Mesa de trabajo vaciada", icon="🗑️")
+                time.sleep(0.5)
+                st.rerun()
     elif st.session_state.menu == "SF6":
         # ==========================================
         # --- FILTRO 1: INICIO MAESTRO DEL SISTEMA (PIN 1827) ---
