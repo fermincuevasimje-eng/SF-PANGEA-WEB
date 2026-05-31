@@ -1839,9 +1839,9 @@ else:
                     if id_recuperar:
                         if st.button("🔄 Recuperar a Mesa de Trabajo", use_container_width=True):
                             data_h = st.session_state.db_depuracion[id_recuperar]
-                            st.session_state.da_actual = pd.read_json(data_h["da_json"], orient='split')
-                            st.session_state.h1_actual = pd.read_json(data_h["h1_json"], orient='split')
-                            st.session_state.h2_actual = pd.read_json(data_h["h2_json"], orient='split')
+                            st.session_state.da_actual = pd.read_json(io.StringIO(data_h["da_json"]), orient='split')
+                            st.session_state.h1_actual = pd.read_json(io.StringIO(data_h["h1_json"]), orient='split')
+                            st.session_state.h2_actual = pd.read_json(io.StringIO(data_h["h2_json"]), orient='split')
                             st.session_state.tipo_depuracion_actual = data_h["tipo"]
                             st.toast(f"Reporte {id_recuperar} cargado en pantalla", icon="🔄")
                             time.sleep(0.3)
