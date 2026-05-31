@@ -1783,7 +1783,7 @@ else:
                     try:
                         dfs = []
                         for f in f_in:
-                            df = pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, dtype=str)
+                            df = pd.read_excel(f, dtype=str) if f.name.endswith('.xlsx') else pd.read_csv(f, encoding='latin-1', dtype=str)
                             df['archivo_origen'] = f.name
                             dfs.append(df)
                         da, h1, h2 = motor_sf5(pd.concat(dfs, ignore_index=True))
@@ -1801,7 +1801,7 @@ else:
             if f_in_s:
                 if st.button("⚡ Ejecutar Auditoría Única", use_container_width=True, type="primary"):
                     try:
-                        df = pd.read_excel(f_in_s, dtype=str) if f_in_s.name.endswith('.xlsx') else pd.read_csv(f_in_s, dtype=str)
+                        df = pd.read_excel(f_in_s, dtype=str) if f_in_s.name.endswith('.xlsx') else pd.read_csv(f_in_s, encoding='latin-1', dtype=str)
                         df['archivo_origen'] = f_in_s.name
                         da, h1, h2 = motor_sf5(df)
                         if da is not None:
