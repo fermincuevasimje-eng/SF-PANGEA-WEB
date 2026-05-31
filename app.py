@@ -605,6 +605,14 @@ else:
 
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
+        
+        PATH_BAJAS_DB = "boveda_bajas.json"
+        if "db_bajas_historico" not in st.session_state:
+            if os.path.exists(PATH_BAJAS_DB):
+                with open(PATH_BAJAS_DB, "r", encoding="utf-8") as f:
+                    st.session_state.db_bajas_historico = json.load(f)
+            else:
+                st.session_state.db_bajas_historico = {}
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
         
         up_sf2 = st.file_uploader("Subir Archivo de Referencia (Excel/CSV)", type=["csv", "xlsx"], key="sf2_up")
@@ -663,13 +671,6 @@ else:
                                 st.warning("⚠️ Por favor digite un folio antes de agregar.")
 
                 with c_lista:
-                    PATH_BAJAS_DB = "boveda_bajas.json"
-                    if "db_bajas_historico" not in st.session_state:
-                        if os.path.exists(PATH_BAJAS_DB):
-                            with open(PATH_BAJAS_DB, "r", encoding="utf-8") as f:
-                                st.session_state.db_bajas_historico = json.load(f)
-                        else:
-                            st.session_state.db_bajas_historico = {}
 
                     tab_actual, tab_boveda = st.tabs(["📋 Captura Actual", "📂 Bóveda de Historial"])
 
