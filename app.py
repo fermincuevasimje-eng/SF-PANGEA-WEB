@@ -1675,8 +1675,8 @@ else:
             
             if df_total.empty: return None, None, None
 
-            # Cluster detection (3 meters)
-            umbral = 3 / 111111.0
+            # Cluster detection (20 meters)
+            umbral = 20 / 111111.0
             coords_arr = df_total[['lat_aux', 'lon_aux']].values
             marcador = [0] * len(df_total)
             color_id = 1
