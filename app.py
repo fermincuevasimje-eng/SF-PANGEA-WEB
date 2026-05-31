@@ -1319,6 +1319,23 @@ else:
 
     elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Arquitecto de Procesos & Oficios")
+        
+        # === ANCLAJE FÍSICO Y CARGA GLOBAL DE BÓVEDAS (SF4) ===
+        PATH_OFICIOS_DB = "boveda_oficios.json"
+        if "db_oficios" not in st.session_state:
+            if os.path.exists(PATH_OFICIOS_DB):
+                with open(PATH_OFICIOS_DB, "r", encoding="utf-8") as f:
+                    st.session_state.db_oficios = json.load(f)
+            else:
+                st.session_state.db_oficios = {}
+
+        if "boveda_mmd" not in st.session_state:
+            if os.path.exists("boveda_pangea.json"):
+                with open("boveda_pangea.json", "r", encoding="utf-8") as f:
+                    st.session_state.boveda_mmd = json.load(f)
+            else:
+                st.session_state.boveda_mmd = {}
+        # ======================================================
         tab_c, tab_b, tab_i, tab_o = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa", "📄 GENERADOR DE OFICIOS"])
 
         with tab_c:
@@ -1508,13 +1525,6 @@ else:
             except ImportError:
                 motor_pdf_listo = False
                 st.warning("⚠️ Motor PDF (fpdf) no detectado. Las descargas están deshabilitadas.")
-
-            if "db_oficios" not in st.session_state:
-                if os.path.exists(PATH_OFICIOS_DB):
-                    with open(PATH_OFICIOS_DB, "r", encoding="utf-8") as f:
-                        st.session_state.db_oficios = json.load(f)
-                else:
-                    st.session_state.db_oficios = {}
 
             plantillas_maestras = {
                 "✅ Atención Exitosa": "Por medio de la presente, se hace de su conocimiento que la petición con folio [FOLIO] ha sido atendida exitosamente por las brigadas de esta Dirección, quedando el servicio en óptimas condiciones de operación.",
