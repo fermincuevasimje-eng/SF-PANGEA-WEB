@@ -1317,17 +1317,11 @@ else:
             else:
                 st.warning("🔒 Área restringida para administradores.")
 
-   elif st.session_state.menu == "SF4":
+    elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Arquitecto de Procesos & Oficios")
         
-        # === ANCLAJE FÍSICO Y CARGA GLOBAL DE BÓVEDAS BLINDADA (SF4) ===
+        # === ANCLAJE FÍSICO Y CARGA GLOBAL DE BÓVEDAS (SF4) ===
         PATH_OFICIOS_DB = "boveda_oficios.json"
-        PATH_PANGEA_DB = "boveda_pangea.json"
-
-        # Asegurar inicialización de variables de control de flujo en RAM
-        if "edit_index" not in st.session_state: st.session_state.edit_index = -1
-        if "pasos_sf4" not in st.session_state: st.session_state.pasos_sf4 = []
-
         if "db_oficios" not in st.session_state:
             if os.path.exists(PATH_OFICIOS_DB):
                 with open(PATH_OFICIOS_DB, "r", encoding="utf-8") as f:
@@ -1336,20 +1330,19 @@ else:
                 st.session_state.db_oficios = {}
 
         if "boveda_mmd" not in st.session_state:
-            if os.path.exists(PATH_PANGEA_DB):
-                with open(PATH_PANGEA_DB, "r", encoding="utf-8") as f:
+            if os.path.exists("boveda_pangea.json"):
+                with open("boveda_pangea.json", "r", encoding="utf-8") as f:
                     st.session_state.boveda_mmd = json.load(f)
             else:
                 st.session_state.boveda_mmd = {}
-        # ===============================================================
-
+        # ======================================================
         tab_c, tab_b, tab_i, tab_o = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa", "📄 GENERADOR DE OFICIOS"])
 
         with tab_c:
             with st.expander("📝 CONFIGURAR PASO", expanded=True):
                 idx = st.session_state.edit_index
                 editando = (idx != -1)
-                paso_actual = st.session_state.pasos_sf4[idx] if (editando and idx < len(st.session_state.pasos_sf4)) else {}
+                paso_actual = st.session_state.pasos_sf4[idx] if editando else {}
                 
                 txt = st.text_input("Actividad o Pregunta (usa '?' para bifurcar):", value=paso_actual.get('texto', ""), key=f"txt_sf4_{idx}")
                 is_decision = txt.strip().endswith('?')
@@ -1464,7 +1457,7 @@ else:
                     if st.button("💾 Guardar en Bóveda Pangea"):
                         if nom_p:
                             st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
-                            with open(PATH_PANGEA_DB, "w", encoding="utf-8") as f:
+                            with open("boveda_pangea.json", "w", encoding="utf-8") as f:
                                 json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
                             st.success("Guardado correctamente.")
 
@@ -1481,7 +1474,7 @@ else:
                         if k.strip().upper() != "PASTEL VERDE":
                             if b3.button("🗑️", key=f"x_{k}", use_container_width=True):
                                 del st.session_state.boveda_mmd[k]
-                                with open(PATH_PANGEA_DB, "w", encoding="utf-8") as f:
+                                with open("boveda_pangea.json", "w", encoding="utf-8") as f:
                                     json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
                                 st.rerun()
 
@@ -1524,6 +1517,7 @@ else:
 
         with tab_o:
             st.subheader("📄 Correspondencia Oficial y Control de Bóveda")
+            PATH_OFICIOS_DB = "boveda_oficios.json"
 
             try:
                 from fpdf import FPDF
@@ -1614,11 +1608,14 @@ else:
                     st.success("✅ Bóveda Actualizada."); time.sleep(1); st.rerun()
 
                 if motor_pdf_listo:
+                    # Inicialización con formato carta y márgenes (en mm)
+                    # set_margins(left, top, right) -> 30mm, 25mm, 20mm
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf.set_margins(30, 25, 20)
                     pdf.set_auto_page_break(auto=True, margin=25) 
                     pdf.add_page()
-                     
+                    
+                    # Espaciado si hay membrete
                     if h_membrete: 
                         pdf.ln(15)
                     pdf.set_font("Arial", 'B', 11)
@@ -1634,11 +1631,12 @@ else:
                     pdf.cell(0, 5, txt=firm.upper(), ln=True, align='C')
                     pdf.cell(0, 5, txt=cargo_firm.upper(), ln=True, align='C')
                     pdf.set_y(-30); pdf.set_font("Arial", '', 8); pdf.cell(0, 5, txt=f"C.c.p. {ccp}", ln=True)
-                     
+                    
                     pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
                     st.download_button(label="🚀 DESCARGAR OFICIO PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
                     st.error("❌ Función PDF no disponible.")
+
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
