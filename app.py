@@ -1318,327 +1318,327 @@ else:
                 st.warning("🔒 Área restringida para administradores.")
 
    elif st.session_state.menu == "SF4":
-        st.title("🏗️ SF4 - Arquitecto de Procesos & Oficios")
-        
-        # === ANCLAJE FÍSICO Y CARGA GLOBAL DE BÓVEDAS BLINDADA (SF4) ===
-        PATH_OFICIOS_DB = "boveda_oficios.json"
-        PATH_PANGEA_DB = "boveda_pangea.json"
-
-        # Asegurar inicialización de variables de control de flujo en RAM
-        if "edit_index" not in st.session_state: st.session_state.edit_index = -1
-        if "pasos_sf4" not in st.session_state: st.session_state.pasos_sf4 = []
-
-        if "db_oficios" not in st.session_state:
-            if os.path.exists(PATH_OFICIOS_DB):
-                with open(PATH_OFICIOS_DB, "r", encoding="utf-8") as f:
-                    st.session_state.db_oficios = json.load(f)
-            else:
-                st.session_state.db_oficios = {}
-
-        if "boveda_mmd" not in st.session_state:
-            if os.path.exists(PATH_PANGEA_DB):
-                with open(PATH_PANGEA_DB, "r", encoding="utf-8") as f:
-                    st.session_state.boveda_mmd = json.load(f)
-            else:
-                st.session_state.boveda_mmd = {}
-        # ===============================================================
-
-        tab_c, tab_b, tab_i, tab_o = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa", "📄 GENERADOR DE OFICIOS"])
-
-        with tab_c:
-            with st.expander("📝 CONFIGURAR PASO", expanded=True):
-                idx = st.session_state.edit_index
-                editando = (idx != -1)
-                paso_actual = st.session_state.pasos_sf4[idx] if (editando and idx < len(st.session_state.pasos_sf4)) else {}
-                
-                txt = st.text_input("Actividad o Pregunta (usa '?' para bifurcar):", value=paso_actual.get('texto', ""), key=f"txt_sf4_{idx}")
-                is_decision = txt.strip().endswith('?')
-                destinos = ["Siguiente", "Fin"] + [f"Paso {i+1}" for i in range(len(st.session_state.pasos_sf4))]
-
-                c1, c2, c3 = st.columns(3)
-                if not is_decision:
-                    with c1: tipo = st.selectbox("Forma:", ["Proceso", "Inicio/Fin"], index=0 if paso_actual.get('tipo') == "Proceso" else (1 if paso_actual.get('tipo') == "Inicio/Fin" else 0))
-                    with c2: 
-                        d_val = paso_actual.get('conecta_a', "Siguiente")
-                        destino = st.selectbox("Conecta a:", destinos, index=destinos.index(d_val) if d_val in destinos else 0)
-                    with c3: label = st.text_input("Etiqueta flecha:", value=paso_actual.get('etiqueta_flecha', ""), placeholder="Ej: Ok")
-                else:
-                    with c1: 
-                        label_si = st.text_input("Etiqueta SÍ:", value=paso_actual.get('label_si', "SÍ"))
-                        d_si_val = paso_actual.get('dest_si', "Siguiente")
-                        dest_si = st.selectbox("Destino SÍ:", destinos, index=destinos.index(d_si_val) if d_si_val in destinos else 0)
-                    with c2: 
-                        label_no = st.text_input("Etiqueta NO:", value=paso_actual.get('label_no', "NO"))
-                        d_no_val = paso_actual.get('dest_no', "Siguiente")
-                        dest_no = st.selectbox("Destino NO (Salto):", destinos, index=destinos.index(d_no_val) if d_no_val in destinos else 0)
-                    with c3: st.info("Las decisiones requieren dos salidas obligatorias.")
-
-                if not editando:
-                    if st.button("➕ Agregar al Flujo", use_container_width=True):
-                        if txt:
-                            nuevo = {"texto": txt, "is_decision": is_decision}
-                            if is_decision: nuevo.update({"label_si": label_si, "dest_si": dest_si, "label_no": label_no, "dest_no": dest_no, "tipo": "Decisión"})
-                            else: nuevo.update({"tipo": tipo, "conecta_a": destino, "etiqueta_flecha": label})
-                            st.session_state.pasos_sf4.append(nuevo)
-                            st.rerun()
-                else:
-                    cs, cc = st.columns(2)
-                    if cs.button("💾 Guardar Cambios", use_container_width=True):
-                        nuevo = {"texto": txt, "is_decision": is_decision}
-                        if is_decision: nuevo.update({"label_si": label_si, "dest_si": dest_si, "label_no": label_no, "dest_no": dest_no, "tipo": "Decisión"})
-                        else: nuevo.update({"tipo": tipo, "conecta_a": destino, "etiqueta_flecha": label})
-                        st.session_state.pasos_sf4[idx] = nuevo
-                        st.session_state.edit_index = -1
-                        st.rerun()
-                    if cc.button("❌ Cancelar", use_container_width=True):
-                        st.session_state.edit_index = -1
-                        st.rerun()
-
-            if st.session_state.pasos_sf4:
-                col_l, col_p = st.columns([1, 1.2])
-                with col_l:
-                    st.subheader("📋 Pasos")
-                    for i, p in enumerate(st.session_state.pasos_sf4):
-                        with st.container(border=True):
-                            cx, cy, cz = st.columns([0.5, 3, 1])
-                            cx.write(f"#{i+1}"); cy.write(p['texto'])
-                            if cz.button("✏️", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
-                            if cz.button("🗑️", key=f"d_{i}"): st.session_state.pasos_sf4.pop(i); st.rerun()
-                    if st.button("🔥 Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
-
-                with col_p:
-                    st.subheader("📊 Visualización Premium")
-                    def clean(t): return re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', str(t))
-                    
-                    mmd_head = ["graph TD", "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
-                    mmd_nodos, mmd_conexiones = [], []
-
-                    for i, p in enumerate(st.session_state.pasos_sf4):
-                        id_n = f"N{i}"
-                        t_c = clean(p.get('texto', ''))
-                        if p.get('tipo') == "Decisión": mmd_nodos.append(f'    {id_n}{{\"{t_c}\"}}:::decision')
-                        elif p.get('tipo') == "Inicio/Fin": mmd_nodos.append(f'    {id_n}((\"{t_c}\"))')
-                        else: mmd_nodos.append(f'    {id_n}[\"{t_c}\"]:::proceso')
-
-                    for i, p in enumerate(st.session_state.pasos_sf4):
-                        id_n = f"N{i}"
-                        if not p.get('is_decision', False):
-                            tgt = p.get('conecta_a', "Siguiente")
-                            lab = p.get('etiqueta_flecha', "")
-                            f_style = f'-- "{lab}" -->' if lab else "-->"
-                            if tgt == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd_conexiones.append(f'    {id_n} {f_style} N{i+1}')
-                            elif tgt == "Fin": mmd_conexiones.append(f'    {id_n} {f_style} Fin([Fin])')
-                            elif "Paso" in str(tgt):
-                                p_num = int(re.search(r'\d+', str(tgt)).group()) - 1
-                                mmd_conexiones.append(f'    {id_n} {f_style} N{p_num}')
-                        else:
-                            for l_key, d_key in [('label_si', 'dest_si'), ('label_no', 'dest_no')]:
-                                dst = p.get(d_key, "Siguiente")
-                                lab_f = p.get(l_key, "Opción")
-                                f_style = f'-- "{lab_f}" -->'
-                                if dst == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd_conexiones.append(f'    {id_n} {f_style} N{i+1}')
-                                elif dst == "Fin": mmd_conexiones.append(f'    {id_n} {f_style} Fin([Fin])')
-                                elif "Paso" in str(dst):
-                                    p_num = int(re.search(r'\d+', str(dst)).group()) - 1
-                                    mmd_conexiones.append(f'    {id_n} {f_style} N{p_num}')
-
-                    full_m = "\n".join(mmd_head + mmd_nodos + mmd_conexiones)
-                    st.code(full_m, language="mermaid")
-                    
-                    if st.session_state.pasos_sf4:
-                        tema = st.session_state.pasos_sf4[0]['texto'].replace('?', '')
-                        st.markdown("---")
-                        st.subheader("📝 Objetivos del Proceso")
-                        adm, tec = st.columns(2)
-                        with adm:
-                            st.info("**Administrativo-Normativo**")
-                            st.caption(f"Establecer el marco procedimental de '{tema}', asegurando el cumplimiento de los criterios de validación.")
-                        with tec:
-                            st.success("**Técnico-Operativo**")
-                            st.caption(f"Optimizar la respuesta de las cuadrillas en '{tema}', mediante la estandarización técnica.")
-
-                    b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
-                    st.link_button("🚀 LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
-                    st.write("---")
-                    nom_p = st.text_input("Nombre para Bóveda:")
-                    if st.button("💾 Guardar en Bóveda Pangea"):
-                        if nom_p:
-                            st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
-                            with open(PATH_PANGEA_DB, "w", encoding="utf-8") as f:
-                                json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
-                            st.success("Guardado correctamente.")
-
-        with tab_b:
-            if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
-            else:
-                for k, v in list(st.session_state.boveda_mmd.items()):
-                    with st.expander(f"📁 {k}"):
-                        st.code(v['code'], language="mermaid")
-                        b1, b2, b3 = st.columns(3)
-                        if b1.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
-                        b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
-                        b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
-                        if k.strip().upper() != "PASTEL VERDE":
-                            if b3.button("🗑️", key=f"x_{k}", use_container_width=True):
-                                del st.session_state.boveda_mmd[k]
-                                with open(PATH_PANGEA_DB, "w", encoding="utf-8") as f:
-                                    json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
-                                st.rerun()
-
-        with tab_i:
-            st.subheader("📥 Importación Externa")
-            raw_import = st.text_area("Pega el código Mermaid aquí:", height=300, key="area_import_sf", placeholder="graph TD\nN0((\"Inicio\")) --> N1[\"Proceso\"]")
-            
-            if st.button("🚀 REDISEÑAR PROCESO", use_container_width=True):
-                if raw_import:
-                    try:
-                        nuevos_pasos = []
-                        lineas = [l.strip() for l in raw_import.split('\n') if l.strip()]
+                        st.title("🏗️ SF4 - Arquitecto de Procesos & Oficios")
                         
-                        for linea in lineas:
-                            m_io = re.search(r'(\w+)\(\("(.+?)"\)\)', linea)
-                            if m_io:
-                                nuevos_pasos.append({"texto": m_io.group(2), "tipo": "Inicio/Fin", "is_decision": False, "conecta_a": "Siguiente", "etiqueta_flecha": ""})
-                                continue
+                        # === ANCLAJE FÍSICO Y CARGA GLOBAL DE BÓVEDAS BLINDADA (SF4) ===
+                        PATH_OFICIOS_DB = "boveda_oficios.json"
+                        PATH_PANGEA_DB = "boveda_pangea.json"
+
+                        # Asegurar inicialización de variables de control de flujo en RAM
+                        if "edit_index" not in st.session_state: st.session_state.edit_index = -1
+                        if "pasos_sf4" not in st.session_state: st.session_state.pasos_sf4 = []
+
+                        if "db_oficios" not in st.session_state:
+                            if os.path.exists(PATH_OFICIOS_DB):
+                                with open(PATH_OFICIOS_DB, "r", encoding="utf-8") as f:
+                                    st.session_state.db_oficios = json.load(f)
+                            else:
+                                st.session_state.db_oficios = {}
+
+                        if "boveda_mmd" not in st.session_state:
+                            if os.path.exists(PATH_PANGEA_DB):
+                                with open(PATH_PANGEA_DB, "r", encoding="utf-8") as f:
+                                    st.session_state.boveda_mmd = json.load(f)
+                            else:
+                                st.session_state.boveda_mmd = {}
+                        # ===============================================================
+
+                        tab_c, tab_b, tab_i, tab_o = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa", "📄 GENERADOR DE OFICIOS"])
+
+                        with tab_c:
+                            with st.expander("📝 CONFIGURAR PASO", expanded=True):
+                                idx = st.session_state.edit_index
+                                editando = (idx != -1)
+                                paso_actual = st.session_state.pasos_sf4[idx] if (editando and idx < len(st.session_state.pasos_sf4)) else {}
+                                
+                                txt = st.text_input("Actividad o Pregunta (usa '?' para bifurcar):", value=paso_actual.get('texto', ""), key=f"txt_sf4_{idx}")
+                                is_decision = txt.strip().endswith('?')
+                                destinos = ["Siguiente", "Fin"] + [f"Paso {i+1}" for i in range(len(st.session_state.pasos_sf4))]
+
+                                c1, c2, c3 = st.columns(3)
+                                if not is_decision:
+                                    with c1: tipo = st.selectbox("Forma:", ["Proceso", "Inicio/Fin"], index=0 if paso_actual.get('tipo') == "Proceso" else (1 if paso_actual.get('tipo') == "Inicio/Fin" else 0))
+                                    with c2: 
+                                        d_val = paso_actual.get('conecta_a', "Siguiente")
+                                        destino = st.selectbox("Conecta a:", destinos, index=destinos.index(d_val) if d_val in destinos else 0)
+                                    with c3: label = st.text_input("Etiqueta flecha:", value=paso_actual.get('etiqueta_flecha', ""), placeholder="Ej: Ok")
+                                else:
+                                    with c1: 
+                                        label_si = st.text_input("Etiqueta SÍ:", value=paso_actual.get('label_si', "SÍ"))
+                                        d_si_val = paso_actual.get('dest_si', "Siguiente")
+                                        dest_si = st.selectbox("Destino SÍ:", destinos, index=destinos.index(d_si_val) if d_si_val in destinos else 0)
+                                    with c2: 
+                                        label_no = st.text_input("Etiqueta NO:", value=paso_actual.get('label_no', "NO"))
+                                        d_no_val = paso_actual.get('dest_no', "Siguiente")
+                                        dest_no = st.selectbox("Destino NO (Salto):", destinos, index=destinos.index(d_no_val) if d_no_val in destinos else 0)
+                                    with c3: st.info("Las decisiones requieren dos salidas obligatorias.")
+
+                                if not editando:
+                                    if st.button("➕ Agregar al Flujo", use_container_width=True):
+                                        if txt:
+                                            nuevo = {"texto": txt, "is_decision": is_decision}
+                                            if is_decision: nuevo.update({"label_si": label_si, "dest_si": dest_si, "label_no": label_no, "dest_no": dest_no, "tipo": "Decisión"})
+                                            else: nuevo.update({"tipo": tipo, "conecta_a": destino, "etiqueta_flecha": label})
+                                            st.session_state.pasos_sf4.append(nuevo)
+                                            st.rerun()
+                                else:
+                                    cs, cc = st.columns(2)
+                                    if cs.button("💾 Guardar Cambios", use_container_width=True):
+                                        nuevo = {"texto": txt, "is_decision": is_decision}
+                                        if is_decision: nuevo.update({"label_si": label_si, "dest_si": dest_si, "label_no": label_no, "dest_no": dest_no, "tipo": "Decisión"})
+                                        else: nuevo.update({"tipo": tipo, "conecta_a": destino, "etiqueta_flecha": label})
+                                        st.session_state.pasos_sf4[idx] = nuevo
+                                        st.session_state.edit_index = -1
+                                        st.rerun()
+                                    if cc.button("❌ Cancelar", use_container_width=True):
+                                        st.session_state.edit_index = -1
+                                        st.rerun()
+
+                            if st.session_state.pasos_sf4:
+                                col_l, col_p = st.columns([1, 1.2])
+                                with col_l:
+                                    st.subheader("📋 Pasos")
+                                    for i, p in enumerate(st.session_state.pasos_sf4):
+                                        with st.container(border=True):
+                                            cx, cy, cz = st.columns([0.5, 3, 1])
+                                            cx.write(f"#{i+1}"); cy.write(p['texto'])
+                                            if cz.button("✏️", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
+                                            if cz.button("🗑️", key=f"d_{i}"): st.session_state.pasos_sf4.pop(i); st.rerun()
+                                    if st.button("🔥 Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
+
+                                with col_p:
+                                    st.subheader("📊 Visualización Premium")
+                                    def clean(t): return re.sub(r'[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]', '', str(t))
+                                    
+                                    mmd_head = ["graph TD", "classDef decision fill:#f9f,stroke:#333,stroke-width:2px;", "classDef proceso fill:#bbf,stroke:#333,stroke-width:2px;"]
+                                    mmd_nodos, mmd_conexiones = [], []
+
+                                    for i, p in enumerate(st.session_state.pasos_sf4):
+                                        id_n = f"N{i}"
+                                        t_c = clean(p.get('texto', ''))
+                                        if p.get('tipo') == "Decisión": mmd_nodos.append(f'    {id_n}{{\"{t_c}\"}}:::decision')
+                                        elif p.get('tipo') == "Inicio/Fin": mmd_nodos.append(f'    {id_n}((\"{t_c}\"))')
+                                        else: mmd_nodos.append(f'    {id_n}[\"{t_c}\"]:::proceso')
+
+                                    for i, p in enumerate(st.session_state.pasos_sf4):
+                                        id_n = f"N{i}"
+                                        if not p.get('is_decision', False):
+                                            tgt = p.get('conecta_a', "Siguiente")
+                                            lab = p.get('etiqueta_flecha', "")
+                                            f_style = f'-- "{lab}" -->' if lab else "-->"
+                                            if tgt == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd_conexiones.append(f'    {id_n} {f_style} N{i+1}')
+                                            elif tgt == "Fin": mmd_conexiones.append(f'    {id_n} {f_style} Fin([Fin])')
+                                            elif "Paso" in str(tgt):
+                                                p_num = int(re.search(r'\d+', str(tgt)).group()) - 1
+                                                mmd_conexiones.append(f'    {id_n} {f_style} N{p_num}')
+                                        else:
+                                            for l_key, d_key in [('label_si', 'dest_si'), ('label_no', 'dest_no')]:
+                                                dst = p.get(d_key, "Siguiente")
+                                                lab_f = p.get(l_key, "Opción")
+                                                f_style = f'-- "{lab_f}" -->'
+                                                if dst == "Siguiente" and i < len(st.session_state.pasos_sf4)-1: mmd_conexiones.append(f'    {id_n} {f_style} N{i+1}')
+                                                elif dst == "Fin": mmd_conexiones.append(f'    {id_n} {f_style} Fin([Fin])')
+                                                elif "Paso" in str(dst):
+                                                    p_num = int(re.search(r'\d+', str(dst)).group()) - 1
+                                                    mmd_conexiones.append(f'    {id_n} {f_style} N{p_num}')
+
+                                    full_m = "\n".join(mmd_head + mmd_nodos + mmd_conexiones)
+                                    st.code(full_m, language="mermaid")
+                                    
+                                    if st.session_state.pasos_sf4:
+                                        tema = st.session_state.pasos_sf4[0]['texto'].replace('?', '')
+                                        st.markdown("---")
+                                        st.subheader("📝 Objetivos del Proceso")
+                                        adm, tec = st.columns(2)
+                                        with adm:
+                                            st.info("**Administrativo-Normativo**")
+                                            st.caption(f"Establecer el marco procedimental de '{tema}', asegurando el cumplimiento de los criterios de validación.")
+                                        with tec:
+                                            st.success("**Técnico-Operativo**")
+                                            st.caption(f"Optimizar la respuesta de las cuadrillas en '{tema}', mediante la estandarización técnica.")
+
+                                    b64 = base64.b64encode(full_m.encode('utf-8')).decode('utf-8')
+                                    st.link_button("🚀 LIVE EDITOR", f"https://mermaid.live/edit#base64:{b64}", use_container_width=True)
+                                    st.write("---")
+                                    nom_p = st.text_input("Nombre para Bóveda:")
+                                    if st.button("💾 Guardar en Bóveda Pangea"):
+                                        if nom_p:
+                                            st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
+                                            with open(PATH_PANGEA_DB, "w", encoding="utf-8") as f:
+                                                json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
+                                            st.success("Guardado correctamente.")
+
+                        with tab_b:
+                            if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
+                            else:
+                                for k, v in list(st.session_state.boveda_mmd.items()):
+                                    with st.expander(f"📁 {k}"):
+                                        st.code(v['code'], language="mermaid")
+                                        b1, b2, b3 = st.columns(3)
+                                        if b1.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
+                                        b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
+                                        b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
+                                        if k.strip().upper() != "PASTEL VERDE":
+                                            if b3.button("🗑️", key=f"x_{k}", use_container_width=True):
+                                                del st.session_state.boveda_mmd[k]
+                                                with open(PATH_PANGEA_DB, "w", encoding="utf-8") as f:
+                                                    json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
+                                                st.rerun()
+
+                        with tab_i:
+                            st.subheader("📥 Importación Externa")
+                            raw_import = st.text_area("Pega el código Mermaid aquí:", height=300, key="area_import_sf", placeholder="graph TD\nN0((\"Inicio\")) --> N1[\"Proceso\"]")
                             
-                            m_dec = re.search(r'(\w+)\{"(.+?)"\}', linea)
-                            if m_dec:
-                                nuevos_pasos.append({"texto": m_dec.group(2) + "?", "tipo": "Decisión", "is_decision": True, "label_si": "SÍ", "dest_si": "Siguiente", "label_no": "NO", "dest_no": "Fin"})
-                                continue
+                            if st.button("🚀 REDISEÑAR PROCESO", use_container_width=True):
+                                if raw_import:
+                                    try:
+                                        nuevos_pasos = []
+                                        lineas = [l.strip() for l in raw_import.split('\n') if l.strip()]
+                                        
+                                        for linea in lineas:
+                                            m_io = re.search(r'(\w+)\(\("(.+?)"\)\)', linea)
+                                            if m_io:
+                                                nuevos_pasos.append({"texto": m_io.group(2), "tipo": "Inicio/Fin", "is_decision": False, "conecta_a": "Siguiente", "etiqueta_flecha": ""})
+                                                continue
+                                            
+                                            m_dec = re.search(r'(\w+)\{"(.+?)"\}', linea)
+                                            if m_dec:
+                                                nuevos_pasos.append({"texto": m_dec.group(2) + "?", "tipo": "Decisión", "is_decision": True, "label_si": "SÍ", "dest_si": "Siguiente", "label_no": "NO", "dest_no": "Fin"})
+                                                continue
 
-                            m_proc = re.search(r'(\w+)\["(.+?)"\]', linea)
-                            if m_proc:
-                                nuevos_pasos.append({"texto": m_proc.group(2), "tipo": "Proceso", "is_decision": False, "conecta_a": "Siguiente", "etiqueta_flecha": ""})
+                                            m_proc = re.search(r'(\w+)\["(.+?)"\]', linea)
+                                            if m_proc:
+                                                nuevos_pasos.append({"texto": m_proc.group(2), "tipo": "Proceso", "is_decision": False, "conecta_a": "Siguiente", "etiqueta_flecha": ""})
 
-                        if nuevos_pasos:
-                            st.session_state.pasos_sf4 = nuevos_pasos
-                            st.success(f"✅ Se han importado {len(nuevos_pasos)} pasos correctamente.")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("❌ No se detectaron nodos válidos en el código. Verifica el formato (N0[\"Texto\"]).")
-                    except Exception as e:
-                        st.error(f"Error en el motor de importación: {e}")
-                else:
-                    st.warning("⚠️ El área de texto está vacía.")
+                                        if nuevos_pasos:
+                                            st.session_state.pasos_sf4 = nuevos_pasos
+                                            st.success(f"✅ Se han importado {len(nuevos_pasos)} pasos correctamente.")
+                                            time.sleep(1)
+                                            st.rerun()
+                                        else:
+                                            st.error("❌ No se detectaron nodos válidos en el código. Verifica el formato (N0[\"Texto\"]).")
+                                    except Exception as e:
+                                        st.error(f"Error en el motor de importación: {e}")
+                                else:
+                                    st.warning("⚠️ El área de texto está vacía.")
 
-        with tab_o:
-            st.subheader("📄 Correspondencia Oficial y Control de Bóveda")
+                        with tab_o:
+                            st.subheader("📄 Correspondencia Oficial y Control de Bóveda")
 
-            try:
-                from fpdf import FPDF
-                motor_pdf_listo = True
-            except ImportError:
-                motor_pdf_listo = False
-                st.warning("⚠️ Motor PDF (fpdf) no detectado. Las descargas están deshabilitadas.")
+                            try:
+                                from fpdf import FPDF
+                                motor_pdf_listo = True
+                            except ImportError:
+                                motor_pdf_listo = False
+                                st.warning("⚠️ Motor PDF (fpdf) no detectado. Las descargas están deshabilitadas.")
 
-            plantillas_maestras = {
-                "✅ Atención Exitosa": "Por medio de la presente, se hace de su conocimiento que la petición con folio [FOLIO] ha sido atendida exitosamente por las brigadas de esta Dirección, quedando el servicio en óptimas condiciones de operación.",
-                "💡 Ya en Servicio": "Tras la inspección realizada por el personal técnico, se hace de su conocimiento que la luminaria correspondiente al folio [FOLIO] ya se encuentra en servicio y funcionando correctamente.",
-                "⏳ Programado/Parcial": "Se informa que la atención al folio [FOLIO] se encuentra en estado parcial; los trabajos continuarán conforme a la disponibilidad de material specialized en el programa de mantenimiento.",
-                "🔌 Bajadas de Luz": "Se autoriza la maniobra de bajada de luz solicitada mediante el folio [FOLIO], misma que será coordinada por el personal asignado a la zona correspondiente.",
-                "❌ Atención Negativa": "Respecto a la petición [FOLIO], se informa que tras el análisis técnico, la solicitud ha sido determinada como improcedente debido a restricciones normativas o técnicas vigentes.",
-                "✏️ Libre (Escribir desde cero)": ""
-            }
+                            plantillas_maestras = {
+                                "✅ Atención Exitosa": "Por medio de la presente, se hace de su conocimiento que la petición con folio [FOLIO] ha sido atendida exitosamente por las brigadas de esta Dirección, quedando el servicio en óptimas condiciones de operación.",
+                                "💡 Ya en Servicio": "Tras la inspección realizada por el personal técnico, se hace de su conocimiento que la luminaria correspondiente al folio [FOLIO] ya se encuentra en servicio y funcionando correctamente.",
+                                "⏳ Programado/Parcial": "Se informa que la atención al folio [FOLIO] se encuentra en estado parcial; los trabajos continuarán conforme a la disponibilidad de material specialized en el programa de mantenimiento.",
+                                "🔌 Bajadas de Luz": "Se autoriza la maniobra de bajada de luz solicitada mediante el folio [FOLIO], misma que será coordinada por el personal asignado a la zona correspondiente.",
+                                "❌ Atención Negativa": "Respecto a la petición [FOLIO], se informa que tras el análisis técnico, la solicitud ha sido determinada como improcedente debido a restricciones normativas o técnicas vigentes.",
+                                "✏️ Libre (Escribir desde cero)": ""
+                            }
 
-            c_config, c_preview = st.columns([1, 1.1])
+                            c_config, c_preview = st.columns([1, 1.1])
 
-            with c_config:
-                modo_of = st.radio("Operación:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True)
-                
-                data_previa = {}
-                if modo_of == "📂 Consultar Bóveda":
-                    if st.session_state.db_oficios:
-                        col_sel, col_del = st.columns([3, 1])
-                        id_sel = col_sel.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1])
-                        data_previa = st.session_state.db_oficios[id_sel]
-                        
-                        seguro_borrado = st.checkbox("🔐 Confirmar eliminación permanente")
-                        if col_del.button("🗑️ BORRAR", use_container_width=True, disabled=not seguro_borrado):
-                            del st.session_state.db_oficios[id_sel]
-                            with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
-                                json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
-                            st.warning(f"Registro {id_sel} eliminado.")
-                            time.sleep(1); st.rerun()
-                    else:
-                        st.info("La bóveda está vacía.")
-                
-                with st.container(border=True):
-                    st.markdown("**📌 Configuración**")
-                    tipo_p = st.selectbox("Plantilla:", list(plantillas_maestras.keys()))
-                    c1, c2 = st.columns(2)
-                    n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"))
-                    f_oficio = c2.date_input("Fecha:", value=pd.to_datetime(data_previa.get("fecha")).date() if data_previa.get("fecha") else pd.Timestamp.now().date())
-                    dest = st.text_area("Destinatario:", value=data_previa.get("dest", ""), height=70, kwargs={"spellcheck": "true"})
-                    cargo = st.text_input("Cargo:", value=data_previa.get("cargo", "P R E S E N T E"))
-                    f_ref = st.text_input("Folio Ref:", value=data_previa.get("folio", ""))
+                            with c_config:
+                                modo_of = st.radio("Operación:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True)
+                                
+                                data_previa = {}
+                                if modo_of == "📂 Consultar Bóveda":
+                                    if st.session_state.db_oficios:
+                                        col_sel, col_del = st.columns([3, 1])
+                                        id_sel = col_sel.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1])
+                                        data_previa = st.session_state.db_oficios[id_sel]
+                                        
+                                        seguro_borrado = st.checkbox("🔐 Confirmar eliminación permanente")
+                                        if col_del.button("🗑️ BORRAR", use_container_width=True, disabled=not seguro_borrado):
+                                            del st.session_state.db_oficios[id_sel]
+                                            with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
+                                                json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
+                                            st.warning(f"Registro {id_sel} eliminado.")
+                                            time.sleep(1); st.rerun()
+                                    else:
+                                        st.info("La bóveda está vacía.")
+                                
+                                with st.container(border=True):
+                                    st.markdown("**📌 Configuración**")
+                                    tipo_p = st.selectbox("Plantilla:", list(plantillas_maestras.keys()))
+                                    c1, c2 = st.columns(2)
+                                    n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"))
+                                    f_oficio = c2.date_input("Fecha:", value=pd.to_datetime(data_previa.get("fecha")).date() if data_previa.get("fecha") else pd.Timestamp.now().date())
+                                    dest = st.text_area("Destinatario:", value=data_previa.get("dest", ""), height=70, kwargs={"spellcheck": "true"})
+                                    cargo = st.text_input("Cargo:", value=data_previa.get("cargo", "P R E S E N T E"))
+                                    f_ref = st.text_input("Folio Ref:", value=data_previa.get("folio", ""))
 
-                with st.container(border=True):
-                    st.markdown("**📝 Mensaje**")
-                    v_cuerpo = data_previa.get("cuerpo", plantillas_maestras[tipo_p])
-                    cuerpo_txt = st.text_area("Cuerpo:", value=v_cuerpo, height=150, kwargs={"spellcheck": "true"})
-                    firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"))
-                    cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"))
-                    ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."), height=65, kwargs={"spellcheck": "true"})
+                                with st.container(border=True):
+                                    st.markdown("**📝 Mensaje**")
+                                    v_cuerpo = data_previa.get("cuerpo", plantillas_maestras[tipo_p])
+                                    cuerpo_txt = st.text_area("Cuerpo:", value=v_cuerpo, height=150, kwargs={"spellcheck": "true"})
+                                    firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"))
+                                    cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"))
+                                    ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."), height=65, kwargs={"spellcheck": "true"})
 
-                h_membrete = st.toggle("🛰️ Modo Hoja Membretada", value=False)
+                                h_membrete = st.toggle("🛰️ Modo Hoja Membretada", value=False)
 
-            with c_preview:
-                st.markdown("### 👁️ Vista Previa")
-                c_final = cuerpo_txt.replace("[FOLIO]", f"**{f_ref}**" if f_ref else "**_______**")
-                e_sup = "100px" if h_membrete else "20px"
+                            with c_preview:
+                                st.markdown("### 👁️ Vista Previa")
+                                c_final = cuerpo_txt.replace("[FOLIO]", f"**{f_ref}**" if f_ref else "**_______**")
+                                e_sup = "100px" if h_membrete else "20px"
 
-                st.markdown(f"""
-                <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.6; min-height: 550px;">
-                    <div style="height: {e_sup};"></div>
-                    <div style="text-align: right; font-weight: bold;">Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}<br>Oficio: {n_oficio}</div><br>
-                    <div style="text-align: left; font-weight: bold; white-space: pre-line;">{dest.upper()}<br>{cargo.upper()}</div><br>
-                    <div style="text-align: justify;"> {c_final} </div><br><br>
-                    <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br>{cargo_firm.upper()}</div>
-                    <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px; white-space: pre-line;">C.c.p. {ccp}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                                st.markdown(f"""
+                                <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.6; min-height: 550px;">
+                                    <div style="height: {e_sup};"></div>
+                                    <div style="text-align: right; font-weight: bold;">Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}<br>Oficio: {n_oficio}</div><br>
+                                    <div style="text-align: left; font-weight: bold; white-space: pre-line;">{dest.upper()}<br>{cargo.upper()}</div><br>
+                                    <div style="text-align: justify;"> {c_final} </div><br><br>
+                                    <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br>{cargo_firm.upper()}</div>
+                                    <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px; white-space: pre-line;">C.c.p. {ccp}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
 
-                st.divider()
-                b_save, b_pdf = st.columns(2)
+                                st.divider()
+                                b_save, b_pdf = st.columns(2)
 
-                if b_save.button("💾 GUARDAR/ACTUALIZAR", use_container_width=True):
-                    id_r = n_oficio.replace("/", "-")
-                    st.session_state.db_oficios[id_r] = {
-                        "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
-                        "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
-                        "firma": firm, "cargo_f": cargo_firm, "ccp": ccp
-                    }
-                    with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
-                        json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
-                    st.success("✅ Bóveda Actualizada."); time.sleep(1); st.rerun()
+                                if b_save.button("💾 GUARDAR/ACTUALIZAR", use_container_width=True):
+                                    id_r = n_oficio.replace("/", "-")
+                                    st.session_state.db_oficios[id_r] = {
+                                        "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
+                                        "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
+                                        "firma": firm, "cargo_f": cargo_firm, "ccp": ccp
+                                    }
+                                    with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
+                                        json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
+                                    st.success("✅ Bóveda Actualizada."); time.sleep(1); st.rerun()
 
-                if motor_pdf_listo:
-                    pdf = FPDF(orientation='P', unit='mm', format='Letter')
-                    pdf.set_margins(30, 25, 20)
-                    pdf.set_auto_page_break(auto=True, margin=25) 
-                    pdf.add_page()
-                     
-                    if h_membrete: 
-                        pdf.ln(15)
-                    pdf.set_font("Arial", 'B', 11)
-                    pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
-                    pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
-                    pdf.ln(15); pdf.cell(0, 5, txt=dest.upper() if dest else "A QUIEN CORRESPONDA", ln=True)
-                    pdf.cell(0, 5, txt=cargo.upper(), ln=True)
-                    pdf.ln(15); pdf.set_font("Arial", '', 11)
-                    c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
-                    pdf.multi_cell(0, 7, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
-                    pdf.ln(25); pdf.set_font("Arial", 'B', 11); pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
-                    pdf.ln(20); pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
-                    pdf.cell(0, 5, txt=firm.upper(), ln=True, align='C')
-                    pdf.cell(0, 5, txt=cargo_firm.upper(), ln=True, align='C')
-                    pdf.set_y(-30); pdf.set_font("Arial", '', 8); pdf.cell(0, 5, txt=f"C.c.p. {ccp}", ln=True)
-                     
-                    pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
-                    st.download_button(label="🚀 DESCARGAR OFICIO PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
-                else:
-                    st.error("❌ Función PDF no disponible.")
+                                if motor_pdf_listo:
+                                    pdf = FPDF(orientation='P', unit='mm', format='Letter')
+                                    pdf.set_margins(30, 25, 20)
+                                    pdf.set_auto_page_break(auto=True, margin=25) 
+                                    pdf.add_page()
+                                     
+                                    if h_membrete: 
+                                        pdf.ln(15)
+                                    pdf.set_font("Arial", 'B', 11)
+                                    pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
+                                    pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
+                                    pdf.ln(15); pdf.cell(0, 5, txt=dest.upper() if dest else "A QUIEN CORRESPONDA", ln=True)
+                                    pdf.cell(0, 5, txt=cargo.upper(), ln=True)
+                                    pdf.ln(15); pdf.set_font("Arial", '', 11)
+                                    c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
+                                    pdf.multi_cell(0, 7, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                                    pdf.ln(25); pdf.set_font("Arial", 'B', 11); pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
+                                    pdf.ln(20); pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
+                                    pdf.cell(0, 5, txt=firm.upper(), ln=True, align='C')
+                                    pdf.cell(0, 5, txt=cargo_firm.upper(), ln=True, align='C')
+                                    pdf.set_y(-30); pdf.set_font("Arial", '', 8); pdf.cell(0, 5, txt=f"C.c.p. {ccp}", ln=True)
+                                     
+                                    pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
+                                    st.download_button(label="🚀 DESCARGAR OFICIO PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
+                                else:
+                                    st.error("❌ Función PDF no disponible.")
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
