@@ -695,21 +695,46 @@ else:
 
             with tab_boveda:
                 st.subheader("🗄️ Historial Permanente")
-                if st.session_state.db_bajas_historico:
+                
+                # Verificamos que haya datos
+                if st.session_state.get("db_bajas_historico"):
                     df_h = pd.DataFrame(st.session_state.db_bajas_historico.values())
                     st.dataframe(df_h[["ID Registro", "Fecha", "Origen", "Folios"]], use_container_width=True, hide_index=True)
                     
-                    id_rec = st.selectbox("Seleccione ID:", list(st.session_state.db_bajas_historico.keys())[::-1])
+                    id_rec = st.selectbox("Seleccione ID para descargar:", list(st.session_state.db_bajas_historico.keys())[::-1])
+                    
                     if id_rec:
-                        data = st.session_state.db_bajas_historico[id_rec]
-                        st.download_button("🔄 Descargar Excel", data=base64.b64decode(data["Excel Base64"]), file_name=f"{id_rec}.xlsx", use_container_width=True)
-                        seguro_del = st.checkbox("🔐 Confirmar borrado físico", key="del_seguro")
-                        if st.button("🗑️ BORRAR DE BÓVEDA", disabled=not seguro_del):
-                            cell = ws.find(id_rec)
-                            ws.delete_rows(cell.row)
-                            del st.session_state.db_bajas_historico[id_rec]
-                            st.rerun()
-                else: st.info("Bóveda vacía.")
+                        data_reg = st.session_state.db_bajas_historico[id_rec]
+                        
+                        # --- DESCARGA BLINDADA ---
+                        try:
+                            # Decodificamos el archivo antes de pasarlo al botón
+                            archivo_bytes = base64.b64decode(data_reg["Excel Base64"])
+                            
+                            st.download_button(
+                                label="🔄 Descargar Excel de este registro",
+                                data=archivo_bytes,
+                                file_name=f"{id_rec}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True
+                            )
+                        except Exception as e:
+                            st.error(f"Error al preparar el archivo: {e}")
+                        
+                        st.write("---")
+                        # Opción de borrado con confirmación
+                        seguro_del = st.checkbox("🔐 Confirmar borrado físico de la nube", key=f"del_{id_rec}")
+                        if st.button("🗑️ BORRAR REGISTRO", disabled=not seguro_del):
+                            try:
+                                cell = ws.find(id_rec)
+                                ws.delete_rows(cell.row)
+                                del st.session_state.db_bajas_historico[id_rec]
+                                st.success("Registro eliminado.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"No se pudo borrar: {e}")
+                else:
+                    st.info("La bóveda está vacía o cargando datos...")
 
         with c_input:
             st.subheader("⌨️ Captura de Folios")
