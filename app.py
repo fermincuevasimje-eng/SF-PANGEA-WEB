@@ -757,26 +757,42 @@ else:
         with c_input:
             st.subheader("⌨️ Captura de Folios")
             if "input_key" not in st.session_state: st.session_state.input_key = 0
+            
             with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
                 col_f, col_ot = st.columns([1.2, 1.0])
                 in_f_val = col_f.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
                 in_ot_val = col_ot.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
+                
                 c_cal, c_man = st.columns([1.1, 1.1])
                 d_p = c_cal.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
                 d_m = c_man.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
+                
                 in_obs = st.text_input("Respuesta Libre / Observaciones:", max_chars=30, key=f"lb_{st.session_state.input_key}")
                 
                 if st.form_submit_button("➕ Agregar"):
-                    if not up_sf2: st.error("⚠️ Sube un archivo de referencia.")
+                    if not up_sf2: 
+                        st.error("⚠️ Sube un archivo de referencia.")
                     else:
                         df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
                         id_col = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
+                        
                         if in_f_val.strip() in df_ref[id_col].astype(str).values:
+                            # --- LÓGICA DE RESCATE ---
                             fec = d_m.strip() if d_m.strip() else d_p.strftime("%d/%m/%Y")
-                            st.session_state.lista_bajas[in_f_val.strip()] = f"O.T. {in_ot_val.strip()} | {fec} | {in_obs.strip()}"
+                            ot_val = in_ot_val.strip()
+                            obs_val = in_obs.strip() if in_obs.strip() else "ATENDIDO"
+                            
+                            # Construimos los componentes. Si ot_val está vacío, no agregamos "O.T."
+                            ot_part = f"O.T. {ot_val}" if ot_val else ""
+                            
+                            # Creamos la lista y filtramos elementos vacíos para que no queden espacios dobles
+                            componentes = [c for c in [ot_part, fec, obs_val] if c]
+                            st.session_state.lista_bajas[in_f_val.strip()] = " | ".join(componentes)
+                            
                             st.session_state.input_key += 1
                             st.rerun()
-                        else: st.error("Folio no encontrado.")
+                        else: 
+                            st.error("Folio no encontrado.")
     
     elif st.session_state.menu == "SF1":
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
