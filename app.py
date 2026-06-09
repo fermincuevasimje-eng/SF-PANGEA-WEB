@@ -694,18 +694,29 @@ else:
                 st.subheader("🗄️ Historial Permanente")
                 
                 if st.session_state.db_bajas_historico:
-                    # 1. Tabla de resumen
+                    # 1. Preparar datos
                     lista_tabla = [{"ID Registro": k, "Fecha": v.get("Fecha", "N/A"), "Origen": v.get("Origen", "N/A"), "Folios": v.get("Folios", 0)} for k, v in st.session_state.db_bajas_historico.items()]
-                    df_h = pd.DataFrame(lista_tabla)
-                    st.dataframe(df_h.sort_values(by="ID Registro", ascending=False), use_container_width=True, hide_index=True)
+                    df_h = pd.DataFrame(lista_tabla).sort_values(by="ID Registro", ascending=False)
                     
+                    # 2. Selección
                     id_rec = st.selectbox("Seleccione ID:", list(st.session_state.db_bajas_historico.keys())[::-1])
+                    
+                    # 3. Resaltado de fila
+                    def resaltar_fila(row):
+                        color = '#d1e7dd' if row['ID Registro'] == id_rec else ''
+                        return [f'background-color: {color}'] * len(row)
+
+                    st.dataframe(
+                        df_h.style.apply(resaltar_fila, axis=1), 
+                        use_container_width=True, 
+                        hide_index=True
+                    )
                     
                     if id_rec:
                         data = st.session_state.db_bajas_historico[id_rec]
                         
-                        # 2. Vista Previa (El ojo)
-                        with st.expander(f"👁️ Vista de la lista ({id_rec})"):
+                        # 4. Vista Previa (Icono más amigable: 🔍)
+                        with st.expander(f"🔍 Detalle de folios ({id_rec})"):
                             raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
                             try:
                                 datos_dict = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
@@ -714,46 +725,35 @@ else:
                             except:
                                 st.error("No se pudo cargar la vista previa.")
 
-                        # 3. Descarga
+                        # 5. Descarga
                         raw_b64 = data.get("Datos Captura") or data.get("Excel Base64") or data.get("Excel") or ""
                         if raw_b64:
                             try:
                                 raw_b64 = str(raw_b64).replace('\n', '').replace('\r', '')
                                 st.download_button("🔄 Descargar Excel", data=base64.b64decode(raw_b64), file_name=f"{id_rec}.xlsx", use_container_width=True)
                             except Exception as e:
-                                st.error(f"Error al procesar descarga: {e}")
-
-                        # 4. Sección de Borrado (Mejorada)
-                        st.markdown("---")
-                        st.warning("⚠️ Zona de Administración")
+                                st.error(f"Error al descargar: {e}")
                         
+                        # 6. Administración
+                        st.markdown("---")
+                        st.markdown("#### 🛠️ Administración del Registro")
                         col1, col2 = st.columns([1, 1])
                         with col1:
                             confirmar = st.checkbox("🔐 Habilitar borrado", key="chk_del")
-                        
                         with col2:
                             if confirmar:
                                 if st.button("🗑️ BORRAR DE BÓVEDA", type="primary"):
-                                    # Intentamos buscar en Sheets
                                     try:
                                         cell = ws.find(id_rec, in_column=1)
-                                        if cell:
-                                            ws.delete_rows(cell.row)
-                                            del st.session_state.db_bajas_historico[id_rec]
-                                            st.success("¡Eliminado de Sheets y Caché!")
-                                            time.sleep(1)
-                                            st.rerun()
-                                        else:
-                                            # Caso de registro fantasma: lo borramos solo de la caché
-                                            del st.session_state.db_bajas_historico[id_rec]
-                                            st.info("Registro no hallado en Sheets. Limpiado de la caché local.")
-                                            time.sleep(1)
-                                            st.rerun()
+                                        if cell: ws.delete_rows(cell.row)
+                                        del st.session_state.db_bajas_historico[id_rec]
+                                        st.success("¡Eliminado!")
+                                        time.sleep(1)
+                                        st.rerun()
                                     except Exception as e:
-                                        st.error(f"Error al intentar borrar: {e}")
+                                        st.error(f"Error: {e}")
                 else: 
                     st.info("Bóveda vacía.")
-
         with c_input:
             st.subheader("⌨️ Captura de Folios")
             if "input_key" not in st.session_state: st.session_state.input_key = 0
