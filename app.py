@@ -603,7 +603,7 @@ else:
             xlsx_unificado = generar_reporte_con_grafica(df_final_vista, "UNIFICADO")
             d_col3.download_button("🚀 Reporte UNIFICADO", xlsx_unificado, "REPORTE_UNIFICADO.xlsx", use_container_width=True)
 
-    if st.session_state.menu == "SF2":
+    elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         
         # --- LIBRERÍAS ---
@@ -659,9 +659,11 @@ else:
                     df_res = pd.DataFrame([{"Folio": rk, "Respuesta 127": v} for rk, v in st.session_state.lista_bajas.items()])
                     st.dataframe(df_res, use_container_width=True, hide_index=True)
                     
-                    with st.expander("✂️ Editar Lista"):
+                    # --- EDICIÓN DE LISTA ---
+                    with st.expander("✂️ Editar Lista Actual"):
                         folios_a_eliminar = st.multiselect("Seleccionar folios a quitar:", list(st.session_state.lista_bajas.keys()))
-                        if st.button("🗑️ Eliminar seleccionados"):
+                        confirma_del = st.checkbox("🔐 Confirmar eliminación de seleccionados")
+                        if st.button("🗑️ Eliminar seleccionados") and confirma_del:
                             for f in folios_a_eliminar:
                                 del st.session_state.lista_bajas[f]
                             st.rerun()
@@ -740,8 +742,8 @@ else:
                                 st.success("¡Datos cargados en Captura Actual!")
                                 st.rerun()
                         with col2:
-                            confirmar = st.checkbox("🔐 Habilitar borrado", key="chk_del")
-                            if confirmar:
+                            confirmar_del = st.checkbox("🔐 Habilitar borrado permanente")
+                            if confirmar_del:
                                 if st.button("🗑️ BORRAR DE BÓVEDA", type="primary"):
                                     try:
                                         cell = ws.find(id_rec, in_column=1)
@@ -777,7 +779,7 @@ else:
                             st.session_state.lista_bajas[in_f_val.strip()] = " | ".join(componentes)
                             st.session_state.input_key += 1
                             st.rerun()
-                        else: st.error("Folio no encontrado."))
+                        else: st.error("Folio no encontrado.")
     
     elif st.session_state.menu == "SF1":
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
