@@ -614,9 +614,9 @@ else:
         import io
         import base64
         import time
-        import os
-
-        # --- 1. CONEXIÓN BLINDADA ---
+        import streamlit as st
+        
+        # --- 1. CONEXIÓN ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
         creds_dict = {
             "type": st.secrets["connections"]["gsheets"]["type"],
@@ -653,6 +653,7 @@ else:
         
         c_input, c_lista = st.columns([1, 1])
         
+        # --- COLUMNA DERECHA: BÓVEDA ---
         with c_lista:
             tab_actual, tab_boveda = st.tabs(["📋 Captura Actual", "📂 Bóveda de Historial"])
             
@@ -666,7 +667,6 @@ else:
                         try:
                             df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
                             id_col = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
-                            
                             st.balloons()
                             mapa_limpio = {str(k).strip(): str(v) for k, v in st.session_state.lista_bajas.items()}
                             df_final = df_ref[df_ref[id_col].astype(str).isin(mapa_limpio.keys())].copy()
@@ -675,15 +675,10 @@ else:
                             output = io.BytesIO()
                             with pd.ExcelWriter(output, engine='openpyxl') as writer: df_final.to_excel(writer, index=False)
                             excel_data = output.getvalue()
-
                             id_reg = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
-                            nuevo_reg = [id_reg, pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), up_sf2.name, len(mapa_limpio), json.dumps(mapa_limpio), base64.b64encode(excel_data).decode('utf-8')]
-                            
-                            ws.append_row(nuevo_reg) 
-                            # Actualizamos memoria con .get para mayor seguridad
-                            st.session_state.db_bajas_historico[id_reg] = {"ID Registro": id_reg, "Fecha": nuevo_reg[1], "Origen": nuevo_reg[2], "Total": nuevo_reg[3], "Datos": nuevo_reg[4], "Excel": nuevo_reg[5]}
-                            
-                            st.success(f"✅ ¡Guardado en Bóveda Nube! ID: {id_reg}")
+                            ws.append_row([id_reg, pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), up_sf2.name, len(mapa_limpio), json.dumps(mapa_limpio), base64.b64encode(excel_data).decode('utf-8')])
+                            st.session_state.db_bajas_historico[id_reg] = {"ID Registro": id_reg, "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), "Origen": up_sf2.name, "Folios": len(mapa_limpio), "Datos": json.dumps(mapa_limpio), "Excel": base64.b64encode(excel_data).decode('utf-8')}
+                            st.success(f"✅ ¡Guardado! ID: {id_reg}")
                             st.download_button("📗 Descargar Excel", data=excel_data, file_name=f"BAJAS_{up_sf2.name}", use_container_width=True)
                         except Exception as e: st.error(f"Error procesando: {e}")
                     
@@ -697,54 +692,46 @@ else:
             with tab_boveda:
                 st.subheader("🗄️ Historial Permanente")
                 if st.session_state.db_bajas_historico:
-                    # CORRECCIÓN AQUÍ: Usamos .get para evitar el KeyError
-                    lista_tabla = []
-                    for k, v in st.session_state.db_bajas_historico.items():
-                        lista_tabla.append({
-                            "ID Registro": k,
-                            "Fecha": v.get("Fecha", "N/A"),
-                            "Origen": v.get("Origen", "N/A"),
-                            "Total": v.get("Total", 0) # <--- Solucionado aquí
-                        })
-                    
-                    df_h = pd.DataFrame(lista_tabla)
-                    st.dataframe(df_h, use_container_width=True, hide_index=True)
+                    df_h = pd.DataFrame(st.session_state.db_bajas_historico.values())
+                    st.dataframe(df_h[["ID Registro", "Fecha", "Origen", "Folios"]], use_container_width=True, hide_index=True)
                     
                     id_rec = st.selectbox("Seleccione ID:", list(st.session_state.db_bajas_historico.keys())[::-1])
                     if id_rec:
                         data = st.session_state.db_bajas_historico[id_rec]
-                        st.download_button("🔄 Descargar Excel", data=base64.b64decode(data.get("Excel", "")), file_name=f"{id_rec}.xlsx", use_container_width=True)
-                        seguro_del = st.checkbox("🔐 Confirmar borrado físico", key="del_seguro")
-                        if st.button("🗑️ BORRAR DE BÓVEDA", disabled=not seguro_del):
-                            cell = ws.find(id_rec)
-                            ws.delete_rows(cell.row)
-                            del st.session_state.db_bajas_historico[id_rec]
-                            st.rerun()
+                        st.download_button("🔄 Descargar Excel", data=base64.b64decode(data["Excel"]), file_name=f"{id_rec}.xlsx", use_container_width=True)
+                        if st.checkbox("🔐 Confirmar borrado físico", key="del_seguro"):
+                            if st.button("🗑️ BORRAR DE BÓVEDA"):
+                                cell = ws.find(id_rec)
+                                ws.delete_rows(cell.row)
+                                del st.session_state.db_bajas_historico[id_rec]
+                                st.rerun()
                 else: st.info("Bóveda vacía.")
 
+        # --- COLUMNA IZQUIERDA: FORMULARIO SIEMPRE VISIBLE ---
         with c_input:
             st.subheader("⌨️ Captura de Folios")
-            if up_sf2:
-                df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
-                id_col = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
+            if "input_key" not in st.session_state: st.session_state.input_key = 0
+            with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
+                c1, c2 = st.columns([1.2, 1.0])
+                f_val = c1.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
+                ot_val = c2.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
+                c3, c4 = st.columns([1.1, 1.1])
+                d_p = c3.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
+                d_m = c4.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
+                obs_val = st.text_input("Respuesta Libre / Observaciones (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
                 
-                if "input_key" not in st.session_state: st.session_state.input_key = 0
-                with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
-                    c1, c2 = st.columns([1.2, 1.0])
-                    f_val = c1.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
-                    ot_val = c2.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
-                    c3, c4 = st.columns([1.1, 1.1])
-                    d_p = c3.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
-                    d_m = c4.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
-                    obs_val = st.text_input("Respuesta Libre / Observaciones (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
-                    if st.form_submit_button("➕ Agregar"):
+                if st.form_submit_button("➕ Agregar"):
+                    if not up_sf2:
+                        st.error("⚠️ Sube un archivo de referencia primero.")
+                    else:
+                        df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
+                        id_col = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
                         if f_val.strip() in df_ref[id_col].astype(str).values:
                             fec = d_m.strip() if d_m.strip() else d_p.strftime("%d/%m/%Y")
                             st.session_state.lista_bajas[f_val.strip()] = f"O.T. {ot_val.strip()} | {fec} | {obs_val.strip()}"
                             st.session_state.input_key += 1
                             st.rerun()
-                        else: st.error("Folio no encontrado.")
-            else: st.info("Sube archivo para capturar.")
+                        else: st.error("Folio no encontrado en el archivo.")
     
     elif st.session_state.menu == "SF1":
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
