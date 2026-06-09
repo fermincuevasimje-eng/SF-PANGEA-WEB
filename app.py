@@ -694,14 +694,29 @@ else:
                 st.subheader("🗄️ Historial Permanente")
                 
                 if st.session_state.db_bajas_historico:
-                    # 1. Preparar datos
-                    lista_tabla = [{"ID Registro": k, "Fecha": v.get("Fecha", "N/A"), "Origen": v.get("Origen", "N/A"), "Folios": v.get("Folios", 0)} for k, v in st.session_state.db_bajas_historico.items()]
+                    # 1. Preparar datos con formato mexicano
+                    lista_tabla = []
+                    for k, v in st.session_state.db_bajas_historico.items():
+                        fecha_raw = v.get("Fecha", "N/A")
+                        # Intentamos convertir a formato DD/MM/AAAA
+                        try:
+                            fecha_format = pd.to_datetime(fecha_raw).strftime("%d/%m/%Y")
+                        except:
+                            fecha_format = fecha_raw
+                        
+                        lista_tabla.append({
+                            "ID Registro": k, 
+                            "Fecha": fecha_format, 
+                            "Origen": v.get("Origen", "N/A"), 
+                            "Folios": v.get("Folios", 0)
+                        })
+                    
                     df_h = pd.DataFrame(lista_tabla).sort_values(by="ID Registro", ascending=False)
                     
                     # 2. Selección
                     id_rec = st.selectbox("Seleccione ID:", list(st.session_state.db_bajas_historico.keys())[::-1])
                     
-                    # 3. Resaltado de fila
+                    # 3. Resaltado
                     def resaltar_fila(row):
                         color = '#d1e7dd' if row['ID Registro'] == id_rec else ''
                         return [f'background-color: {color}'] * len(row)
