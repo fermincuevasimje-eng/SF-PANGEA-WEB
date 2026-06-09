@@ -630,7 +630,7 @@ else:
                                 "excel_base64": str(fila.get("Excel Base64", ""))
                             }
             except Exception:
-                # Si la hoja está vacía en Google Sheets, inicializamos el diccionario local en blanco de forma segura
+                # Si la hoja está vacía o saturada al inicio, mantenemos la sesión limpia en blanco
                 st.session_state.db_bajas_historico = {}
         # ===============================================================
 
@@ -680,7 +680,7 @@ else:
                                     "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
                                 
-                                # Reconstruir el DataFrame completo mapeando exactamente tus columnas oficiales
+                                # Reconstruir el DataFrame completo mapeando tus columnas oficiales
                                 lista_filas_sheets = []
                                 for k, v in st.session_state.db_bajas_historico.items():
                                     lista_filas_sheets.append({
@@ -694,9 +694,26 @@ else:
                                     })
                                 df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 
-                                # Ejecución de actualización limpia con el conector de Streamlit
-                                conn = st.connection("gsheets", type=GSheetsConnection)
-                                conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                # === BUCLE DE REINTENTOS PARA CONEXIÓN SATURADA (503 UNAVAILABLE) ===
+                                max_intentos = 3
+                                guardado_exitoso = False
+                                ultimo_error_msg = ""
+                                
+                                for intento in range(1, max_intentos + 1):
+                                    try:
+                                        conn = st.connection("gsheets", type=GSheetsConnection)
+                                        conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                        guardado_exitoso = True
+                                        break
+                                    except Exception as error_nube:
+                                        ultimo_error_msg = str(error_nube)
+                                        if intento < max_intentos:
+                                            # Amortiguador de espera: incrementa la pausa en cada intento fallido
+                                            time.sleep(intento * 2)
+                                
+                                if not guardado_exitoso:
+                                    raise RuntimeError(f"Google API saturada tras {max_intentos} intentos. Detalles: {ultimo_error_msg}")
+                                # ====================================================================
 
                                 st.success(f"✅ ¡Documento guardado en Bóveda Eterna de Google Sheets! ID: {id_registro_baja}")
                                 st.download_button(
@@ -765,7 +782,7 @@ else:
                             if id_recuperar:
                                 del st.session_state.db_bajas_historico[id_recuperar]
                                 
-                                # Reconstruir el archivo tras una eliminación física
+                                # Reconstruir el archivo limpio tras una eliminación física con reintentos
                                 lista_filas_sheets = []
                                 for k, v in st.session_state.db_bajas_historico.items():
                                     lista_filas_sheets.append({
@@ -778,14 +795,27 @@ else:
                                         "Excel Base64": v["excel_base64"]
                                     })
                                 
-                                conn = st.connection("gsheets", type=GSheetsConnection)
                                 if lista_filas_sheets:
                                     df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 else:
                                     df_bajas_to_sheets = pd.DataFrame(columns=["ID Registro", "Fecha", "Origen", "Usuario", "Folios", "Datos Captura", "Excel Base64"])
                                 
-                                conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
-                                st.warning(f"ID {id_recuperar} eliminado permanentemente de la nube.")
+                                # Aplicar la misma paciencia de reintentos para la eliminación física
+                                guardado_eliminar = False
+                                for int_el in range(1, 4):
+                                    try:
+                                        conn = st.connection("gsheets", type=GSheetsConnection)
+                                        conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                        guardado_eliminar = True
+                                        break
+                                    except Exception:
+                                        time.sleep(int_el * 2)
+                                
+                                if guardado_eliminar:
+                                    st.warning(f"ID {id_recuperar} eliminado permanentemente de la nube.")
+                                else:
+                                    st.error("No se pudo sincronizar la eliminación debido a la lentitud de la API de Google.")
+                                
                                 time.sleep(1)
                                 st.rerun()
                 else:
