@@ -606,13 +606,32 @@ else:
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         
-        PATH_BAJAS_DB = "boveda_bajas.json"
+        # === ANCLAJE FÍSICO Y CARGA GLOBAL DESDE GOOGLE SHEETS (SF2) ===
+        HOJA_BAJAS = "Boveda_Bajas"
+        
+        # Sincronización inicial con la nube para evitar pérdidas por reinicio del servidor
         if "db_bajas_historico" not in st.session_state:
-            if os.path.exists(PATH_BAJAS_DB):
-                with open(PATH_BAJAS_DB, "r", encoding="utf-8") as f:
-                    st.session_state.db_bajas_historico = json.load(f)
-            else:
+            st.session_state.db_bajas_historico = {}
+            try:
+                conn = st.connection("gsheets", type=GSheetsConnection)
+                df_sheets_bajas = conn.read(worksheet=HOJA_BAJAS, ttl="0d")
+                
+                if not df_sheets_bajas.empty:
+                    for _, fila in df_sheets_bajas.iterrows():
+                        id_reg = str(fila["ID Registro"]).strip()
+                        st.session_state.db_bajas_historico[id_reg] = {
+                            "fecha_generacion": str(fila["Fecha"]),
+                            "archivo_origen": str(fila["Origen"]),
+                            "usuario": str(fila["Usuario"]),
+                            "total_folios": int(fila["Folios"]),
+                            "datos_capture": json.loads(fila["Datos Captura"]),
+                            "excel_base64": str(fila["Excel Base64"])
+                        }
+            except Exception as e:
+                # Si la pestaña aún no existe en tu Sheets, no pasa nada, inicia en blanco
                 st.session_state.db_bajas_historico = {}
+        # ===============================================================
+
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
         
         up_sf2 = st.file_uploader("Subir Archivo de Referencia (Excel/CSV)", type=["csv", "xlsx"], key="sf2_up")
@@ -648,6 +667,8 @@ else:
                                 excel_data = output_sf2.getvalue()
 
                                 id_registro_baja = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
+                                
+                                # Guardar en la memoria RAM del estado de la sesión
                                 st.session_state.db_bajas_historico[id_registro_baja] = {
                                     "fecha_generacion": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
                                     "archivo_origen": up_sf2.name,
@@ -656,10 +677,26 @@ else:
                                     "datos_capture": dict(st.session_state.lista_bajas),
                                     "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
-                                with open(PATH_BAJAS_DB, "w", encoding="utf-8") as f:
-                                    json.dump(st.session_state.db_bajas_historico, f, indent=4, ensure_ascii=False)
+                                
+                                # Construir el bloque completo de filas para actualizar Google Sheets
+                                lista_filas_sheets = []
+                                for k, v in st.session_state.db_bajas_historico.items():
+                                    lista_filas_sheets.append({
+                                        "ID Registro": k,
+                                        "Fecha": v["fecha_generacion"],
+                                        "Origen": v["archivo_origen"],
+                                        "Usuario": v["usuario"],
+                                        "Folios": v["total_folios"],
+                                        "Datos Captura": json.dumps(v["datos_capture"], ensure_ascii=False),
+                                        "Excel Base64": v["excel_base64"]
+                                    })
+                                df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
+                                
+                                # Empujar la actualización de la base completa a la nube
+                                conn = st.connection("gsheets", type=GSheetsConnection)
+                                conn.update(spreadsheet=st.secrets.get("connections", {}).get("gsheets", {}).get("spreadsheet"), worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
 
-                                st.success(f"✅ ¡Documento guardado en Bóveda! ID: {id_registro_baja}")
+                                st.success(f"✅ ¡Documento guardado en Bóveda Eterna de Google Sheets! ID: {id_registro_baja}")
                                 st.download_button(
                                     label="📗 Descargar Excel de Bajas Oficial",
                                     data=excel_data,
@@ -684,7 +721,7 @@ else:
                     st.info("Esperando captura de folios en la sección izquierda...")
 
             with tab_boveda:
-                st.subheader("🗄️ Historial Permanente de Bajas")
+                st.subheader("🗄️ Historial Permanente de Bajas (Google Sheets)")
                 if st.session_state.db_bajas_historico:
                     lista_tabla_boveda = []
                     for k, v in st.session_state.db_bajas_historico.items():
@@ -725,9 +762,28 @@ else:
                         if st.button("🗑️ BORRAR DE BÓVEDA", use_container_width=True, type="secondary", disabled=not seguro_borrado_boveda):
                             if id_recuperar:
                                 del st.session_state.db_bajas_historico[id_recuperar]
-                                with open(PATH_BAJAS_DB, "w", encoding="utf-8") as f:
-                                    json.dump(st.session_state.db_bajas_historico, f, indent=4, ensure_ascii=False)
-                                st.warning(f"ID {id_recuperar} eliminado permanentemente.")
+                                
+                                # Sincronizar la eliminación reconstruyendo el archivo de Google Sheets
+                                lista_filas_sheets = []
+                                for k, v in st.session_state.db_bajas_historico.items():
+                                    lista_filas_sheets.append({
+                                        "ID Registro": k,
+                                        "Fecha": v["fecha_generacion"],
+                                        "Origen": v["archivo_origen"],
+                                        "Usuario": v["usuario"],
+                                        "Folios": v["total_folios"],
+                                        "Datos Captura": json.dumps(v["datos_capture"], ensure_ascii=False),
+                                        "Excel Base64": v["excel_base64"]
+                                    })
+                                
+                                conn = st.connection("gsheets", type=GSheetsConnection)
+                                if lista_filas_sheets:
+                                    df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
+                                else:
+                                    df_bajas_to_sheets = pd.DataFrame(columns=["ID Registro", "Fecha", "Origen", "Usuario", "Folios", "Datos Captura", "Excel Base64"])
+                                
+                                conn.update(spreadsheet=st.secrets.get("connections", {}).get("gsheets", {}).get("spreadsheet"), worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                st.warning(f"ID {id_recuperar} eliminado permanentemente de la nube.")
                                 time.sleep(1)
                                 st.rerun()
                 else:
