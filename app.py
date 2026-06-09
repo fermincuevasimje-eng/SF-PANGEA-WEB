@@ -640,12 +640,11 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- 2. CARGA DE BÓVEDA DESDE NUBE (AJUSTADA A TUS COLUMNAS) ---
+        # --- 2. CARGA DE BÓVEDA ---
         if "db_bajas_historico" not in st.session_state:
             try:
                 registros = ws.get_all_records()
-                # Usamos "ID Registro" que es el nombre real en tu Sheet
-                st.session_state.db_bajas_historico = {str(r["ID Registro"]): r for r in registros if "ID Registro" in r}
+                st.session_state.db_bajas_historico = {str(r.get("ID Registro", f"TEMP_{i}")): r for i, r in enumerate(registros) if r}
             except:
                 st.session_state.db_bajas_historico = {}
 
@@ -678,7 +677,6 @@ else:
                             excel_data = output.getvalue()
 
                             id_reg = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
-                            # Datos para guardar en Sheet
                             nuevo_reg = [id_reg, pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), up_sf2.name, "SF_ADMIN", len(mapa_limpio), json.dumps(mapa_limpio), base64.b64encode(excel_data).decode('utf-8')]
                             
                             ws.append_row(nuevo_reg) 
@@ -705,7 +703,6 @@ else:
                     if id_rec:
                         data = st.session_state.db_bajas_historico[id_rec]
                         st.download_button("🔄 Descargar Excel", data=base64.b64decode(data["Excel Base64"]), file_name=f"{id_rec}.xlsx", use_container_width=True)
-                        
                         seguro_del = st.checkbox("🔐 Confirmar borrado físico", key="del_seguro")
                         if st.button("🗑️ BORRAR DE BÓVEDA", disabled=not seguro_del):
                             cell = ws.find(id_rec)
@@ -716,27 +713,29 @@ else:
 
         with c_input:
             st.subheader("⌨️ Captura de Folios")
-            if up_sf2:
-                df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
-                id_col = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
+            # --- FORMULARIO SIEMPRE ACTIVO ---
+            if "input_key" not in st.session_state: st.session_state.input_key = 0
+            with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
+                c1, c2 = st.columns([1.2, 1.0])
+                f_val = c1.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
+                ot_val = c2.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
+                c3, c4 = st.columns([1.1, 1.1])
+                d_p = c3.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
+                d_m = c4.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
+                obs_val = st.text_input("Respuesta Libre / Observaciones (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
                 
-                if "input_key" not in st.session_state: st.session_state.input_key = 0
-                with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
-                    c1, c2 = st.columns([1.2, 1.0])
-                    f_val = c1.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
-                    ot_val = c2.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
-                    c3, c4 = st.columns([1.1, 1.1])
-                    d_p = c3.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
-                    d_m = c4.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
-                    obs_val = st.text_input("Respuesta Libre / Observaciones (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
-                    if st.form_submit_button("➕ Agregar a Lista"):
+                if st.form_submit_button("➕ Agregar a Lista"):
+                    if not up_sf2:
+                        st.error("⚠️ Sube el archivo primero.")
+                    else:
+                        df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
+                        id_col = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
                         if f_val.strip() in df_ref[id_col].astype(str).values:
                             fec = d_m.strip() if d_m.strip() else d_p.strftime("%d/%m/%Y")
                             st.session_state.lista_bajas[f_val.strip()] = f"O.T. {ot_val.strip()} | {fec} | {obs_val.strip()}"
                             st.session_state.input_key += 1
                             st.rerun()
                         else: st.error("Folio no encontrado en el archivo.")
-            else: st.info("Sube archivo para capturar.")
     
     elif st.session_state.menu == "SF1":
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
