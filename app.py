@@ -693,16 +693,8 @@ else:
             with tab_boveda:
                 st.subheader("🗄️ Historial Permanente")
                 if st.session_state.db_bajas_historico:
-                    # Creamos una lista para mostrar en tabla
-                    lista_tabla = []
-                    for k, v in st.session_state.db_bajas_historico.items():
-                        lista_tabla.append({
-                            "ID Registro": k, 
-                            "Fecha": v.get("Fecha", "N/A"), 
-                            "Origen": v.get("Origen", "N/A"), 
-                            "Folios": v.get("Folios", v.get("total_folios", 0))
-                        })
-                    
+                    # Lista para tabla
+                    lista_tabla = [{"ID Registro": k, "Fecha": v.get("Fecha", "N/A"), "Origen": v.get("Origen", "N/A"), "Folios": v.get("Folios", 0)} for k, v in st.session_state.db_bajas_historico.items()]
                     df_h = pd.DataFrame(lista_tabla)
                     st.dataframe(df_h.sort_values(by="ID Registro", ascending=False), use_container_width=True, hide_index=True)
                     
@@ -710,19 +702,19 @@ else:
                     if id_rec:
                         data = st.session_state.db_bajas_historico[id_rec]
                         
-                        # --- DETECCIÓN DE DATOS ---
-                        # Buscamos en todas las variantes posibles de nombre de columna
-                        raw_b64 = data.get("Excel Base64") or data.get("excel_base64") or data.get("Excel")
+                        # --- CORRECCIÓN ---
+                        # Buscamos el archivo en "Datos Captura", luego en "Excel Base64", luego en "Excel"
+                        raw_b64 = data.get("Datos Captura") or data.get("Excel Base64") or data.get("Excel") or ""
                         
                         if raw_b64:
                             try:
+                                # Limpiamos la cadena de basura y decodificamos
                                 raw_b64 = str(raw_b64).replace('\n', '').replace('\r', '')
                                 st.download_button("🔄 Descargar Excel", data=base64.b64decode(raw_b64), file_name=f"{id_rec}.xlsx", use_container_width=True)
                             except Exception as e:
-                                st.error(f"Error al decodificar archivo: {e}")
+                                st.error(f"El archivo está guardado pero no se pudo abrir: {e}")
                         else:
-                            st.error("No se encontró el archivo. Llaves disponibles en el registro:")
-                            st.json(data) # Esto nos dirá exactamente qué nombres tiene tu base de datos
+                            st.error("No se encontró el archivo en este registro.")
                         
                         if st.checkbox("🔐 Confirmar borrado físico", key="del_seguro"):
                             if st.button("🗑️ BORRAR DE BÓVEDA"):
