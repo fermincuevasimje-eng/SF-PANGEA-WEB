@@ -793,7 +793,6 @@ else:
                     st.error(f"Error en formulario SF2: {e}")
             else:
                 st.info("💡 Por favor sube un archivo de referencia primero para habilitar el tablero de captura manual.")
-
     
     elif st.session_state.menu == "SF1":
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
