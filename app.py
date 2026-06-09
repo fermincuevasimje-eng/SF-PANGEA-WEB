@@ -640,71 +640,49 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- 2. CARGA DE BÓVEDA ---
+        # --- 2. CARGA DE BÓVEDA (RESILIENTE) ---
         if "db_bajas_historico" not in st.session_state:
             try:
                 registros = ws.get_all_records()
+                # Usamos .get para no depender del nombre exacto de la columna en el Sheet
                 st.session_state.db_bajas_historico = {str(r.get("ID Registro", f"TEMP_{i}")): r for i, r in enumerate(registros) if r}
             except:
                 st.session_state.db_bajas_historico = {}
 
-        st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
-        up_sf2 = st.file_uploader("Subir Archivo de Referencia (Excel/CSV)", type=["csv", "xlsx"], key="sf2_up")
-        
-        c_input, c_lista = st.columns([1, 1])
-        
-        # --- COLUMNA DERECHA: BÓVEDA ---
-        with c_lista:
-            tab_actual, tab_boveda = st.tabs(["📋 Captura Actual", "📂 Bóveda de Historial"])
-            
-            with tab_actual:
-                st.subheader("Folios en proceso de baja")
-                if "lista_bajas" in st.session_state and st.session_state.lista_bajas:
-                    df_res = pd.DataFrame([{"Folio": rk, "Respuesta 127": v} for rk, v in st.session_state.lista_bajas.items()])
-                    st.dataframe(df_res, use_container_width=True, hide_index=True)
-                    
-                    if up_sf2 and st.button("📥 Generar Documento de Bajas", use_container_width=True, type="primary"):
-                        try:
-                            df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
-                            id_col = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
-                            st.balloons()
-                            mapa_limpio = {str(k).strip(): str(v) for k, v in st.session_state.lista_bajas.items()}
-                            df_final = df_ref[df_ref[id_col].astype(str).isin(mapa_limpio.keys())].copy()
-                            df_final['RESPUESTA 127'] = df_final[id_col].astype(str).map(mapa_limpio)
-                            
-                            output = io.BytesIO()
-                            with pd.ExcelWriter(output, engine='openpyxl') as writer: df_final.to_excel(writer, index=False)
-                            excel_data = output.getvalue()
-                            id_reg = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
-                            ws.append_row([id_reg, pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), up_sf2.name, len(mapa_limpio), json.dumps(mapa_limpio), base64.b64encode(excel_data).decode('utf-8')])
-                            st.session_state.db_bajas_historico[id_reg] = {"ID Registro": id_reg, "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), "Origen": up_sf2.name, "Folios": len(mapa_limpio), "Datos": json.dumps(mapa_limpio), "Excel": base64.b64encode(excel_data).decode('utf-8')}
-                            st.success(f"✅ ¡Guardado! ID: {id_reg}")
-                            st.download_button("📗 Descargar Excel", data=excel_data, file_name=f"BAJAS_{up_sf2.name}", use_container_width=True)
-                        except Exception as e: st.error(f"Error procesando: {e}")
-                    
-                    st.write("---")
-                    seguro_limpiar = st.checkbox("🔐 Confirmar vaciado", key="limpiar_seguro")
-                    if st.button("🗑️ Limpiar Lista Actual", disabled=not seguro_limpiar):
-                        st.session_state.lista_bajas = {}
-                        st.rerun()
-                else: st.info("Esperando captura...")
+        # ... (Mantén tu lógica de Captura Actual igual) ...
 
             with tab_boveda:
                 st.subheader("🗄️ Historial Permanente")
                 if st.session_state.db_bajas_historico:
-                    df_h = pd.DataFrame(st.session_state.db_bajas_historico.values())
-                    st.dataframe(df_h[["ID Registro", "Fecha", "Origen", "Folios"]], use_container_width=True, hide_index=True)
+                    # Construimos la lista de forma segura buscando variantes de nombres de columnas
+                    lista_tabla = []
+                    for k, v in st.session_state.db_bajas_historico.items():
+                        lista_tabla.append({
+                            "ID Registro": k,
+                            "Fecha": v.get("Fecha", "N/A"),
+                            "Origen": v.get("Origen", "N/A"),
+                            "Total": v.get("Total", v.get("Folios", 0))
+                        })
+                    
+                    df_h = pd.DataFrame(lista_tabla)
+                    st.dataframe(df_h, use_container_width=True, hide_index=True)
                     
                     id_rec = st.selectbox("Seleccione ID:", list(st.session_state.db_bajas_historico.keys())[::-1])
                     if id_rec:
                         data = st.session_state.db_bajas_historico[id_rec]
-                        st.download_button("🔄 Descargar Excel", data=base64.b64decode(data["Excel"]), file_name=f"{id_rec}.xlsx", use_container_width=True)
-                        if st.checkbox("🔐 Confirmar borrado físico", key="del_seguro"):
-                            if st.button("🗑️ BORRAR DE BÓVEDA"):
-                                cell = ws.find(id_rec)
-                                ws.delete_rows(cell.row)
-                                del st.session_state.db_bajas_historico[id_rec]
-                                st.rerun()
+                        # Buscamos la llave del archivo de forma segura
+                        excel_blob = data.get("Excel", data.get("Excel Base64", ""))
+                        if excel_blob:
+                            st.download_button("🔄 Descargar Excel", data=base64.b64decode(excel_blob), file_name=f"{id_rec}.xlsx", use_container_width=True)
+                        else:
+                            st.error("No se encontró el archivo en este registro.")
+                        
+                        seguro_del = st.checkbox("🔐 Confirmar borrado físico", key="del_seguro")
+                        if st.button("🗑️ BORRAR DE BÓVEDA", disabled=not seguro_del):
+                            cell = ws.find(id_rec)
+                            ws.delete_rows(cell.row)
+                            del st.session_state.db_bajas_historico[id_rec]
+                            st.rerun()
                 else: st.info("Bóveda vacía.")
 
         # --- COLUMNA IZQUIERDA: FORMULARIO SIEMPRE VISIBLE ---
