@@ -606,6 +606,7 @@ else:
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         
+        # --- LIBRERÍAS Y CONFIGURACIÓN ---
         import gspread
         from google.oauth2.service_account import Credentials
         import json
@@ -613,8 +614,9 @@ else:
         import io
         import base64
         import time
-
-        # --- 1. CONEXIÓN ---
+        import streamlit as st
+        
+        # --- 1. CONEXIÓN BLINDADA ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
         creds_dict = {
             "type": st.secrets["connections"]["gsheets"]["type"],
@@ -638,11 +640,12 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- 2. CARGA DE BÓVEDA SEGURA ---
+        # --- 2. CARGA DE BÓVEDA DESDE NUBE (AJUSTADA A TUS COLUMNAS) ---
         if "db_bajas_historico" not in st.session_state:
             try:
                 registros = ws.get_all_records()
-                st.session_state.db_bajas_historico = {str(r["ID"]): r for r in registros if "ID" in r}
+                # Usamos "ID Registro" que es el nombre real en tu Sheet
+                st.session_state.db_bajas_historico = {str(r["ID Registro"]): r for r in registros if "ID Registro" in r}
             except:
                 st.session_state.db_bajas_historico = {}
 
@@ -675,37 +678,41 @@ else:
                             excel_data = output.getvalue()
 
                             id_reg = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
-                            ws.append_row([id_reg, pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), up_sf2.name, len(mapa_limpio), json.dumps(mapa_limpio), base64.b64encode(excel_data).decode('utf-8')])
+                            # Datos para guardar en Sheet
+                            nuevo_reg = [id_reg, pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), up_sf2.name, "SF_ADMIN", len(mapa_limpio), json.dumps(mapa_limpio), base64.b64encode(excel_data).decode('utf-8')]
                             
-                            st.session_state.db_bajas_historico[id_reg] = {"ID": id_reg, "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"), "Origen": up_sf2.name, "Total": len(mapa_limpio), "Datos": json.dumps(mapa_limpio), "Excel": base64.b64encode(excel_data).decode('utf-8')}
+                            ws.append_row(nuevo_reg) 
+                            st.session_state.db_bajas_historico[id_reg] = {"ID Registro": id_reg, "Fecha": nuevo_reg[1], "Origen": nuevo_reg[2], "Usuario": "SF_ADMIN", "Folios": nuevo_reg[3], "Datos Captura": nuevo_reg[4], "Excel Base64": nuevo_reg[5]}
                             
                             st.success(f"✅ ¡Guardado en Bóveda Nube! ID: {id_reg}")
                             st.download_button("📗 Descargar Excel", data=excel_data, file_name=f"BAJAS_{up_sf2.name}", use_container_width=True)
                         except Exception as e: st.error(f"Error procesando: {e}")
                     
-                    if st.button("🗑️ Limpiar Lista Actual"):
+                    st.write("---")
+                    seguro_limpiar = st.checkbox("🔐 Confirmar vaciado", key="limpiar_seguro")
+                    if st.button("🗑️ Limpiar Lista Actual", disabled=not seguro_limpiar):
                         st.session_state.lista_bajas = {}
                         st.rerun()
+                else: st.info("Esperando captura de folios...")
 
             with tab_boveda:
                 st.subheader("🗄️ Historial Permanente")
                 if st.session_state.db_bajas_historico:
                     df_h = pd.DataFrame(st.session_state.db_bajas_historico.values())
-                    # Validamos que las columnas existan antes de mostrarlas
-                    cols_mostrar = [c for c in ["ID", "Fecha", "Origen", "Total"] if c in df_h.columns]
-                    st.dataframe(df_h[cols_mostrar], use_container_width=True, hide_index=True)
+                    st.dataframe(df_h[["ID Registro", "Fecha", "Origen", "Folios"]], use_container_width=True, hide_index=True)
                     
                     id_rec = st.selectbox("Seleccione ID:", list(st.session_state.db_bajas_historico.keys())[::-1])
                     if id_rec:
                         data = st.session_state.db_bajas_historico[id_rec]
-                        st.download_button("🔄 Descargar Excel", data=base64.b64decode(data["Excel"]), file_name=f"{id_rec}.xlsx", use_container_width=True)
+                        st.download_button("🔄 Descargar Excel", data=base64.b64decode(data["Excel Base64"]), file_name=f"{id_rec}.xlsx", use_container_width=True)
                         
-                        if st.button("🗑️ BORRAR DE BÓVEDA"):
+                        seguro_del = st.checkbox("🔐 Confirmar borrado físico", key="del_seguro")
+                        if st.button("🗑️ BORRAR DE BÓVEDA", disabled=not seguro_del):
                             cell = ws.find(id_rec)
                             ws.delete_rows(cell.row)
                             del st.session_state.db_bajas_historico[id_rec]
                             st.rerun()
-                else: st.info("Bóveda vacía. Asegúrate de que el Sheet tenga los encabezados correctos.")
+                else: st.info("Bóveda vacía.")
 
         with c_input:
             st.subheader("⌨️ Captura de Folios")
