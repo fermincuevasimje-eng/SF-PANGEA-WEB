@@ -735,64 +735,48 @@ else:
 
         with c_input:
             st.subheader("⌨️ Captura de Folios")
-            if up_sf2:
-                try:
-                    df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
-                    id_col_sf2 = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
-                    
-                    if "lista_bajas" not in st.session_state:
-                        st.session_state.lista_bajas = {}
-                    if "input_key" not in st.session_state:
-                        st.session_state.input_key = 0
+            
+            # Inicialización de estados
+            if "lista_bajas" not in st.session_state: st.session_state.lista_bajas = {}
+            if "input_key" not in st.session_state: st.session_state.input_key = 0
 
-                    with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
-                        col_f_in, col_ot_in = st.columns([1.2, 1.0])
-                        with col_f_in:
-                            in_f_val = st.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
-                        with col_ot_in:
-                            in_ot_val = st.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
-                        
-                        col_cal_in, col_man_in = st.columns([1.1, 1.1])
-                        with col_cal_in:
-                            date_picker = st.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
-                        with col_man_in:
-                            date_manual = st.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
-                        
-                        st.markdown("---")
-                        in_libre_val = st.text_input("Respuesta Libre / Observaciones (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
-                        submitted = st.form_submit_button("➕ Agregar a Lista", use_container_width=True)
-                        
-                        if submitted:
+            with st.form(key=f"form_bajas_{st.session_state.input_key}", clear_on_submit=True):
+                col_f_in, col_ot_in = st.columns([1.2, 1.0])
+                in_f_val = col_f_in.text_input("Digite Folio/Ticket/IMEi:", key=f"f_{st.session_state.input_key}")
+                in_ot_val = col_ot_in.text_input("Orden de Trabajo (O.T.):", key=f"ot_{st.session_state.input_key}")
+                
+                col_cal_in, col_man_in = st.columns([1.1, 1.1])
+                date_picker = col_cal_in.date_input("Fecha (Calendario):", value=pd.Timestamp.now().date(), key=f"dt_p_{st.session_state.input_key}")
+                date_manual = col_man_in.text_input("Fecha (Copiar/Pegar):", placeholder="DD/MM/AAAA", key=f"dt_m_{st.session_state.input_key}")
+                
+                st.markdown("---")
+                in_libre_val = st.text_input("Respuesta Libre / Observaciones (Máx 30 car.):", max_chars=30, key=f"lb_{st.session_state.input_key}")
+                submitted = st.form_submit_button("➕ Agregar a Lista", use_container_width=True)
+                
+                if submitted:
+                    if not up_sf2:
+                        st.error("⚠️ Sube un archivo de referencia primero para validar los folios.")
+                    else:
+                        try:
+                            df_ref = pd.read_excel(up_sf2, dtype=str).fillna("") if up_sf2.name.endswith('.xlsx') else pd.read_csv(up_sf2, encoding='latin-1', dtype=str).fillna("")
+                            id_col_sf2 = next((c for c in df_ref.columns if any(p in str(c).upper() for p in ['FOLIO','TICKET','ID','IMEI'])), df_ref.columns[0])
+                            
                             f_final = in_f_val.strip()
-                            if f_final:
-                                if f_final in df_ref[id_col_sf2].astype(str).values:
-                                    if date_manual.strip():
-                                        fecha_final_texto = date_manual.strip()
-                                    else:
-                                        fecha_final_texto = date_picker.strftime("%d/%m/%Y")
-                                    
-                                    ot_part = f"O.T. {in_ot_val.strip()}" if in_ot_val.strip() else ""
-                                    libre_part = in_libre_val.strip()
-                                    
-                                    if not libre_part:
-                                        componentes = [c for c in [ot_part, "ATENDIDO", fecha_final_texto] if c]
-                                        c_final = " | ".join(componentes)
-                                    else:
-                                        componentes = [c for c in [ot_part, fecha_final_texto, libre_part] if c]
-                                        c_final = " | ".join(componentes)
-                                    
-                                    st.session_state.lista_bajas[f_final] = c_final
-                                    st.toast(f"Folio {f_final} validado", icon="✅")
-                                    st.session_state.input_key += 1
-                                    st.rerun()
-                                else:
-                                    st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado. Verifique.")
+                            if f_final and f_final in df_ref[id_col_sf2].astype(str).values:
+                                fecha_final_texto = date_manual.strip() if date_manual.strip() else date_picker.strftime("%d/%m/%Y")
+                                ot_part = f"O.T. {in_ot_val.strip()}" if in_ot_val.strip() else ""
+                                libre_part = in_libre_val.strip()
+                                
+                                componentes = [c for c in [ot_part, fecha_final_texto, libre_part if libre_part else "ATENDIDO"] if c]
+                                st.session_state.lista_bajas[f_final] = " | ".join(componentes)
+                                st.session_state.input_key += 1
+                                st.rerun()
+                            elif not f_final:
+                                st.warning("⚠️ Debes digitar un folio.")
                             else:
-                                st.warning("⚠️ Por favor digite un folio antes de agregar.")
-                except Exception as e:
-                    st.error(f"Error en formulario SF2: {e}")
-            else:
-                st.info("💡 Por favor sube un archivo de referencia primero para habilitar el tablero de captura manual.")
+                                st.error(f"⚠️ El folio '{f_final}' no existe en el archivo cargado.")
+                        except Exception as e:
+                            st.error(f"Error procesando formulario: {e}")
     
     elif st.session_state.menu == "SF1":
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
