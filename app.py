@@ -610,13 +610,12 @@ else:
         import json
         HOJA_BAJAS = "Boveda_Bajas"
         
-        # Sincronización inicial con la nube blindada con URL explícita
+        # Sincronización inicial con la nube blindada (Lectura nativa)
         if "db_bajas_historico" not in st.session_state:
             st.session_state.db_bajas_historico = {}
             try:
-                spreadsheet_url = st.secrets["connections"]["gsheets"]["url"]
                 conn = st.connection("gsheets", type=GSheetsConnection)
-                df_sheets_bajas = conn.read(spreadsheet=spreadsheet_url, worksheet=HOJA_BAJAS, ttl="0d")
+                df_sheets_bajas = conn.read(worksheet=HOJA_BAJAS, ttl="0d")
                 
                 if df_sheets_bajas is not None and not df_sheets_bajas.empty:
                     for _, fila in df_sheets_bajas.iterrows():
@@ -681,7 +680,7 @@ else:
                                     "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
                                 
-                                # Reconstruir el DataFrame completo mapeando tus columnas oficiales y la nueva fila
+                                # Reconstruir el DataFrame completo mapeando tus columnas oficiales
                                 lista_filas_sheets = []
                                 for k, v in st.session_state.db_bajas_historico.items():
                                     lista_filas_sheets.append({
@@ -695,23 +694,22 @@ else:
                                     })
                                 df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 
-                                # === BUCLE DE REINTENTOS CON ENLACE EXPLÍCITO DE GOOGLE SHEETS ===
+                                # === BUCLE DE REINTENTOS PARA CONEXIÓN SATURADA NATIVA ===
                                 max_intentos = 3
                                 guardado_exitoso = False
                                 ultimo_error_msg = ""
                                 
-                                spreadsheet_url = st.secrets["connections"]["gsheets"]["url"]
-                                
                                 for intento in range(1, max_intentos + 1):
                                     try:
                                         conn = st.connection("gsheets", type=GSheetsConnection)
-                                        conn.update(spreadsheet=spreadsheet_url, worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                        # Inyección nativa directa, sin forzar credenciales manuales
+                                        conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
                                         guardado_exitoso = True
                                         break
                                     except Exception as error_nube:
                                         ultimo_error_msg = str(error_nube)
                                         if intento < max_intentos:
-                                            time.sleep(intento * 2)
+                                            time.sleep(intento * 2)  # Pausa de 2 y 4 segundos entre intentos
                                 
                                 if not guardado_exitoso:
                                     raise RuntimeError(f"Google API saturada tras {max_intentos} intentos. Detalles: {ultimo_error_msg}")
@@ -797,18 +795,17 @@ else:
                                         "Excel Base64": v["excel_base64"]
                                     })
                                 
-                                spreadsheet_url = st.secrets["connections"]["gsheets"]["url"]
-                                conn = st.connection("gsheets", type=GSheetsConnection)
                                 if lista_filas_sheets:
                                     df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 else:
                                     df_bajas_to_sheets = pd.DataFrame(columns=["ID Registro", "Fecha", "Origen", "Usuario", "Folios", "Datos Captura", "Excel Base64"])
                                 
-                                # Aplicar la misma paciencia con URL explícita para la eliminación física
+                                # Aplicar la paciencia nativa para la eliminación física
                                 guardado_eliminar = False
                                 for int_el in range(1, 4):
                                     try:
-                                        conn.update(spreadsheet=spreadsheet_url, worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                        conn = st.connection("gsheets", type=GSheetsConnection)
+                                        conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
                                         guardado_eliminar = True
                                         break
                                     except Exception:
