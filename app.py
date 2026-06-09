@@ -603,7 +603,7 @@ else:
             xlsx_unificado = generar_reporte_con_grafica(df_final_vista, "UNIFICADO")
             d_col3.download_button("🚀 Reporte UNIFICADO", xlsx_unificado, "REPORTE_UNIFICADO.xlsx", use_container_width=True)
 
-        elif st.session_state.menu == "SF2":
+elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         
         # --- LIBRERÍAS ---
@@ -680,7 +680,6 @@ else:
                             with pd.ExcelWriter(output, engine='openpyxl') as writer: df_final.to_excel(writer, index=False)
                             excel_data = output.getvalue()
                             
-                            # Hora México (UTC-6)
                             tz_mx = timezone(timedelta(hours=-6))
                             ahora = datetime.now(tz_mx)
                             id_reg = f"BAJA-{ahora.strftime('%Y%m%d-%H%M%S')}"
