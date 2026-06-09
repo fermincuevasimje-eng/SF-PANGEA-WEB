@@ -620,16 +620,16 @@ else:
                 if not df_sheets_bajas.empty:
                     for _, fila in df_sheets_bajas.iterrows():
                         id_reg = str(fila["ID Registro"]).strip()
-                        st.session_state.db_bajas_historico[id_reg] = {
-                            "fecha_generacion": str(fila["Fecha"]),
-                            "archivo_origen": str(fila["Origen"]),
-                            "usuario": str(fila["Usuario"]),
-                            "total_folios": int(fila["Folios"]),
-                            "datos_capture": json.loads(fila["Datos Captura"]),
-                            "excel_base64": str(fila["Excel Base64"])
-                        }
+                        if id_reg and id_reg != "nan" and id_reg != "ID Registro":
+                            st.session_state.db_bajas_historico[id_reg] = {
+                                "fecha_generacion": str(fila["Fecha"]),
+                                "archivo_origen": str(fila["Origen"]),
+                                "usuario": str(fila["Usuario"]),
+                                "total_folios": int(fila["Folios"]) if str(fila["Folios"]).isdigit() else 0,
+                                "datos_capture": json.loads(fila["Datos Captura"]) if str(fila["Datos Captura"]).startswith("{") else {},
+                                "excel_base64": str(fila["Excel Base64"])
+                            }
             except Exception as e:
-                # Si ocurre un problema de lectura inicial, mantiene el diccionario local activo
                 st.session_state.db_bajas_historico = {}
         # ===============================================================
 
@@ -669,7 +669,7 @@ else:
 
                                 id_registro_baja = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
                                 
-                                # Guardar en la memoria RAM del estado de la sesión
+                                # Guardar en el estado local de la sesión
                                 st.session_state.db_bajas_historico[id_registro_baja] = {
                                     "fecha_generacion": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
                                     "archivo_origen": up_sf2.name,
@@ -679,20 +679,23 @@ else:
                                     "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
                                 
-                                # Construir el bloque completo de la nueva fila para añadir a Google Sheets
-                                nueva_baja_append = pd.DataFrame([{
-                                    "ID Registro": id_registro_baja,
-                                    "Fecha": st.session_state.db_bajas_historico[id_registro_baja]["fecha_generacion"],
-                                    "Origen": st.session_state.db_bajas_historico[id_registro_baja]["archivo_origen"],
-                                    "Usuario": st.session_state.db_bajas_historico[id_registro_baja]["usuario"],
-                                    "Folios": st.session_state.db_bajas_historico[id_registro_baja]["total_folios"],
-                                    "Datos Captura": json.dumps(st.session_state.db_bajas_historico[id_registro_baja]["datos_capture"], ensure_ascii=False),
-                                    "Excel Base64": st.session_state.db_bajas_historico[id_registro_baja]["excel_base64"]
-                                }])
+                                # Reconstruir el historial completo para actualizar con .update() compatible
+                                lista_filas_sheets = []
+                                for k, v in st.session_state.db_bajas_historico.items():
+                                    lista_filas_sheets.append({
+                                        "ID Registro": k,
+                                        "Fecha": v["fecha_generacion"],
+                                        "Origen": v["archivo_origen"],
+                                        "Usuario": v["usuario"],
+                                        "Folios": v["total_folios"],
+                                        "Datos Captura": json.dumps(v["datos_capture"], ensure_ascii=False),
+                                        "Excel Base64": v["excel_base64"]
+                                    })
+                                df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 
-                                # Inyección directa y segura mediante método nativo .create con append
+                                # Método clásico e infalible compatible con todas las versiones de Streamlit
                                 conn = st.connection("gsheets", type=GSheetsConnection)
-                                conn.create(worksheet=HOJA_BAJAS, data=nueva_baja_append, if_exists="append")
+                                conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
 
                                 st.success(f"✅ ¡Documento guardado en Bóveda Eterna de Google Sheets! ID: {id_registro_baja}")
                                 st.download_button(
@@ -761,7 +764,7 @@ else:
                             if id_recuperar:
                                 del st.session_state.db_bajas_historico[id_recuperar]
                                 
-                                # Sincronizar la eliminación reconstruyendo la tabla limpia en Google Sheets
+                                # Reconstruir el archivo limpio tras una eliminación física
                                 lista_filas_sheets = []
                                 for k, v in st.session_state.db_bajas_historico.items():
                                     lista_filas_sheets.append({
@@ -780,8 +783,7 @@ else:
                                 else:
                                     df_bajas_to_sheets = pd.DataFrame(columns=["ID Registro", "Fecha", "Origen", "Usuario", "Folios", "Datos Captura", "Excel Base64"])
                                 
-                                # En el borrado sobreescribimos la pestaña completa para limpiar la fila físicamente
-                                conn.create(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets, if_exists="replace")
+                                conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
                                 st.warning(f"ID {id_recuperar} eliminado permanentemente de la nube.")
                                 time.sleep(1)
                                 st.rerun()
