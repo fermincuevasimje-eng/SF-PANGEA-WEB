@@ -607,6 +607,7 @@ else:
         st.title("📁 SF2 - Módulo de Baja de Folios")
         
         # === ANCLAJE FÍSICO Y CARGA GLOBAL DESDE GOOGLE SHEETS (SF2) ===
+        import json
         HOJA_BAJAS = "Boveda_Bajas"
         
         # Sincronización inicial con la nube para evitar pérdidas por reinicio del servidor
@@ -692,9 +693,10 @@ else:
                                     })
                                 df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 
-                                # Empujar la actualización de la base completa a la nube
+                                # Empujar la actualización extrayendo de forma correcta la URL de tus secretos
+                                spreadsheet_url = st.secrets.get("connections", {}).get("gsheets", {}).get("url")
                                 conn = st.connection("gsheets", type=GSheetsConnection)
-                                conn.update(spreadsheet=st.secrets.get("connections", {}).get("gsheets", {}).get("spreadsheet"), worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                conn.update(spreadsheet=spreadsheet_url, worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
 
                                 st.success(f"✅ ¡Documento guardado en Bóveda Eterna de Google Sheets! ID: {id_registro_baja}")
                                 st.download_button(
@@ -776,13 +778,14 @@ else:
                                         "Excel Base64": v["excel_base64"]
                                     })
                                 
+                                spreadsheet_url = st.secrets.get("connections", {}).get("gsheets", {}).get("url")
                                 conn = st.connection("gsheets", type=GSheetsConnection)
                                 if lista_filas_sheets:
                                     df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 else:
                                     df_bajas_to_sheets = pd.DataFrame(columns=["ID Registro", "Fecha", "Origen", "Usuario", "Folios", "Datos Captura", "Excel Base64"])
                                 
-                                conn.update(spreadsheet=st.secrets.get("connections", {}).get("gsheets", {}).get("spreadsheet"), worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                conn.update(spreadsheet=spreadsheet_url, worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
                                 st.warning(f"ID {id_recuperar} eliminado permanentemente de la nube.")
                                 time.sleep(1)
                                 st.rerun()
