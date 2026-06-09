@@ -609,15 +609,17 @@ else:
         # === ANCLAJE FÍSICO Y CARGA GLOBAL DESDE GOOGLE SHEETS (SF2) ===
         import json
         HOJA_BAJAS = "Boveda_Bajas"
+        URL_DB_SF2 = st.secrets["connections"]["gsheets"]["spreadsheet"]
         
-        # Sincronización inicial con la nube blindada (Lectura nativa)
+        # Sincronización inicial con la nube replicando la estructura del Módulo 1
         if "db_bajas_historico" not in st.session_state:
             st.session_state.db_bajas_historico = {}
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
-                df_sheets_bajas = conn.read(worksheet=HOJA_BAJAS, ttl="0d")
+                # Lectura explícita con URL anclada y limpieza de renglones fantasma (dropna)
+                df_sheets_bajas = conn.read(spreadsheet=URL_DB_SF2, worksheet=HOJA_BAJAS, ttl=0).dropna(how='all')
                 
-                if df_sheets_bajas is not None and not df_sheets_bajas.empty:
+                if not df_sheets_bajas.empty:
                     for _, fila in df_sheets_bajas.iterrows():
                         id_reg = str(fila.get("ID Registro", "")).strip()
                         if id_reg and id_reg != "nan" and id_reg != "ID Registro":
@@ -630,7 +632,6 @@ else:
                                 "excel_base64": str(fila.get("Excel Base64", ""))
                             }
             except Exception:
-                # Si la hoja está vacía al inicio, mantenemos la sesión limpia en blanco de forma segura
                 st.session_state.db_bajas_historico = {}
         # ===============================================================
 
@@ -638,7 +639,6 @@ else:
         
         up_sf2 = st.file_uploader("Subir Archivo de Referencia (Excel/CSV)", type=["csv", "xlsx"], key="sf2_up")
         
-        # Inicializamos las pestañas en la columna derecha de forma global para SF2
         c_input, c_lista = st.columns([1, 1])
         
         with c_lista:
@@ -670,7 +670,6 @@ else:
 
                                 id_registro_baja = f"BAJA-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
                                 
-                                # Guardar en el estado local de la sesión
                                 st.session_state.db_bajas_historico[id_registro_baja] = {
                                     "fecha_generacion": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
                                     "archivo_origen": up_sf2.name,
@@ -680,7 +679,6 @@ else:
                                     "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
                                 
-                                # Reconstruir el DataFrame completo mapeando tus columnas oficiales
                                 lista_filas_sheets = []
                                 for k, v in st.session_state.db_bajas_historico.items():
                                     lista_filas_sheets.append({
@@ -694,7 +692,7 @@ else:
                                     })
                                 df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 
-                                # === BUCLE DE REINTENTOS PARA CONEXIÓN SATURADA NATIVA ===
+                                # === ESCRITURA ANCLADA CON REINTENTOS ===
                                 max_intentos = 3
                                 guardado_exitoso = False
                                 ultimo_error_msg = ""
@@ -702,18 +700,18 @@ else:
                                 for intento in range(1, max_intentos + 1):
                                     try:
                                         conn = st.connection("gsheets", type=GSheetsConnection)
-                                        # Inyección nativa directa, sin forzar credenciales manuales
-                                        conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                        # Actualización obligatoria apuntando directo a URL_DB_SF2
+                                        conn.update(spreadsheet=URL_DB_SF2, worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
                                         guardado_exitoso = True
                                         break
                                     except Exception as error_nube:
                                         ultimo_error_msg = str(error_nube)
                                         if intento < max_intentos:
-                                            time.sleep(intento * 2)  # Pausa de 2 y 4 segundos entre intentos
+                                            time.sleep(intento * 2)
                                 
                                 if not guardado_exitoso:
                                     raise RuntimeError(f"Google API saturada tras {max_intentos} intentos. Detalles: {ultimo_error_msg}")
-                                # ====================================================================
+                                # ========================================
 
                                 st.success(f"✅ ¡Documento guardado en Bóveda Eterna de Google Sheets! ID: {id_registro_baja}")
                                 st.download_button(
@@ -782,7 +780,6 @@ else:
                             if id_recuperar:
                                 del st.session_state.db_bajas_historico[id_recuperar]
                                 
-                                # Reconstruir el archivo limpio tras una eliminación física
                                 lista_filas_sheets = []
                                 for k, v in st.session_state.db_bajas_historico.items():
                                     lista_filas_sheets.append({
@@ -800,12 +797,12 @@ else:
                                 else:
                                     df_bajas_to_sheets = pd.DataFrame(columns=["ID Registro", "Fecha", "Origen", "Usuario", "Folios", "Datos Captura", "Excel Base64"])
                                 
-                                # Aplicar la paciencia nativa para la eliminación física
                                 guardado_eliminar = False
                                 for int_el in range(1, 4):
                                     try:
                                         conn = st.connection("gsheets", type=GSheetsConnection)
-                                        conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
+                                        # Eliminación con anclaje estricto de URL
+                                        conn.update(spreadsheet=URL_DB_SF2, worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
                                         guardado_eliminar = True
                                         break
                                     except Exception:
