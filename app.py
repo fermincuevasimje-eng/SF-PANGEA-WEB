@@ -610,26 +610,27 @@ else:
         import json
         HOJA_BAJAS = "Boveda_Bajas"
         
-        # Sincronización inicial con la nube para evitar pérdidas por reinicio del servidor
+        # Sincronización inicial con la nube blindada contra errores 404 de hojas vacías
         if "db_bajas_historico" not in st.session_state:
             st.session_state.db_bajas_historico = {}
             try:
                 conn = st.connection("gsheets", type=GSheetsConnection)
                 df_sheets_bajas = conn.read(worksheet=HOJA_BAJAS, ttl="0d")
                 
-                if not df_sheets_bajas.empty:
+                if df_sheets_bajas is not None and not df_sheets_bajas.empty:
                     for _, fila in df_sheets_bajas.iterrows():
-                        id_reg = str(fila["ID Registro"]).strip()
+                        id_reg = str(fila.get("ID Registro", "")).strip()
                         if id_reg and id_reg != "nan" and id_reg != "ID Registro":
                             st.session_state.db_bajas_historico[id_reg] = {
-                                "fecha_generacion": str(fila["Fecha"]),
-                                "archivo_origen": str(fila["Origen"]),
-                                "usuario": str(fila["Usuario"]),
-                                "total_folios": int(fila["Folios"]) if str(fila["Folios"]).isdigit() else 0,
-                                "datos_capture": json.loads(fila["Datos Captura"]) if str(fila["Datos Captura"]).startswith("{") else {},
-                                "excel_base64": str(fila["Excel Base64"])
+                                "fecha_generacion": str(fila.get("Fecha", "")),
+                                "archivo_origen": str(fila.get("Origen", "")),
+                                "usuario": str(fila.get("Usuario", "")),
+                                "total_folios": int(fila["Folios"]) if str(fila.get("Folios", "")).isdigit() else 0,
+                                "datos_capture": json.loads(fila["Datos Captura"]) if str(fila.get("Datos Captura", "")).startswith("{") else {},
+                                "excel_base64": str(fila.get("Excel Base64", ""))
                             }
-            except Exception as e:
+            except Exception:
+                # Si la hoja está vacía en Google Sheets, inicializamos el diccionario local en blanco de forma segura
                 st.session_state.db_bajas_historico = {}
         # ===============================================================
 
@@ -679,7 +680,7 @@ else:
                                     "excel_base64": base64.b64encode(excel_data).decode('utf-8')
                                 }
                                 
-                                # Reconstruir el historial completo para actualizar con .update() compatible
+                                # Reconstruir el DataFrame completo mapeando exactamente tus columnas oficiales
                                 lista_filas_sheets = []
                                 for k, v in st.session_state.db_bajas_historico.items():
                                     lista_filas_sheets.append({
@@ -693,7 +694,7 @@ else:
                                     })
                                 df_bajas_to_sheets = pd.DataFrame(lista_filas_sheets)
                                 
-                                # Método clásico e infalible compatible con todas las versiones de Streamlit
+                                # Ejecución de actualización limpia con el conector de Streamlit
                                 conn = st.connection("gsheets", type=GSheetsConnection)
                                 conn.update(worksheet=HOJA_BAJAS, data=df_bajas_to_sheets)
 
@@ -764,7 +765,7 @@ else:
                             if id_recuperar:
                                 del st.session_state.db_bajas_historico[id_recuperar]
                                 
-                                # Reconstruir el archivo limpio tras una eliminación física
+                                # Reconstruir el archivo tras una eliminación física
                                 lista_filas_sheets = []
                                 for k, v in st.session_state.db_bajas_historico.items():
                                     lista_filas_sheets.append({
