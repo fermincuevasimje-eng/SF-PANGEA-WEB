@@ -693,16 +693,36 @@ else:
             with tab_boveda:
                 st.subheader("🗄️ Historial Permanente")
                 if st.session_state.db_bajas_historico:
-                    lista_tabla = [{"ID Registro": k, "Fecha": v.get("Fecha", "N/A"), "Origen": v.get("Origen", "N/A"), "Folios": v.get("Folios", 0)} for k, v in st.session_state.db_bajas_historico.items()]
+                    # Creamos una lista para mostrar en tabla
+                    lista_tabla = []
+                    for k, v in st.session_state.db_bajas_historico.items():
+                        lista_tabla.append({
+                            "ID Registro": k, 
+                            "Fecha": v.get("Fecha", "N/A"), 
+                            "Origen": v.get("Origen", "N/A"), 
+                            "Folios": v.get("Folios", v.get("total_folios", 0))
+                        })
+                    
                     df_h = pd.DataFrame(lista_tabla)
                     st.dataframe(df_h.sort_values(by="ID Registro", ascending=False), use_container_width=True, hide_index=True)
                     
                     id_rec = st.selectbox("Seleccione ID:", list(st.session_state.db_bajas_historico.keys())[::-1])
                     if id_rec:
                         data = st.session_state.db_bajas_historico[id_rec]
-                        raw_b64 = data.get("Excel", "").replace('\n', '').replace('\r', '')
+                        
+                        # --- DETECCIÓN DE DATOS ---
+                        # Buscamos en todas las variantes posibles de nombre de columna
+                        raw_b64 = data.get("Excel Base64") or data.get("excel_base64") or data.get("Excel")
+                        
                         if raw_b64:
-                            st.download_button("🔄 Descargar Excel", data=base64.b64decode(raw_b64), file_name=f"{id_rec}.xlsx", use_container_width=True)
+                            try:
+                                raw_b64 = str(raw_b64).replace('\n', '').replace('\r', '')
+                                st.download_button("🔄 Descargar Excel", data=base64.b64decode(raw_b64), file_name=f"{id_rec}.xlsx", use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error al decodificar archivo: {e}")
+                        else:
+                            st.error("No se encontró el archivo. Llaves disponibles en el registro:")
+                            st.json(data) # Esto nos dirá exactamente qué nombres tiene tu base de datos
                         
                         if st.checkbox("🔐 Confirmar borrado físico", key="del_seguro"):
                             if st.button("🗑️ BORRAR DE BÓVEDA"):
