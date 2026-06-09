@@ -626,8 +626,8 @@ else:
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Conexión al ID del archivo
-        SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzeJSbMwxUm8"
+        # Conexión al ID del archivo corregido
+        SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
         try:
             sh = client.open_by_key(SHEET_ID)
             # Intentar abrir la hoja específicamente por nombre
