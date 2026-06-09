@@ -608,8 +608,10 @@ else:
         
         import gspread
         from google.oauth2.service_account import Credentials
+        import json
+        import pandas as pd
         
-        # Configuración de credenciales
+        # 1. Configuración de conexión (la que ya nos funcionó)
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
         creds_dict = {
             "type": st.secrets["connections"]["gsheets"]["type"],
@@ -626,19 +628,56 @@ else:
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Conexión al ID del archivo corregido
+        # 2. Apertura de la hoja
         SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
         try:
             sh = client.open_by_key(SHEET_ID)
-            # Intentar abrir la hoja específicamente por nombre
             ws = sh.worksheet("Boveda_Bajas")
-            st.success(f"✅ ¡Conexión exitosa a: {ws.title}!")
-        except gspread.exceptions.WorksheetNotFound:
-            # Si falla, intentamos con la primera hoja
+        except:
             ws = sh.get_worksheet(0)
-            st.warning(f"⚠️ No encontré 'Boveda_Bajas'. Conectado a: {ws.title}")
-        except Exception as e:
-            st.error(f"❌ Error crítico: {e}")
+            
+        st.success(f"✅ Conectado a: {ws.title}")
+
+        # 3. Interfaz de trabajo
+        if "lista_bajas" not in st.session_state:
+            st.session_state.lista_bajas = {}
+
+        col_izq, col_der = st.columns(2)
+
+        with col_izq:
+            st.subheader("Captura de Folios")
+            with st.form("form_baja", clear_on_submit=True):
+                folio = st.text_input("Folio / Ticket:")
+                obs = st.text_input("Observaciones:")
+                if st.form_submit_button("➕ Agregar a la lista"):
+                    if folio:
+                        st.session_state.lista_bajas[folio] = obs
+                        st.rerun()
+
+        with col_der:
+            st.subheader("Lista para Guardar")
+            if st.session_state.lista_bajas:
+                df = pd.DataFrame(list(st.session_state.lista_bajas.items()), columns=["Folio", "Observaciones"])
+                st.table(df)
+                
+                if st.button("🚀 Enviar a Google Sheets"):
+                    try:
+                        # Preparamos los datos
+                        fecha = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")
+                        folios_json = json.dumps(st.session_state.lista_bajas)
+                        
+                        # Guardamos la fila
+                        ws.append_row([fecha, "Manual", len(st.session_state.lista_bajas), folios_json])
+                        
+                        st.balloons()
+                        st.success("✅ ¡Folios guardados correctamente!")
+                        st.session_state.lista_bajas = {} # Limpiamos
+                        time.sleep(2)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al guardar: {e}")
+            else:
+                st.info("La lista está vacía.")
     
     elif st.session_state.menu == "SF1":
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
