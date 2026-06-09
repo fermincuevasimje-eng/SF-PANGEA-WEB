@@ -608,8 +608,7 @@ else:
         
         import gspread
         from google.oauth2.service_account import Credentials
-        import json
-
+        
         # Configuración de credenciales
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
         creds_dict = {
@@ -627,14 +626,19 @@ else:
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Conexión directa
+        # Conexión al ID del archivo
         SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzeJSbMwxUm8"
         try:
             sh = client.open_by_key(SHEET_ID)
+            # Intentar abrir la hoja específicamente por nombre
             ws = sh.worksheet("Boveda_Bajas")
-            st.success("✅ Conectado a Bóveda_Bajas")
+            st.success(f"✅ ¡Conexión exitosa a: {ws.title}!")
+        except gspread.exceptions.WorksheetNotFound:
+            # Si falla, intentamos con la primera hoja
+            ws = sh.get_worksheet(0)
+            st.warning(f"⚠️ No encontré 'Boveda_Bajas'. Conectado a: {ws.title}")
         except Exception as e:
-            st.error(f"Error de conexión: {e}")
+            st.error(f"❌ Error crítico: {e}")
     
     elif st.session_state.menu == "SF1":
         st.title("🚀 GdR V24 - Generador de Rutas Inteligente")
