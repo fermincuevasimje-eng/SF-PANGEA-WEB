@@ -2109,18 +2109,26 @@ else:
                 data_manager.guardar_inventario(df_base)
                 st.session_state.db_inventario = df_base
 
-        # Carga síncrona del histórico de vales permanente desde Google Sheets
+        # CARGA OPTIMIZADA DESDE NUBE: Solo descarga columnas requeridas evitando colapsos
         if "vales_historial" not in st.session_state:
-            registros_nube = ws.get_all_records()
             st.session_state.vales_historial = []
-            for r in registros_nube:
-                reg_id = str(r.get("ID Registro", ""))
-                if reg_id.startswith("SF6-VAL-"):
+            try:
+                valores_columnas = ws.get_all_values()
+                if valores_columnas:
+                    headers = [str(h).strip() for h in valores_columnas[0]]
                     try:
-                        datos_raw = r.get("Datos", "{}")
-                        vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                        st.session_state.vales_historial.append(vale_parsed)
-                    except: pass
+                        idx_id = headers.index("ID Registro")
+                        idx_datos = headers.index("Datos")
+                        for row in valores_columnas[1:]:
+                            if len(row) > idx_id and str(row[idx_id]).startswith("SF6-VAL-"):
+                                try:
+                                    datos_raw = row[idx_datos]
+                                    vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    st.session_state.vales_historial.append(vale_parsed)
+                                except: pass
+                    except ValueError: pass
+            except Exception as e:
+                st.error(f"⚠️ Alerta de sincronización en red: {e}")
 
         if "carrito_vale" not in st.session_state:
             st.session_state.carrito_vale = []
@@ -2331,14 +2339,14 @@ else:
                 
                 with col_v2:
                     if st.button(f"🚀 PROCESAR Y EMITIR VALE ({folio_actual})", type="primary", use_container_width=True):
-                        # Validación en tiempo real directa contra Google Sheets para blindaje absoluto de duplicados
-                        registros_actuales = ws.get_all_records()
-                        folios_existentes = [json.loads(r.get("Datos", "{}")).get("Folio", "") for r in registros_actuales if r.get("ID Registro", "").startswith("SF6-VAL-")]
-                        
-                        if folio_actual in folios_existentes or any(v["Folio"] == folio_actual for v in st.session_state.vales_historial):
-                            st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya fue emitido previamente. Por seguridad de inventarios, recargue el entorno.")
-                        else:
-                            try:
+                        try:
+                            # Validación directa ultrarápida
+                            col_id_vals = ws.col_values(1)
+                            id_reg_vale = f"SF6-VAL-{folio_actual}"
+                            
+                            if id_reg_vale in col_id_vals or any(v["Folio"] == folio_actual for v in st.session_state.vales_historial):
+                                st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya fue emitido previamente. Por seguridad de inventarios, recargue el entorno.")
+                            else:
                                 # --- 1. CONSTRUCCIÓN DEL PDF ---
                                 from fpdf import FPDF
                                 pdf = FPDF()
@@ -2451,11 +2459,9 @@ else:
                                 st.session_state.vale_listo_descarga = {"folio": folio_actual, "bytes": pdf_bytes}
                                 st.session_state.carrito_vale = []
                                 st.success("✅ Vale Oficial sincronizado en la Bóveda Nube con éxito.")
-
-                            except Exception as e:
-                                st.error(f"❌ Error al procesar datos: {e}")
-                            
-                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error al procesar datos: {e}")
+                        st.rerun()
 
             # --- COMPROBANTE DE DESCARGA ACTIVO ---
             if "vale_listo_descarga" in st.session_state and st.session_state.vale_listo_descarga:
@@ -2495,7 +2501,6 @@ else:
                 st.markdown("### 📊 Monitoreo Técnico de Despliegue")
                 st.caption("Estatus operativo inmutable de las brigadas en territorio de Toluca:")
                 
-                # --- CONTROL DE SELECCIÓN PARA RESALTADO ---
                 v_select_previa = st.session_state.get("sb_seguimiento_folios", st.session_state.vales_historial[-1]["Folio"] if st.session_state.vales_historial else "")
                 
                 tabla_resumen_seguimiento = []
@@ -2516,7 +2521,6 @@ else:
                     })
                 df_seg_vista = pd.DataFrame(tabla_resumen_seguimiento)
                 
-                # Función de estilo para resaltar en verde claro la fila en seguimiento
                 def resaltar_vale_seguimiento(row):
                     color = '#d1e7dd' if row['Folio'] == v_select_previa else ''
                     return [f'background-color: {color}'] * len(row)
@@ -2538,7 +2542,6 @@ else:
                 if vale_obj.get("Estado", "Pendiente") == "Conciliado":
                     st.success(f"✅ Este folio ya se encuentra **CONCILIADO**. Puede volver a guardar para modificar los datos reales.")
                 
-                # --- FILTRADO CRUZADO DINÁMICO DE CONCILIACIÓN ---
                 if "sb_rec_delegacion" not in st.session_state or st.session_state.get("current_v_select") != v_select:
                     st.session_state.current_v_select = v_select
                     st.session_state.sb_rec_delegacion = vale_obj.get("Delegacion_Real", vale_obj["Delegacion"])
@@ -2592,7 +2595,6 @@ else:
                     
                     if not error_cantidades:
                         try:
-                            # 1. Actualización de inventario local
                             for index, row in df_editado.iterrows():
                                 dif_devolucion = row["Devuelto"] - df_materiales_vale.loc[index, "Devuelto"]
                                 if dif_devolucion > 0:
@@ -2601,27 +2603,22 @@ else:
                             
                             st.session_state.db_inventario.to_csv('inventario_dap_guardado.csv', index=False)
                             
-                            # 2. Sincronización de estructura en memoria
                             st.session_state.vales_historial[idx_vale]["Materiales"] = df_editado.to_dict(orient='records')
                             st.session_state.vales_historial[idx_vale]["Delegacion_Real"] = real_del_sel
                             st.session_state.vales_historial[idx_vale]["UTB_Real"] = real_utb_sel
                             st.session_state.vales_historial[idx_vale]["Estado"] = "Conciliado"
                             
-                            # 3. Actualización de la fila correspondiente en Google Sheets
                             id_reg_buscar = f"SF6-VAL-{v_select}"
                             cell = ws.find(id_reg_buscar, in_column=1)
                             if cell:
                                 ws.update_cell(cell.row, 5, json.dumps(st.session_state.vales_historial[idx_vale]))
                             
                             st.success(f"📊 Cierre técnico sincronizado en la nube con éxito.")
-                        
                         except Exception as e:
                             st.error(f"❌ Error al guardar la conciliación: {e}")
-                        
                         time.sleep(0.5)
                         st.rerun()
                 
-                # --- REPORTE COMPLETO DINÁMICO DE CONSUMO HISTÓRICO ---
                 st.divider()
                 st.markdown("### 📈 2. Reporte Dinámico de Consumo Real e Histórico")
                 
@@ -2715,7 +2712,6 @@ else:
                 
                 st.divider()
                 
-                # --- APARTADO A: ACTUALIZACIÓN DE EXISTENCIAS (ABASTECIMIENTO) ---
                 with st.expander("📥 Aumentar Existencias Físicas (Abastecimiento)", expanded=False):
                     m_in = st.selectbox("Seleccione Material a Abastecer:", df_inv['Material'].tolist(), key="sb_abastecer")
                     stock_previo = df_inv.loc[df_inv['Material'] == m_in, 'Stock'].values[0]
@@ -2735,7 +2731,6 @@ else:
                                 st.error(f"❌ Error al guardar archivo: {e}")
                             st.rerun()
                 
-                # --- APARTADO B: ALTA EN EL CATÁLOGO ---
                 with st.expander("➕ Dar de Alta Nuevo Ítem en el Catálogo Oficial", expanded=False):
                     with st.container(border=True):
                         nuevo_nombre = st.text_input("Nombre del Material / Insumo:", placeholder="Ej: FOTOCELDA MULTIVOLTAJE").upper().strip()
@@ -2747,21 +2742,17 @@ else:
                         if st.button("🚀 REGISTRAR NUEVO MATERIAL INMUEBLE", use_container_width=True):
                             if nuevo_nombre and nuevo_nombre not in df_inv['Material'].tolist():
                                 nuevo_registro = {"ID": f"MAT-{len(df_inv)+1}", "Material": nuevo_nombre, "Stock": stock_inicial_item, "Min": minimo_alerta, "Unidad": nueva_unidad}
-                                
                                 st.session_state.db_inventario = pd.concat([st.session_state.db_inventario, pd.DataFrame([nuevo_registro])], ignore_index=True)
-                                
                                 try:
                                     data_manager.guardar_inventario(st.session_state.db_inventario)
                                     st.success("✅ Alta registrada.")
                                 except Exception as e:
                                     st.error(f"❌ Error al guardar archivo: {e}")
-                                
                                 time.sleep(0.5)
                                 st.rerun()
                             else:
                                 st.warning("⚠️ Nombre vacío o el material ya existe.")
 
-                # --- APARTADO C: BAJA DEL CATÁLOGO ---
                 with st.expander("🗑️ Eliminar Ítem del Catálogo (Baja Definitiva)", expanded=False):
                     with st.container(border=True):
                         mat_a_eliminar = st.selectbox("Seleccione el Ítem a eliminar:", df_inv['Material'].tolist(), key="del_item_catalog")
@@ -2769,17 +2760,14 @@ else:
                         
                         if st.button("💥 ELIMINAR CONCEPTO DEL INVENTARIO", use_container_width=True, type="secondary", disabled=not check_seguro_item):
                             st.session_state.db_inventario = st.session_state.db_inventario[st.session_state.db_inventario['Material'] != mat_a_eliminar].reset_index(drop=True)
-                            
                             try:
                                 data_manager.guardar_inventario(st.session_state.db_inventario)
                                 st.success("🗑️ El ítem ha sido borrado.")
                             except Exception as e:
                                 st.error(f"❌ Error al guardar archivo: {e}")
-                            
                             time.sleep(0.5)
                             st.rerun()
                 
-                # --- SECCIÓN DE BÓVEDA HISTÓRICA AUDITABLE ---
                 st.write("")
                 st.markdown("---")
                 st.subheader("🔒 Bóveda de Vales Emitidos (Historial Antirrobos)")
@@ -2794,7 +2782,6 @@ else:
                     
                     folio_select = st.selectbox("Seleccione Folio para auditoría interna:", [v["Folio"] for v in st.session_state.vales_historial], key="sb_auditoria_boveda")
                     
-                    # Función de estilo para resaltar en verde claro la fila en la bóveda de administración
                     def resaltar_vale_admin(row):
                         color = '#d1e7dd' if row['Folio'] == folio_select else ''
                         return [f'background-color: {color}'] * len(row)
@@ -2812,7 +2799,6 @@ else:
                         check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select}", key=f"chk_del_{folio_select}")
                         if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
                             try:
-                                # Eliminación física directa de la fila correspondiente en Google Sheets
                                 id_reg_borrar = f"SF6-VAL-{folio_select}"
                                 cell = ws.find(id_reg_borrar, in_column=1)
                                 if cell:
@@ -2825,9 +2811,6 @@ else:
                             except Exception as e:
                                 st.error(f"Error al eliminar de Google Sheets: {e}")
 
-                # ==========================================
-                # --- BOTÓN SECRETO DE REINICIO MASTER (PIN 1827) ---
-                # ==========================================
                 st.write("")
                 st.markdown("---")
                 st.subheader("🚨 Zona de Despliegue Oficial (Pasar a Producción)")
@@ -2838,7 +2821,7 @@ else:
                 
                 if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
                     try:
-                        # 1. Purgar todas las filas correspondientes al SF6 de la base de datos Google Sheets
+                        # Purgar en Sheets ultrarápido por lote de IDs
                         registros_limpieza = ws.get_all_records()
                         for i, r in enumerate(reversed(registros_limpieza), start=1):
                             idx_real = len(registros_limpieza) - i + 2 
@@ -2846,10 +2829,8 @@ else:
                             if reg_id.startswith("SF6-VAL-"):
                                 ws.delete_rows(idx_real)
                         
-                        # 2. Encargado de almacén local
                         data_manager.reiniciar_sistema()
                         
-                        # 3. Reconfiguración in-memory
                         df_base = pd.DataFrame(STOCK_INICIAL)
                         df_base['Stock'] = 0  
                         df_base['Min'] = 0    
