@@ -1418,7 +1418,12 @@ else:
                             cx.write(f"#{i+1}"); cy.write(p['texto'])
                             if cz.button("✏️", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
                             if cz.button("🗑️", key=f"d_{i}"): st.session_state.pasos_sf4.pop(i); st.rerun()
-                    if st.button("🔥 Reiniciar Mesa", use_container_width=True): st.session_state.pasos_sf4 = []; st.rerun()
+                    
+                    st.write("---")
+                    seguro_reiniciar = st.checkbox("🔐 Confirmar vaciado total de la mesa", key="reiniciar_seguro_sf4")
+                    if st.button("🔥 Reiniciar Mesa", use_container_width=True, disabled=not seguro_reiniciar): 
+                        st.session_state.pasos_sf4 = []
+                        st.rerun()
 
                 with col_p:
                     st.subheader("📊 Visualización Premium")
@@ -1477,16 +1482,20 @@ else:
                     nom_p = st.text_input("Nombre para Bóveda:")
                     if st.button("💾 Guardar en Bóveda Pangea"):
                         if nom_p:
-                            payload = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
-                            st.session_state.boveda_mmd[nom_p] = payload
-                            
-                            tz_mx = timezone(timedelta(hours=-6))
-                            ahora = datetime.now(tz_mx)
-                            id_reg = f"SF4-PRY-{ahora.strftime('%Y%m%d-%H%M%S')}"
-                            fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
-                            
-                            ws.append_row([id_reg, fecha_mx, nom_p, len(st.session_state.pasos_sf4), json.dumps(payload), ""])
-                            st.success("Guardado en Bóveda Permanente Correctamente.")
+                            # --- CONTROL DE DUPLICADOS EN DIAGRAMAS ---
+                            if nom_p in st.session_state.boveda_mmd:
+                                st.error(f"⚠️ Error: El nombre '{nom_p}' ya existe en la bóveda. Use un nombre diferente para evitar confusiones.")
+                            else:
+                                payload = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
+                                st.session_state.boveda_mmd[nom_p] = payload
+                                
+                                tz_mx = timezone(timedelta(hours=-6))
+                                ahora = datetime.now(tz_mx)
+                                id_reg = f"SF4-PRY-{ahora.strftime('%Y%m%d-%H%M%S')}"
+                                fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
+                                
+                                ws.append_row([id_reg, fecha_mx, nom_p, len(st.session_state.pasos_sf4), json.dumps(payload), ""])
+                                st.success("Guardado en Bóveda Permanente Correctamente.")
 
         with tab_b:
             if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
@@ -1576,6 +1585,16 @@ else:
                         id_sel = col_sel.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1])
                         data_previa = st.session_state.db_oficios[id_sel]
                         
+                        # --- TABLA RESUMEN CON RESALTADO DINÁMICO ---
+                        lista_oficios_tabla = [{"Oficio ID": k, "Fecha": v.get("fecha", "N/A"), "Folio Ref": v.get("folio", "N/A")} for k, v in st.session_state.db_oficios.items()]
+                        df_oficios_vista = pd.DataFrame(lista_oficios_tabla)
+                        
+                        def resaltar_oficio_seleccionado(row):
+                            color = '#d1e7dd' if row['Oficio ID'] == id_sel else ''
+                            return [f'background-color: {color}'] * len(row)
+                            
+                        st.dataframe(df_oficios_vista.style.apply(resaltar_oficio_seleccionado, axis=1), use_container_width=True, hide_index=True)
+                        
                         seguro_borrado = st.checkbox("🔐 Confirmar eliminación permanente de este oficio")
                         if col_del.button("🗑️ BORRAR", use_container_width=True, disabled=not seguro_borrado):
                             try:
@@ -1629,25 +1648,30 @@ else:
 
                 if b_save.button("💾 GUARDAR/ACTUALIZAR", use_container_width=True):
                     id_r = n_oficio.replace("/", "-")
-                    payload_oficio = {
-                        "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
-                        "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
-                        "firma": firm, "cargo_f": cargo_firm, "ccp": ccp
-                    }
-                    st.session_state.db_oficios[id_r] = payload_oficio
                     
-                    tz_mx = timezone(timedelta(hours=-6))
-                    ahora = datetime.now(tz_mx)
-                    id_reg = f"SF4-OFC-{ahora.strftime('%Y%m%d-%H%M%S')}"
-                    fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
-                    
-                    try:
-                        cell = ws.find(id_r, in_column=3)
-                        if cell: ws.delete_rows(cell.row)
-                    except: pass
-                    
-                    ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
-                    st.success("✅ Bóveda Nube de Oficios Actualizada."); time.sleep(1); st.rerun()
+                    # --- CONTROL DE DUPLICADOS EN OFICIOS (SOLO AL CREAR NUEVOS) ---
+                    if modo_of == "✨ Crear Nuevo" and id_r in st.session_state.db_oficios:
+                        st.error(f"⚠️ Error: El oficio '{n_oficio}' ya existe en el registro histórico de la Dirección. Por favor verifique el número.")
+                    else:
+                        payload_oficio = {
+                            "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
+                            "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
+                            "firma": firm, "cargo_f": cargo_firm, "ccp": ccp
+                        }
+                        st.session_state.db_oficios[id_r] = payload_oficio
+                        
+                        tz_mx = timezone(timedelta(hours=-6))
+                        ahora = datetime.now(tz_mx)
+                        id_reg = f"SF4-OFC-{ahora.strftime('%Y%m%d-%H%M%S')}"
+                        fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
+                        
+                        try:
+                            cell = ws.find(id_r, in_column=3)
+                            if cell: ws.delete_rows(cell.row)
+                        except: pass
+                        
+                        ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
+                        st.success("✅ Bóveda Nube de Oficios Actualizada."); time.sleep(1); st.rerun()
 
                 if motor_pdf_listo:
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
