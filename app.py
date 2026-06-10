@@ -448,7 +448,7 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- SINCRONIZACIÓN AUTOMÁTICA ---
+        # --- SINCRONIZACIÓN AUTOMÁTICA ADAPTADA ---
         if "manual_db" not in st.session_state:
             st.session_state.manual_db = []
             try:
@@ -472,68 +472,72 @@ else:
             st.session_state.reset_key = 0
         rk = st.session_state.reset_key
 
-        # --- FORMULARIO DE REGISTRO ---
+        # --- FORMULARIO ---
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
+            st.write("📍 **Paso 1: Ubicación**")
+            col_geo1, col_geo2 = st.columns(2)
+            with col_geo1:
+                f_del = st.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"del_manual_{rk}")
+            with col_geo2:
+                opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
+                f_utb = st.selectbox("UTB", opciones_utb_f, key=f"utb_manual_{rk}")
+
             with st.form(key=f"form_sf3_core_{rk}", clear_on_submit=True):
-                c1, c2 = st.columns(2)
-                f_del = c1.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())))
-                f_utb = c2.selectbox("UTB", sorted(CATALOGO_MAESTRO.get(f_del, [])))
-                
+                st.write("📝 **Paso 2: Detalles de la Atención**")
                 c1, c2, c3 = st.columns([1, 1, 2])
-                f_fecha = c1.date_input("Fecha")
-                f_ot = c2.text_input("O.T.")
-                f_folio = c3.text_input("Folio / Ticket / IMEI")
+                with c1: f_fecha = st.date_input("Fecha")
+                with c2: f_ot = st.text_input("O.T.")
+                with c3: f_folio = st.text_input("Folio / Ticket / IMEI")
                 f_calle = st.text_input("Calle")
 
                 m1, m2, m3, m4 = st.columns(4)
-                f_rehab = m1.number_input("7. Rehabilitación", min_value=0, step=1)
-                f_manto = m2.number_input("8. Mantenimiento", min_value=0, step=1)
-                f_sust = m3.number_input("9. Sustitución", min_value=0, step=1)
-                f_ampli = m4.number_input("10. Ampliación", min_value=0, step=1)
+                with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
+                with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
+                with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
+                with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
+
                 f_obs = st.text_area("11. Observaciones")
-                
-                if st.form_submit_button("🚀 GUARDAR REGISTRO"):
+                btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA PERMANENTE", use_container_width=True)
+
+                if btn_guardar:
                     payload = {"FECHA":f_fecha.strftime("%d/%m/%Y"), "OT":f_ot.upper(), "CALLE":f_calle.upper(), "DELEGACIÓN":f_del, "UTB":f_utb, "FOLIO":f_folio.upper(), "REHAB":int(f_rehab), "MANTO":int(f_manto), "SUST":int(f_sust), "AMPLI":int(f_ampli), "OBS":f_obs}
                     st.session_state.manual_db.append(payload)
                     ws.append_row([f"SF3-MET-{f_ot.upper()}", datetime.now().strftime("%d/%m/%Y %H:%M"), f_del, "", "", json.dumps(payload), ""])
                     st.session_state.reset_key += 1
                     st.rerun()
 
-        # --- CONSOLA DE GESTIÓN (FORMULARIO COMPLETO DE EDICIÓN) ---
-        with st.expander("🛠️ GESTIÓN Y EDICIÓN DE REGISTROS", expanded=False):
+        # --- CONSOLA DE GESTIÓN (EDIT/ELIMINAR) ---
+        with st.expander("🛠️ GESTIÓN DE REGISTROS (EDICIÓN/BORRADO)", expanded=False):
             if st.session_state.manual_db:
-                sel_idx = st.selectbox("Seleccionar Registro:", range(len(st.session_state.manual_db)), format_func=lambda i: f"{st.session_state.manual_db[i]['OT']} | {st.session_state.manual_db[i]['FECHA']}")
-                reg = st.session_state.manual_db[sel_idx]
+                sel = st.selectbox("Seleccionar:", [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db])
+                idx = [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db].index(sel)
+                col_e, col_d, col_b = st.columns(3)
+                if col_e.button("✏️ Editar"): st.session_state.edit = idx
+                if col_d.button("🗑️ Eliminar"): st.session_state.borra = idx
+                if col_b.button("💥 Borrar Último"): st.session_state.borra_ult = True
                 
-                # Editor completo que carga los datos actuales
-                with st.form("form_edicion"):
-                    st.write("### ✏️ Editando registro seleccionado:")
-                    e_del = st.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())), index=sorted(list(CATALOGO_MAESTRO.keys())).index(reg['DELEGACIÓN']))
-                    e_utb = st.selectbox("UTB", sorted(CATALOGO_MAESTRO.get(e_del, [])), index=sorted(CATALOGO_MAESTRO.get(e_del, [])).index(reg['UTB']) if reg['UTB'] in CATALOGO_MAESTRO.get(e_del, []) else 0)
-                    e_ot = st.text_input("O.T.", value=reg['OT'])
-                    e_folio = st.text_input("Folio", value=reg['FOLIO'])
-                    e_calle = st.text_input("Calle", value=reg['CALLE'])
-                    e_rehab = st.number_input("Rehabilitación", value=reg['REHAB'])
-                    e_manto = st.number_input("Mantenimiento", value=reg['MANTO'])
-                    e_sust = st.number_input("Sustitución", value=reg['SUST'])
-                    e_ampli = st.number_input("Ampliación", value=reg['AMPLI'])
-                    e_obs = st.text_area("Observaciones", value=reg['OBS'])
-                    
-                    if st.form_submit_button("💾 GUARDAR TODOS LOS CAMBIOS"):
-                        payload = {"FECHA":reg['FECHA'], "OT":e_ot.upper(), "CALLE":e_calle.upper(), "DELEGACIÓN":e_del, "UTB":e_utb, "FOLIO":e_folio.upper(), "REHAB":int(e_rehab), "MANTO":int(e_manto), "SUST":int(e_sust), "AMPLI":int(e_ampli), "OBS":e_obs}
-                        st.session_state.manual_db[sel_idx] = payload
+                if "edit" in st.session_state:
+                    reg = st.session_state.manual_db[st.session_state.edit]
+                    nr = st.number_input("Rehab", value=reg['REHAB'])
+                    if st.button("💾 Guardar Cambios"):
+                        st.session_state.manual_db[st.session_state.edit].update({"REHAB": nr})
                         cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
-                        if cell: ws.update_cell(cell.row, 6, json.dumps(payload))
-                        st.rerun()
-
-                if st.checkbox("🔐 Confirmar ELIMINAR REGISTRO SELECCIONADO", key="c_del"):
-                    if st.button("🚨 EJECUTAR BORRADO DEFINITIVO"):
-                        reg_del = st.session_state.manual_db.pop(sel_idx)
-                        cell = ws.find(f"SF3-MET-{reg_del['OT']}", in_column=1)
+                        if cell: ws.update_cell(cell.row, 6, json.dumps(st.session_state.manual_db[st.session_state.edit]))
+                        del st.session_state.edit; st.rerun()
+                if "borra" in st.session_state and st.checkbox("Confirmar"):
+                    if st.button("Ejecutar"):
+                        reg = st.session_state.manual_db.pop(st.session_state.borra)
+                        cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
                         if cell: ws.delete_rows(cell.row)
-                        st.rerun()
+                        del st.session_state.borra; st.rerun()
+                if "borra_ult" in st.session_state and st.checkbox("Confirmar"):
+                    if st.button("Ejecutar"):
+                        last = st.session_state.manual_db.pop()
+                        cell = ws.find(f"SF3-MET-{last['OT']}", in_column=1)
+                        if cell: ws.delete_rows(cell.row)
+                        del st.session_state.borra_ult; st.rerun()
 
-        # --- FILTROS Y RESUMEN (TU LÓGICA ORIGINAL INTACTA) ---
+        # --- FILTROS Y RESUMEN (TU LÓGICA ORIGINAL) ---
         st.markdown("---")
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         if up_cap:
@@ -585,7 +589,6 @@ else:
             d1.download_button("📂 Reporte MASIVO", generar_reporte(df_final, "MASIVO"), "REPORTE_MASIVO.xlsx")
             d2.download_button("📝 Reporte MANUAL", generar_reporte(df_final, "MANUAL"), "REPORTE_MANUAL.xlsx")
             d3.download_button("🚀 Reporte UNIFICADO", generar_reporte(df_final, "UNIFICADO"), "REPORTE_UNIFICADO.xlsx")
-            
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         
