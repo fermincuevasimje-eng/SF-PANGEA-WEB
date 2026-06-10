@@ -506,11 +506,16 @@ else:
                     st.session_state.reset_key += 1
                     st.rerun()
 
-        # --- CONSOLA DE GESTIÓN (EDIT/ELIMINAR) ---
-        with st.expander("🛠️ GESTIÓN DE REGISTROS (EDICIÓN/BORRADO)", expanded=False):
+        # --- CONSOLA DE GESTIÓN (NUEVA) ---
+        with st.expander("🛠️ GESTIÓN Y EDICIÓN DE REGISTROS", expanded=False):
             if st.session_state.manual_db:
-                sel = st.selectbox("Seleccionar:", [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db])
+                df_gest = pd.DataFrame(st.session_state.manual_db)
+                sel = st.selectbox("Seleccionar Registro:", [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db])
                 idx = [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db].index(sel)
+                
+                # Resaltado visual en verde
+                st.dataframe(df_gest.style.apply(lambda r: ['background-color: #d1e7dd' if r['OT'] == st.session_state.manual_db[idx]['OT'] else '' for _ in r], axis=1), use_container_width=True)
+                
                 col_e, col_d, col_b = st.columns(3)
                 if col_e.button("✏️ Editar"): st.session_state.edit = idx
                 if col_d.button("🗑️ Eliminar"): st.session_state.borra = idx
@@ -518,24 +523,29 @@ else:
                 
                 if "edit" in st.session_state:
                     reg = st.session_state.manual_db[st.session_state.edit]
-                    nr = st.number_input("Rehab", value=reg['REHAB'])
-                    if st.button("💾 Guardar Cambios"):
-                        st.session_state.manual_db[st.session_state.edit].update({"REHAB": nr})
-                        cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
-                        if cell: ws.update_cell(cell.row, 6, json.dumps(st.session_state.manual_db[st.session_state.edit]))
-                        del st.session_state.edit; st.rerun()
-                if "borra" in st.session_state and st.checkbox("Confirmar"):
-                    if st.button("Ejecutar"):
-                        reg = st.session_state.manual_db.pop(st.session_state.borra)
-                        cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
-                        if cell: ws.delete_rows(cell.row)
-                        del st.session_state.borra; st.rerun()
-                if "borra_ult" in st.session_state and st.checkbox("Confirmar"):
-                    if st.button("Ejecutar"):
-                        last = st.session_state.manual_db.pop()
-                        cell = ws.find(f"SF3-MET-{last['OT']}", in_column=1)
-                        if cell: ws.delete_rows(cell.row)
-                        del st.session_state.borra_ult; st.rerun()
+                    nr = st.number_input("Nueva Rehabilitación:", value=reg['REHAB'])
+                    if st.checkbox("Confirmar edición", key="conf_ed"):
+                        if st.button("💾 Guardar Cambios"):
+                            st.session_state.manual_db[st.session_state.edit].update({"REHAB": nr})
+                            cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
+                            if cell: ws.update_cell(cell.row, 6, json.dumps(st.session_state.manual_db[st.session_state.edit]))
+                            del st.session_state.edit; st.rerun()
+                
+                if "borra" in st.session_state:
+                    if st.checkbox("Confirmar ELIMINACIÓN", key="conf_del"):
+                        if st.button("🚨 EJECUTAR BORRADO"):
+                            reg = st.session_state.manual_db.pop(st.session_state.borra)
+                            cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
+                            if cell: ws.delete_rows(cell.row)
+                            del st.session_state.borra; st.rerun()
+
+                if "borra_ult" in st.session_state:
+                    if st.checkbox("Confirmar ELIMINAR ÚLTIMO", key="conf_del_ult"):
+                        if st.button("🚨 EJECUTAR BORRADO"):
+                            last = st.session_state.manual_db.pop()
+                            cell = ws.find(f"SF3-MET-{last['OT']}", in_column=1)
+                            if cell: ws.delete_rows(cell.row)
+                            del st.session_state.borra_ult; st.rerun()
 
         # --- FILTROS Y RESUMEN (TU LÓGICA ORIGINAL) ---
         st.markdown("---")
@@ -589,6 +599,7 @@ else:
             d1.download_button("📂 Reporte MASIVO", generar_reporte(df_final, "MASIVO"), "REPORTE_MASIVO.xlsx")
             d2.download_button("📝 Reporte MANUAL", generar_reporte(df_final, "MANUAL"), "REPORTE_MANUAL.xlsx")
             d3.download_button("🚀 Reporte UNIFICADO", generar_reporte(df_final, "UNIFICADO"), "REPORTE_UNIFICADO.xlsx")
+            
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         
