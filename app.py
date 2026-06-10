@@ -415,10 +415,62 @@ else:
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
+        # --- LIBRERÍAS DE ACCESO NUBE ---
+        import gspread
+        from google.oauth2.service_account import Credentials
+        import json
+        import pandas as pd
+        import io
+        import time
+        from datetime import datetime
+
+        # --- CONEXIÓN DE SEGURIDAD CON GOOGLE SHEETS ---
+        scope = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds_dict = {
+            "type": st.secrets["connections"]["gsheets"]["type"],
+            "project_id": st.secrets["connections"]["gsheets"]["project_id"],
+            "private_key_id": st.secrets["connections"]["gsheets"]["private_key_id"],
+            "private_key": st.secrets["connections"]["gsheets"]["private_key"].replace('\\n', '\n'),
+            "client_email": st.secrets["connections"]["gsheets"]["client_email"],
+            "client_id": st.secrets["connections"]["gsheets"]["client_id"],
+            "auth_uri": st.secrets["connections"]["gsheets"]["auth_uri"],
+            "token_uri": st.secrets["connections"]["gsheets"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["connections"]["gsheets"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["connections"]["gsheets"]["client_x509_cert_url"]
+        }
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
+        
+        try:
+            sh = client.open_by_key(SHEET_ID)
+            ws = sh.worksheet("Boveda_Bajas")
+        except:
+            ws = sh.get_worksheet(0)
+
+        # --- SINCRONIZACIÓN AUTOMÁTICA DE LA BÓVEDA SF3 ---
+        if "manual_db" not in st.session_state:
+            st.session_state.manual_db = []
+            try:
+                valores_sheet = ws.get_all_values()
+                if valores_sheet:
+                    headers = [str(h).strip() for h in valores_sheet[0]]
+                    if "ID Registro" in headers and "Datos" in headers:
+                        idx_id = headers.index("ID Registro")
+                        idx_datos = headers.index("Datos")
+                        for row in valores_sheet[1:]:
+                            if len(row) > idx_id and str(row[idx_id]).startswith("SF3-MET-"):
+                                try:
+                                    st.session_state.manual_db.append(json.loads(row[idx_datos]))
+                                except: pass
+            except Exception as e:
+                st.sidebar.warning(f"Sincronizando métricas: {e}")
+
         if "reset_key" not in st.session_state:
             st.session_state.reset_key = 0
         rk = st.session_state.reset_key
 
+        # --- FORMULARIO DE CAPTURA INDESTRUCTIBLE ---
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
             st.write("📍 **Paso 1: Ubicación**")
             col_geo1, col_geo2 = st.columns(2)
@@ -445,23 +497,35 @@ else:
                 with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
 
                 f_obs = st.text_area("11. Observaciones")
-                btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA", use_container_width=True)
+                btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA PERMANENTE", use_container_width=True)
 
                 if btn_guardar:
-                    if "manual_db" not in st.session_state: st.session_state.manual_db = []
-                    st.session_state.manual_db.append({
+                    payload_ot = {
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
                         "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
-                        "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
-                    })
+                        "REHAB": int(f_rehab), "MANTO": int(f_manto), "SUST": int(f_sust), "AMPLI": int(f_ampli), "OBS": f_obs
+                    }
+                    
+                    st.session_state.manual_db.append(payload_ot)
+                    
+                    id_reg_met = f"SF3-MET-{f_ot.upper() if f_ot.strip() else datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                    fecha_captura_mx = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    ws.append_row([id_reg_met, fecha_captura_mx, f_del, f_ot.upper(), json.dumps(payload_ot), ""])
+                    
                     st.session_state.reset_key += 1
-                    st.toast(f"O.T. {f_ot} registrada correctamente", icon="✅")
+                    st.toast(f"O.T. {f_ot} blindada con éxito en la nube", icon="✅")
                     time.sleep(0.5)
                     st.rerun()
 
+        # --- BORRADO CONTROLADO DESDE NUBE ---
         if "manual_db" in st.session_state and st.session_state.manual_db:
             if st.button("🗑️ Borrar Último Registro Manual", use_container_width=True):
-                st.session_state.manual_db.pop()
+                item_eliminado = st.session_state.manual_db.pop()
+                try:
+                    id_a_buscar = f"SF3-MET-{item_eliminado['OT']}"
+                    cell = ws.find(id_a_buscar, in_column=1)
+                    if cell: ws.delete_rows(cell.row)
+                except: pass
                 st.rerun()
 
         st.markdown("---")
@@ -557,7 +621,7 @@ else:
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     df_reporte.to_excel(writer, index=False, sheet_name=nombre_hoja)
                     wb = writer.book
-                    ws = wb[nombre_hoja]
+                    ws_xl = wb[nombre_hoja]
                     
                     chart = BarChart()
                     chart.type = "col"
@@ -570,12 +634,12 @@ else:
                     idx_fin = df_reporte.columns.get_loc("AMPLI") + 1
                     fila_totales = len(df_reporte) + 1
                     
-                    data = Reference(ws, min_col=idx_inicio, max_col=idx_fin, min_row=fila_totales, max_row=fila_totales)
-                    cats = Reference(ws, min_col=idx_inicio, max_col=idx_fin, min_row=1, max_row=1)
+                    data = Reference(ws_xl, min_col=idx_inicio, max_col=idx_fin, min_row=fila_totales, max_row=fila_totales)
+                    cats = Reference(ws_xl, min_col=idx_inicio, max_col=idx_fin, min_row=1, max_row=1)
                     
                     chart.add_data(data, titles_from_data=False)
                     chart.set_categories(cats)
-                    ws.add_chart(chart, "M2")
+                    ws_xl.add_chart(chart, "M2")
                 return output.getvalue()
 
             st.write("---")
