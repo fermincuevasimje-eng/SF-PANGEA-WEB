@@ -1307,22 +1307,56 @@ else:
     elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Arquitecto de Procesos & Oficios")
         
-        # === ANCLAJE FÍSICO Y CARGA GLOBAL DE BÓVEDAS (SF4) ===
-        PATH_OFICIOS_DB = "boveda_oficios.json"
-        if "db_oficios" not in st.session_state:
-            if os.path.exists(PATH_OFICIOS_DB):
-                with open(PATH_OFICIOS_DB, "r", encoding="utf-8") as f:
-                    st.session_state.db_oficios = json.load(f)
-            else:
-                st.session_state.db_oficios = {}
+        # --- LIBRERÍAS ---
+        import gspread
+        from google.oauth2.service_account import Credentials
+        import json
+        import pandas as pd
+        import io
+        import base64
+        import time
+        import re
+        from datetime import datetime, timedelta, timezone
 
-        if "boveda_mmd" not in st.session_state:
-            if os.path.exists("boveda_pangea.json"):
-                with open("boveda_pangea.json", "r", encoding="utf-8") as f:
-                    st.session_state.boveda_mmd = json.load(f)
-            else:
-                st.session_state.boveda_mmd = {}
-        # ======================================================
+        # --- 1. CONEXIÓN A GOOGLE SHEETS ---
+        scope = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds_dict = {
+            "type": st.secrets["connections"]["gsheets"]["type"],
+            "project_id": st.secrets["connections"]["gsheets"]["project_id"],
+            "private_key_id": st.secrets["connections"]["gsheets"]["private_key_id"],
+            "private_key": st.secrets["connections"]["gsheets"]["private_key"].replace('\\n', '\n'),
+            "client_email": st.secrets["connections"]["gsheets"]["client_email"],
+            "client_id": st.secrets["connections"]["gsheets"]["client_id"],
+            "auth_uri": st.secrets["connections"]["gsheets"]["auth_uri"],
+            "token_uri": st.secrets["connections"]["gsheets"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["connections"]["gsheets"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["connections"]["gsheets"]["client_x509_cert_url"]
+        }
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
+        
+        try:
+            sh = client.open_by_key(SHEET_ID)
+            ws = sh.worksheet("Boveda_Bajas")
+        except:
+            ws = sh.get_worksheet(0)
+
+        # --- 2. CARGA DINÁMICA DE PROYECTOS Y OFICIOS DESDE NUBE ---
+        if "db_oficios" not in st.session_state or "boveda_mmd" not in st.session_state:
+            registros = ws.get_all_records()
+            st.session_state.db_oficios = {}
+            st.session_state.boveda_mmd = {}
+            
+            for r in registros:
+                reg_id = str(r.get("ID Registro", ""))
+                if reg_id.startswith("SF4-PRY-"):
+                    try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                    except: pass
+                elif reg_id.startswith("SF4-OFC-"):
+                    try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                    except: pass
+
         tab_c, tab_b, tab_i, tab_o = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa", "📄 GENERADOR DE OFICIOS"])
 
         with tab_c:
@@ -1443,10 +1477,16 @@ else:
                     nom_p = st.text_input("Nombre para Bóveda:")
                     if st.button("💾 Guardar en Bóveda Pangea"):
                         if nom_p:
-                            st.session_state.boveda_mmd[nom_p] = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
-                            with open("boveda_pangea.json", "w", encoding="utf-8") as f:
-                                json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
-                            st.success("Guardado correctamente.")
+                            payload = {"code": full_m, "struct": list(st.session_state.pasos_sf4)}
+                            st.session_state.boveda_mmd[nom_p] = payload
+                            
+                            tz_mx = timezone(timedelta(hours=-6))
+                            ahora = datetime.now(tz_mx)
+                            id_reg = f"SF4-PRY-{ahora.strftime('%Y%m%d-%H%M%S')}"
+                            fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
+                            
+                            ws.append_row([id_reg, fecha_mx, nom_p, len(st.session_state.pasos_sf4), json.dumps(payload), ""])
+                            st.success("Guardado en Bóveda Permanente Correctamente.")
 
         with tab_b:
             if not st.session_state.boveda_mmd: st.info("Bóveda vacía.")
@@ -1459,11 +1499,15 @@ else:
                         b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
                         b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
                         if k.strip().upper() != "PASTEL VERDE":
-                            if b3.button("🗑️", key=f"x_{k}", use_container_width=True):
-                                del st.session_state.boveda_mmd[k]
-                                with open("boveda_pangea.json", "w", encoding="utf-8") as f:
-                                    json.dump(st.session_state.boveda_mmd, f, ensure_ascii=False, indent=4)
-                                st.rerun()
+                            seguro_borrado_p = st.checkbox("🔐 Confirmar borrado permanente del diagrama", key=f"chk_del_mmd_{k}")
+                            if b3.button("🗑️", key=f"x_{k}", use_container_width=True, disabled=not seguro_borrado_p):
+                                try:
+                                    cell = ws.find(k, in_column=3)
+                                    if cell: ws.delete_rows(cell.row)
+                                    del st.session_state.boveda_mmd[k]
+                                    st.success("¡Eliminado de la nube!")
+                                    time.sleep(1); st.rerun()
+                                except Exception as e: st.error(f"Error al borrar: {e}")
 
         with tab_i:
             st.subheader("📥 Importación Externa")
@@ -1493,8 +1537,7 @@ else:
                         if nuevos_pasos:
                             st.session_state.pasos_sf4 = nuevos_pasos
                             st.success(f"✅ Se han importado {len(nuevos_pasos)} pasos correctamente.")
-                            time.sleep(1)
-                            st.rerun()
+                            time.sleep(1); st.rerun()
                         else:
                             st.error("❌ No se detectaron nodos válidos en el código. Verifica el formato (N0[\"Texto\"]).")
                     except Exception as e:
@@ -1504,7 +1547,6 @@ else:
 
         with tab_o:
             st.subheader("📄 Correspondencia Oficial y Control de Bóveda")
-            PATH_OFICIOS_DB = "boveda_oficios.json"
 
             try:
                 from fpdf import FPDF
@@ -1534,13 +1576,15 @@ else:
                         id_sel = col_sel.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1])
                         data_previa = st.session_state.db_oficios[id_sel]
                         
-                        seguro_borrado = st.checkbox("🔐 Confirmar eliminación permanente")
+                        seguro_borrado = st.checkbox("🔐 Confirmar eliminación permanente de este oficio")
                         if col_del.button("🗑️ BORRAR", use_container_width=True, disabled=not seguro_borrado):
-                            del st.session_state.db_oficios[id_sel]
-                            with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
-                                json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
-                            st.warning(f"Registro {id_sel} eliminado.")
-                            time.sleep(1); st.rerun()
+                            try:
+                                cell = ws.find(id_sel, in_column=3)
+                                if cell: ws.delete_rows(cell.row)
+                                del st.session_state.db_oficios[id_sel]
+                                st.warning(f"Registro {id_sel} eliminado de la nube.")
+                                time.sleep(1); st.rerun()
+                            except Exception as e: st.error(f"Error al eliminar: {e}")
                     else:
                         st.info("La bóveda está vacía.")
                 
@@ -1585,24 +1629,32 @@ else:
 
                 if b_save.button("💾 GUARDAR/ACTUALIZAR", use_container_width=True):
                     id_r = n_oficio.replace("/", "-")
-                    st.session_state.db_oficios[id_r] = {
+                    payload_oficio = {
                         "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
                         "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
                         "firma": firm, "cargo_f": cargo_firm, "ccp": ccp
                     }
-                    with open(PATH_OFICIOS_DB, "w", encoding="utf-8") as f:
-                        json.dump(st.session_state.db_oficios, f, indent=4, ensure_ascii=False)
-                    st.success("✅ Bóveda Actualizada."); time.sleep(1); st.rerun()
+                    st.session_state.db_oficios[id_r] = payload_oficio
+                    
+                    tz_mx = timezone(timedelta(hours=-6))
+                    ahora = datetime.now(tz_mx)
+                    id_reg = f"SF4-OFC-{ahora.strftime('%Y%m%d-%H%M%S')}"
+                    fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
+                    
+                    try:
+                        cell = ws.find(id_r, in_column=3)
+                        if cell: ws.delete_rows(cell.row)
+                    except: pass
+                    
+                    ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
+                    st.success("✅ Bóveda Nube de Oficios Actualizada."); time.sleep(1); st.rerun()
 
                 if motor_pdf_listo:
-                    # Inicialización con formato carta y márgenes (en mm)
-                    # set_margins(left, top, right) -> 30mm, 25mm, 20mm
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf.set_margins(30, 25, 20)
                     pdf.set_auto_page_break(auto=True, margin=25) 
                     pdf.add_page()
                     
-                    # Espaciado si hay membrete
                     if h_membrete: 
                         pdf.ln(15)
                     pdf.set_font("Arial", 'B', 11)
