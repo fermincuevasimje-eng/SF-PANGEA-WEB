@@ -415,55 +415,169 @@ else:
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
+        # --- LIBRERÍAS DE ACCESO NUBE ---
+        import gspread
+        from google.oauth2.service_account import Credentials
+        import json
+        import pandas as pd
+        import io
+        import time
+        from datetime import datetime
+
+        # --- CONEXIÓN DE SEGURIDAD CON GOOGLE SHEETS ---
+        scope = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds_dict = {
+            "type": st.secrets["connections"]["gsheets"]["type"],
+            "project_id": st.secrets["connections"]["gsheets"]["project_id"],
+            "private_key_id": st.secrets["connections"]["gsheets"]["private_key_id"],
+            "private_key": st.secrets["connections"]["gsheets"]["private_key"].replace('\\n', '\n'),
+            "client_email": st.secrets["connections"]["gsheets"]["client_email"],
+            "client_id": st.secrets["connections"]["gsheets"]["client_id"],
+            "auth_uri": st.secrets["connections"]["gsheets"]["auth_uri"],
+            "token_uri": st.secrets["connections"]["gsheets"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["connections"]["gsheets"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["connections"]["gsheets"]["client_x509_cert_url"]
+        }
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
+        
+        try:
+            sh = client.open_by_key(SHEET_ID)
+            ws = sh.worksheet("Boveda_Bajas")
+        except:
+            ws = sh.get_worksheet(0)
+
+        # --- SINCRONIZACIÓN AUTOMÁTICA DESDE LA NUBE ---
+        if "manual_db" not in st.session_state:
+            st.session_state.manual_db = []
+            try:
+                valores_sheet = ws.get_all_values()
+                if valores_sheet:
+                    headers = [str(h).strip() for h in valores_sheet[0]]
+                    if "ID Registro" in headers and "Datos Captura" in headers:
+                        idx_id = headers.index("ID Registro")
+                        idx_datos = headers.index("Datos Captura")
+                        for row in valores_sheet[1:]:
+                            if len(row) > idx_id and str(row[idx_id]).startswith("SF3-MET-"):
+                                try:
+                                    datos_raw = row[idx_datos]
+                                    vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    st.session_state.manual_db.append(vale_parsed)
+                                except: pass
+            except Exception as e:
+                st.sidebar.warning(f"Sincronizando métricas: {e}")
+
         if "reset_key" not in st.session_state:
             st.session_state.reset_key = 0
         rk = st.session_state.reset_key
 
-        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
+        # --- SELECTOR DE MODO (CREACIÓN / EDICIÓN COMPLETA) ---
+        opciones_registro = ["🆕 CREAR NUEVO REGISTRO"]
+        if st.session_state.manual_db:
+            opciones_registro += [f"✏️ EDITAR O.T: {r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db]
+        
+        sel_modo = st.selectbox("Modo de Operación Formulario:", opciones_registro, key=f"sel_modo_sf3_{rk}")
+        
+        # Mapeo y precarga absoluta de datos en el formulario
+        idx_editar = None
+        if sel_modo != "🆕 CREAR NUEVO REGISTRO":
+            idx_editar = opciones_registro.index(sel_modo) - 1
+            datos_defecto = st.session_state.manual_db[idx_editar]
+            try: default_date = datetime.strptime(datos_defecto["FECHA"], "%d/%m/%Y").date()
+            except: default_date = datetime.today().date()
+        else:
+            datos_defecto = {"FECHA": datetime.today().strftime("%d/%m/%Y"), "OT": "", "CALLE": "", "DELEGACIÓN": sorted(list(CATALOGO_MAESTRO.keys()))[0], "UTB": "", "FOLIO": "", "REHAB": 0, "MANTO": 0, "SUST": 0, "AMPLI": 0, "OBS": ""}
+            default_date = datetime.today().date()
+
+        # --- FORMULARIO DE CAPTURA ---
+        with st.expander("📝 FORMULARIO DE ATENCIÓN (NUEVOS Y EDICIONES)", expanded=True if idx_editar is not None else False):
             st.write("📍 **Paso 1: Ubicación**")
             col_geo1, col_geo2 = st.columns(2)
             with col_geo1:
-                f_del = st.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"del_manual_{rk}")
+                lista_delegaciones_form = sorted(list(CATALOGO_MAESTRO.keys()))
+                try: idx_del_def = lista_delegaciones_form.index(datos_defecto["DELEGACIÓN"])
+                except: idx_del_def = 0
+                f_del = st.selectbox("Delegación", lista_delegaciones_form, index=idx_del_def, key=f"del_manual_{rk}")
             with col_geo2:
                 opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                f_utb = st.selectbox("UTB", opciones_utb_f, key=f"utb_manual_{rk}")
+                try: idx_utb_def = opciones_utb_f.index(datos_defecto["UTB"])
+                except: idx_utb_def = 0
+                f_utb = st.selectbox("UTB", opciones_utb_f, index=idx_utb_def, key=f"utb_manual_{rk}")
 
             with st.form(key=f"form_sf3_core_{rk}", clear_on_submit=True):
                 st.write("📝 **Paso 2: Detalles de la Atención**")
                 c1, c2, c3 = st.columns([1, 1, 2])
-                with c1: f_fecha = st.date_input("Fecha")
-                with c2: f_ot = st.text_input("O.T.")
-                with c3: f_folio = st.text_input("Folio / Ticket / IMEI")
-                f_calle = st.text_input("Calle")
+                with c1: f_fecha = st.date_input("Fecha", value=default_date)
+                with c2: f_ot = st.text_input("O.T.", value=datos_defecto["OT"])
+                with c3: f_folio = st.text_input("Folio / Ticket / IMEI", value=datos_defecto["FOLIO"])
+                f_calle = st.text_input("Calle", value=datos_defecto["CALLE"])
 
                 st.markdown("---")
                 st.write("📊 **Cantidades de Trabajo Realizado:**")
                 m1, m2, m3, m4 = st.columns(4)
-                with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
-                with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
-                with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
-                with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
+                with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1, value=int(datos_defecto["REHAB"]))
+                with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1, value=int(datos_defecto["MANTO"]))
+                with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1, value=int(datos_defecto["SUST"]))
+                with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1, value=int(datos_defecto["AMPLI"]))
 
-                f_obs = st.text_area("11. Observaciones")
-                btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA", use_container_width=True)
+                f_obs = st.text_area("11. Observaciones", value=datos_defecto["OBS"])
+                
+                texto_ejecutar = "💾 ACTUALIZAR REGISTRO COMPLETO EN LA NUBE" if idx_editar is not None else "🚀 GUARDAR REGISTRO EN LISTA PERMANENTE"
+                btn_guardar = st.form_submit_button(texto_ejecutar, use_container_width=True)
 
                 if btn_guardar:
-                    if "manual_db" not in st.session_state: st.session_state.manual_db = []
-                    st.session_state.manual_db.append({
+                    payload = {
                         "FECHA": f_fecha.strftime("%d/%m/%Y"), "OT": f_ot.upper(), "CALLE": f_calle.upper(),
                         "DELEGACIÓN": f_del, "UTB": f_utb, "FOLIO": f_folio.upper(),
-                        "REHAB": f_rehab, "MANTO": f_manto, "SUST": f_sust, "AMPLI": f_ampli, "OBS": f_obs
-                    })
+                        "REHAB": int(f_rehab), "MANTO": int(f_manto), "SUST": int(f_sust), "AMPLI": int(f_ampli), "OBS": f_obs
+                    }
+                    
+                    if idx_editar is not None:
+                        # --- EJECUTAR EDICIÓN SEGURA EN LA NUBE ---
+                        ot_original = datos_defecto["OT"]
+                        id_a_buscar = f"SF3-MET-{ot_original.upper()}"
+                        st.session_state.manual_db[idx_editar] = payload
+                        cell = ws.find(id_a_buscar, in_column=1)
+                        if cell:
+                            ws.update_cell(cell.row, 6, json.dumps(payload))
+                            st.toast(f"O.T. {f_ot} modificada con éxito", icon="✅")
+                    else:
+                        # --- REGISTRO NUEVO ---
+                        st.session_state.manual_db.append(payload)
+                        id_reg_met = f"SF3-MET-{f_ot.upper() if f_ot.strip() else datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                        fecha_captura_mx = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                        ws.append_row([id_reg_met, fecha_captura_mx, f_del, "", "", json.dumps(payload), ""])
+                        st.toast(f"O.T. {f_ot} registrada en la nube", icon="✅")
+                    
                     st.session_state.reset_key += 1
-                    st.toast(f"O.T. {f_ot} registrada correctamente", icon="✅")
                     time.sleep(0.5)
                     st.rerun()
 
-        if "manual_db" in st.session_state and st.session_state.manual_db:
-            if st.button("🗑️ Borrar Último Registro Manual", use_container_width=True):
-                st.session_state.manual_db.pop()
+        # --- ELIMINACIÓN CON FILTRO ÚNICO LIMPIO ---
+        if idx_editar is not None:
+            seguro_eliminar = st.checkbox(f"Habilitar destrucción permanente de la O.T. {datos_defecto['OT']}", key=f"seguro_del_{rk}")
+            if st.button("🗑️ ELIMINAR ESTE REGISTRO SELECCIONADO", use_container_width=True, disabled=not seguro_eliminar):
+                ot_target = datos_defecto["OT"]
+                st.session_state.manual_db.pop(idx_editar)
+                cell = ws.find(f"SF3-MET-{ot_target.upper()}", in_column=1)
+                if cell: ws.delete_rows(cell.row)
+                st.session_state.reset_key += 1
                 st.rerun()
 
+        # --- BORRAR ÚLTIMO CON CANDADO SIMPLE ---
+        elif "manual_db" in st.session_state and st.session_state.manual_db:
+            seguro_ultimo = st.checkbox("Habilitar borrado del último registro manual de la lista", key=f"seguro_ult_{rk}")
+            if st.button("🗑️ Borrar Último Registro Manual", use_container_width=True, disabled=not seguro_ultimo):
+                item_eliminado = st.session_state.manual_db.pop()
+                try:
+                    id_a_buscar = f"SF3-MET-{item_eliminado['OT']}"
+                    cell = ws.find(id_a_buscar, in_column=1)
+                    if cell: ws.delete_rows(cell.row)
+                except: pass
+                st.rerun()
+
+        # --- FILTROS Y RESUMEN (TU LÓGICA ORIGINAL) ---
         st.markdown("---")
         up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
         
@@ -557,7 +671,7 @@ else:
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     df_reporte.to_excel(writer, index=False, sheet_name=nombre_hoja)
                     wb = writer.book
-                    ws = wb[nombre_hoja]
+                    ws_hoja = wb[nombre_hoja]
                     
                     chart = BarChart()
                     chart.type = "col"
@@ -570,12 +684,12 @@ else:
                     idx_fin = df_reporte.columns.get_loc("AMPLI") + 1
                     fila_totales = len(df_reporte) + 1
                     
-                    data = Reference(ws, min_col=idx_inicio, max_col=idx_fin, min_row=fila_totales, max_row=fila_totales)
-                    cats = Reference(ws, min_col=idx_inicio, max_col=idx_fin, min_row=1, max_row=1)
+                    data = Reference(ws_hoja, min_col=idx_inicio, max_col=idx_fin, min_row=fila_totales, max_row=fila_totales)
+                    cats = Reference(ws_hoja, min_col=idx_inicio, max_col=idx_fin, min_row=1, max_row=1)
                     
                     chart.add_data(data, titles_from_data=False)
                     chart.set_categories(cats)
-                    ws.add_chart(chart, "M2")
+                    ws_hoja.add_chart(chart, "M2")
                 return output.getvalue()
 
             st.write("---")
