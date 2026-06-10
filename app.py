@@ -1600,7 +1600,7 @@ else:
                         st.info("La bóveda está vacía.")
                 
                 with st.container(border=True):
-                    st.sidebar.markdown("**📌 Configuración**") if False else st.markdown("**📌 Configuración**")
+                    st.markdown("**📌 Configuración**")
                     tipo_p = st.selectbox("Plantilla:", list(plantillas_maestras.keys()))
                     c1, c2 = st.columns(2)
                     n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"))
