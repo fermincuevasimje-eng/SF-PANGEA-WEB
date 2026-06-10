@@ -1488,11 +1488,17 @@ else:
             else:
                 for k, v in list(st.session_state.boveda_mmd.items()):
                     with st.expander(f"📁 {k}"):
-                        st.code(v['code'], language="mermaid")
-                        b1, b2, b3 = st.columns(3)
-                        if b1.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
-                        b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
-                        b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
+                        # --- ESCUDO ANTI-CRASH PARA CONTROL DE COMPONENTES CORRUPTOS ---
+                        if isinstance(v, dict) and 'code' in v and 'struct' in v:
+                            st.code(v['code'], language="mermaid")
+                            b1, b2, b3 = st.columns(3)
+                            if b1.button("🛠️ RECUPERAR", key=f"r_{k}"): st.session_state.pasos_sf4 = list(v['struct']); st.rerun()
+                            b_u = base64.b64encode(v['code'].encode('utf-8')).decode('utf-8')
+                            b2.link_button("🚀 Live", f"https://mermaid.live/edit#base64:{b_u}")
+                        else:
+                            st.error("⚠️ Los datos de este diagrama están corruptos o incompletos en Google Sheets.")
+                            b1, b2, b3 = st.columns(3) # Mantiene las columnas alineadas para el botón de borrado
+
                         if k.strip().upper() != "PASTEL VERDE":
                             seguro_borrado_p = st.checkbox("🔐 Confirmar borrado permanente del diagrama", key=f"chk_del_mmd_{k}")
                             if b3.button("🗑️", key=f"x_{k}", use_container_width=True, disabled=not seguro_borrado_p):
@@ -1594,7 +1600,7 @@ else:
                         st.info("La bóveda está vacía.")
                 
                 with st.container(border=True):
-                    st.markdown("**📌 Configuración**")
+                    st.sidebar.markdown("**📌 Configuración**") if False else st.markdown("**📌 Configuración**")
                     tipo_p = st.selectbox("Plantilla:", list(plantillas_maestras.keys()))
                     c1, c2 = st.columns(2)
                     n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"))
@@ -1657,7 +1663,7 @@ else:
                         except: pass
                         
                         ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
-                        st.success("✅ Bóveda Nube de Oficios Actualizada."); time.sleep(1); st.rerun()
+                        st.success("¼️ Bóveda Nube de Oficios Actualizada."); time.sleep(1); st.rerun()
 
                 if motor_pdf_listo:
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
