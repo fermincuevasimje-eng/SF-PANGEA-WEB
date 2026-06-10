@@ -1571,6 +1571,7 @@ else:
                 modo_of = st.radio("Operación:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True)
                 
                 data_previa = {}
+                id_sel = "nuevo"
                 if modo_of == "📂 Consultar Bóveda":
                     if st.session_state.db_oficios:
                         col_sel, col_del = st.columns([3, 1])
@@ -1599,25 +1600,35 @@ else:
                     else:
                         st.info("La bóveda está vacía.")
                 
+                # Generamos una llave de identidad única para forzar el refresco de datos
+                pk = f"{modo_of}_{id_sel}"
+                
                 with st.container(border=True):
                     st.markdown("**📌 Configuración**")
-                    tipo_p = st.selectbox("Plantilla:", list(plantillas_maestras.keys()))
+                    tipo_p = st.selectbox("Plantilla:", list(plantillas_maestras.keys()), key=f"tipo_p_{pk}")
                     c1, c2 = st.columns(2)
-                    n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"))
-                    f_oficio = c2.date_input("Fecha:", value=pd.to_datetime(data_previa.get("fecha")).date() if data_previa.get("fecha") else pd.Timestamp.now().date())
-                    dest = st.text_area("Destinatario:", value=data_previa.get("dest", ""), height=70, kwargs={"spellcheck": "true"})
-                    cargo = st.text_input("Cargo:", value=data_previa.get("cargo", "P R E S E N T E"))
-                    f_ref = st.text_input("Folio Ref:", value=data_previa.get("folio", ""))
+                    n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"), key=f"num_{pk}")
+                    
+                    if data_previa.get("fecha"):
+                        try: default_date = pd.to_datetime(data_previa.get("fecha")).date()
+                        except: default_date = pd.Timestamp.now().date()
+                    else:
+                        default_date = pd.Timestamp.now().date()
+                        
+                    f_oficio = c2.date_input("Fecha:", value=default_date, key=f"fecha_{pk}")
+                    dest = st.text_area("Destinatario:", value=data_previa.get("dest", ""), height=70, key=f"dest_{pk}", kwargs={"spellcheck": "true"})
+                    cargo = st.text_input("Cargo:", value=data_previa.get("cargo", "P R E S E N T E"), key=f"cargo_{pk}")
+                    f_ref = st.text_input("Folio Ref:", value=data_previa.get("folio", ""), key=f"folio_{pk}")
 
                 with st.container(border=True):
                     st.markdown("**📝 Mensaje**")
                     v_cuerpo = data_previa.get("cuerpo", plantillas_maestras[tipo_p])
-                    cuerpo_txt = st.text_area("Cuerpo:", value=v_cuerpo, height=150, kwargs={"spellcheck": "true"})
-                    firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"))
-                    cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"))
-                    ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."), height=65, kwargs={"spellcheck": "true"})
+                    cuerpo_txt = st.text_area("Cuerpo:", value=v_cuerpo, height=150, key=f"cuerpo_{pk}_{tipo_p}", kwargs={"spellcheck": "true"})
+                    firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"), key=f"firma_{pk}")
+                    cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"), key=f"cargo_f_{pk}")
+                    ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."), height=65, key=f"ccp_{pk}", kwargs={"spellcheck": "true"})
 
-                h_membrete = st.toggle("🛰️ Modo Hoja Membretada", value=False)
+                h_membrete = st.toggle("🛰️ Modo Hoja Membretada", value=False, key=f"memb_{pk}")
 
             with c_preview:
                 st.markdown("### 👁️ Vista Previa")
