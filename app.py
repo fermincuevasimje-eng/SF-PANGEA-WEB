@@ -2309,7 +2309,7 @@ else:
             st.markdown("### 📝 Control y Notas de Entrega")
             obs_digital = st.text_area(
                 "Observaciones del Responsable de Almacén (Se captura en sistema):", 
-                placeholder="Ej: Material destinado a la rehabilitation de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
+                placeholder="Ej: Material destinado a la rehabilitación de luminarias en San Martín Toltepec. Se entrega cable con empalmes de fábrica.",
                 key="obs_responsable_entrega"
             )
 
@@ -2611,12 +2611,6 @@ else:
                             id_reg_buscar = f"SF6-VAL-{v_select}"
                             cell = ws.find(id_reg_buscar, in_column=1)
                             if cell:
-                                # Volvemos a traer el renglón original para no romper el PDF b64 que ya existía
-                                fila_raw = ws.row_values(cell.row)
-                                pdf_b64_existente = fila_raw[5] if len(fila_raw) >= 6 else ""
-                                fecha_original_mx = fila_raw[1] if len(fila_raw) >= 2 else pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")
-                                brigada_original_mx = fila_raw[2] if len(fila_raw) >= 3 else vale_obj["Brigada"]
-                                
                                 ws.update_cell(cell.row, 5, json.dumps(st.session_state.vales_historial[idx_vale]))
                             
                             st.success(f"📊 Cierre técnico sincronizado en la nube con éxito.")
@@ -2846,9 +2840,8 @@ else:
                     try:
                         # 1. Purgar todas las filas correspondientes al SF6 de la base de datos Google Sheets
                         registros_limpieza = ws.get_all_records()
-                        # Iteramos en orden inverso para no alterar los índices de las filas al eliminar
                         for i, r in enumerate(reversed(registros_limpieza), start=1):
-                            idx_real = len(registros_limpieza) - i + 2 # Ajuste por encabezado (fila 1 es header, índice 0 es fila 2)
+                            idx_real = len(registros_limpieza) - i + 2 
                             reg_id = str(r.get("ID Registro", ""))
                             if reg_id.startswith("SF6-VAL-"):
                                 ws.delete_rows(idx_real)
