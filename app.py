@@ -2582,6 +2582,17 @@ else:
                     st.write("")
                     df_materiales_vale = pd.DataFrame(vale_obj["Materiales"])
                     
+                    # LLAVE DE SOLUCIÓN AL DOBLE CLIC: Callback on_change para actualizar la memoria al instante
+                    key_editor_live = f"editor_live_{v_select}"
+                    
+                    def callback_actualizar_edicion():
+                        if key_editor_live in st.session_state:
+                            cambios = st.session_state[key_editor_live]
+                            if "edited_rows" in cambios:
+                                for r_idx, r_changes in cambios["edited_rows"].items():
+                                    for col_key, col_val in r_changes.items():
+                                        df_materiales_vale.at[int(r_idx), col_key] = col_val
+
                     df_editado = st.data_editor(
                         df_materiales_vale,
                         column_config={
@@ -2591,7 +2602,7 @@ else:
                             "Utilizado": st.column_config.NumberColumn("Instalado (Calle)", min_value=0, required=True),
                             "Devuelto": st.column_config.NumberColumn("Devuelto (Almacén)", min_value=0, required=True),
                         },
-                        hide_index=True, use_container_width=True, key=f"editor_live_{v_select}"
+                        hide_index=True, use_container_width=True, key=key_editor_live, on_change=callback_actualizar_edicion
                     )
                     
                     if st.button("💾 Guardar Conciliación de Materiales", use_container_width=True, type="primary"):
