@@ -472,7 +472,7 @@ else:
             st.session_state.reset_key = 0
         rk = st.session_state.reset_key
 
-        # --- FORMULARIO ---
+        # --- FORMULARIO DE CAPTURA ---
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
             st.write("📍 **Paso 1: Ubicación**")
             col_geo1, col_geo2 = st.columns(2)
@@ -506,14 +506,13 @@ else:
                     st.session_state.reset_key += 1
                     st.rerun()
 
-        # --- CONSOLA DE GESTIÓN (EDIT/ELIMINAR CON SEGURIDAD) ---
+        # --- CONSOLA DE GESTIÓN (EDICIÓN/BORRADO) ---
         with st.expander("🛠️ GESTIÓN Y EDICIÓN DE REGISTROS", expanded=False):
             if st.session_state.manual_db:
                 df_gest = pd.DataFrame(st.session_state.manual_db)
                 sel = st.selectbox("Seleccionar Registro:", [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db])
                 idx = [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db].index(sel)
                 
-                # Resaltado visual en verde
                 st.dataframe(df_gest.style.apply(lambda r: ['background-color: #d1e7dd' if r['OT'] == st.session_state.manual_db[idx]['OT'] else '' for _ in r], axis=1), use_container_width=True)
                 
                 col_e, col_d, col_b = st.columns(3)
