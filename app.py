@@ -448,20 +448,23 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- SINCRONIZACIÓN AUTOMÁTICA DE LA BÓVEDA SF3 ---
+        # --- SINCRONIZACIÓN AUTOMÁTICA ADAPTADA A TU HOJA REAL (COLUMNA F STRICT) ---
         if "manual_db" not in st.session_state:
             st.session_state.manual_db = []
             try:
                 valores_sheet = ws.get_all_values()
                 if valores_sheet:
                     headers = [str(h).strip() for h in valores_sheet[0]]
-                    if "ID Registro" in headers and "Datos" in headers:
+                    # Mapeo exacto: ID Registro en columna A, Datos Captura en columna F
+                    if "ID Registro" in headers and "Datos Captura" in headers:
                         idx_id = headers.index("ID Registro")
-                        idx_datos = headers.index("Datos")
+                        idx_datos = headers.index("Datos Captura")
                         for row in valores_sheet[1:]:
                             if len(row) > idx_id and str(row[idx_id]).startswith("SF3-MET-"):
                                 try:
-                                    st.session_state.manual_db.append(json.loads(row[idx_datos]))
+                                    datos_raw = row[idx_datos]
+                                    vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    st.session_state.manual_db.append(vale_parsed)
                                 except: pass
             except Exception as e:
                 st.sidebar.warning(f"Sincronizando métricas: {e}")
@@ -470,7 +473,7 @@ else:
             st.session_state.reset_key = 0
         rk = st.session_state.reset_key
 
-        # --- FORMULARIO DE CAPTURA INDESTRUCTIBLE ---
+        # --- FORMULARIO DE CAPTURA ---
         with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
             st.write("📍 **Paso 1: Ubicación**")
             col_geo1, col_geo2 = st.columns(2)
@@ -510,7 +513,9 @@ else:
                     
                     id_reg_met = f"SF3-MET-{f_ot.upper() if f_ot.strip() else datetime.now().strftime('%Y%m%d-%H%M%S')}"
                     fecha_captura_mx = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                    ws.append_row([id_reg_met, fecha_captura_mx, f_del, f_ot.upper(), json.dumps(payload_ot), ""])
+                    
+                    # Estructura alineada a tu captura: ID(A), Fecha(B), Origen(C), Usuario(D), Folios(E), Datos Captura(F), Excel Base64(G)
+                    ws.append_row([id_reg_met, fecha_captura_mx, f_del, "", "", json.dumps(payload_ot), ""])
                     
                     st.session_state.reset_key += 1
                     st.toast(f"O.T. {f_ot} blindada con éxito en la nube", icon="✅")
@@ -666,7 +671,6 @@ else:
 
             xlsx_unificado = generar_reporte_con_grafica(df_final_vista, "UNIFICADO")
             d_col3.download_button("🚀 Reporte UNIFICADO", xlsx_unificado, "REPORTE_UNIFICADO.xlsx", use_container_width=True)
-
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
         
