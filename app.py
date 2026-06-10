@@ -1703,21 +1703,58 @@ else:
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
-        # === ANCLAJE FÍSICO Y CARGA GLOBAL DE BÓVEDA (SF5) ===
-        PATH_DEPURACION_DB = "boveda_depuracion.json"
+        # --- LIBRERÍAS ---
+        import gspread
+        from google.oauth2.service_account import Credentials
+        import json
+        import pandas as pd
+        import io
+        import base64
+        import time
+        import re
+        from datetime import datetime, timedelta, timezone
+
+        # --- 1. CONEXIÓN A GOOGLE SHEETS ---
+        scope = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds_dict = {
+            "type": st.secrets["connections"]["gsheets"]["type"],
+            "project_id": st.secrets["connections"]["gsheets"]["project_id"],
+            "private_key_id": st.secrets["connections"]["gsheets"]["private_key_id"],
+            "private_key": st.secrets["connections"]["gsheets"]["private_key"].replace('\\n', '\n'),
+            "client_email": st.secrets["connections"]["gsheets"]["client_email"],
+            "client_id": st.secrets["connections"]["gsheets"]["client_id"],
+            "auth_uri": st.secrets["connections"]["gsheets"]["auth_uri"],
+            "token_uri": st.secrets["connections"]["gsheets"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["connections"]["gsheets"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["connections"]["gsheets"]["client_x509_cert_url"]
+        }
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
+        
+        try:
+            sh = client.open_by_key(SHEET_ID)
+            ws = sh.worksheet("Boveda_Bajas")
+        except:
+            ws = sh.get_worksheet(0)
+
+        # --- 2. CARGA GLOBAL Y SINCRONIZACIÓN DESDE NUBE ---
         if "db_depuracion" not in st.session_state:
-            if os.path.exists(PATH_DEPURACION_DB):
-                with open(PATH_DEPURACION_DB, "r", encoding="utf-8") as f:
-                    st.session_state.db_depuracion = json.load(f)
-            else:
-                st.session_state.db_depuracion = {}
+            registros = ws.get_all_records()
+            st.session_state.db_depuracion = {}
+            for r in registros:
+                reg_id = str(r.get("ID Registro", ""))
+                if reg_id.startswith("SF5-DEP-"):
+                    try:
+                        datos_raw = r.get("Datos", "{}")
+                        st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                    except: pass
 
         # Inicialización de variables de sesión para la mesa de trabajo actual
         if "da_actual" not in st.session_state: st.session_state.da_actual = None
         if "h1_actual" not in st.session_state: st.session_state.h1_actual = None
         if "h2_actual" not in st.session_state: st.session_state.h2_actual = None
         if "tipo_depuracion_actual" not in st.session_state: st.session_state.tipo_depuracion_actual = ""
-        # ======================================================
 
         # --- MOTOR DE PROCESAMIENTO REFINADO ---
         def motor_sf5(df_total):
@@ -1790,10 +1827,10 @@ else:
 
             with pd.ExcelWriter(out, engine='openpyxl') as w:
                 h1.to_excel(w, index=False, sheet_name='PARA_MODULO_1')
-                ws = w.sheets['PARA_MODULO_1']
+                ws_sheet = w.sheets['PARA_MODULO_1']
                 for r_num, (_, row) in enumerate(h1.iterrows(), 2):
                     if int(row['Grupo_Duplicado']) > 0:
-                        for cell in ws[r_num]: cell.fill = yellow_fill
+                        for cell in ws_sheet[r_num]: cell.fill = yellow_fill
                 
                 h2.to_excel(w, index=False, sheet_name='REPORTE_DUPLICADOS')
             
@@ -1810,29 +1847,40 @@ else:
                 st.rerun()
 
             st.write("---")
-            st.subheader("💾 Guardado en Bóveda Histórica")
+            st.subheader("💾 Guardado en Bóveda Histórica Nube")
             col_txt_nom, col_btn_json = st.columns([2.5, 1.5])
             nombre_depuracion = col_txt_nom.text_input("Asigna un nombre a esta depuración para tu archivo permanente:", placeholder="Ej: Depuración Oriente 01/06", key=f"txt_save_{suffix}")
             
             if col_btn_json.button("📁 Guardar en Historial", use_container_width=True, key=f"save_bov_{suffix}"):
                 if nombre_depuracion.strip():
-                    id_dep = f"DEP-{pd.Timestamp.now().strftime('%Y%m%d-%H%M%S')}"
-                    st.session_state.db_depuracion[id_dep] = {
-                        "nombre": nombre_depuracion.strip(),
-                        "fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
-                        "tipo": st.session_state.tipo_depuracion_actual,
-                        "procesados": len(da),
-                        "duplicados": len(h2),
-                        "unicos": len(h1),
-                        "da_json": da.to_json(orient='split'),
-                        "h1_json": h1.to_json(orient='split'),
-                        "h2_json": h2.to_json(orient='split')
-                    }
-                    with open(PATH_DEPURACION_DB, "w", encoding="utf-8") as f:
-                        json.dump(st.session_state.db_depuracion, f, indent=4, ensure_ascii=False)
-                    st.success(f"✅ Depuración guardada con éxito. ID: {id_dep}")
-                    time.sleep(0.5)
-                    st.rerun()
+                    # --- CONTROL DE DUPLICADOS EN NOMBRES ---
+                    nombre_repetido = any(v.get("nombre", "").strip().upper() == nombre_depuracion.strip().upper() for v in st.session_state.db_depuracion.values())
+                    
+                    if nombre_repetido:
+                        st.error(f"⚠️ El nombre '{nombre_depuracion}' ya existe en el registro permanente de la Dirección. Use una nomenclatura diferente.")
+                    else:
+                        tz_mx = timezone(timedelta(hours=-6))
+                        ahora = datetime.now(tz_mx)
+                        id_dep = f"SF5-DEP-{ahora.strftime('%Y%m%d-%H%M%S')}"
+                        fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
+                        
+                        payload = {
+                            "nombre": nombre_depuracion.strip(),
+                            "fecha": fecha_mx,
+                            "tipo": st.session_state.tipo_depuracion_actual,
+                            "procesados": len(da),
+                            "duplicados": len(h2),
+                            "unicos": len(h1),
+                            "da_json": da.to_json(orient='split'),
+                            "h1_json": h1.to_json(orient='split'),
+                            "h2_json": h2.to_json(orient='split')
+                        }
+                        
+                        st.session_state.db_depuracion[id_dep] = payload
+                        ws.append_row([id_dep, fecha_mx, nombre_depuracion.strip(), len(da), json.dumps(payload), ""])
+                        st.success(f"✅ Depuración guardada con éxito en Google Sheets. ID: {id_dep}")
+                        time.sleep(0.5)
+                        st.rerun()
                 else:
                     st.warning("⚠️ Ingresa un nombre para poder guardar el reporte físico.")
 
@@ -1877,28 +1925,35 @@ else:
                         st.error(f"Error al procesar archivo único: {e}")
 
         with tab_boveda:
-            st.subheader("🗄️ Historial de Reportes de Depuración")
+            st.subheader("🗄️ Historial de Reportes de Depuración (Nube)")
             if st.session_state.db_depuracion:
                 lista_boveda_dep = []
                 for k, v in st.session_state.db_depuracion.items():
                     lista_boveda_dep.append({
                         "ID Registro": k,
-                        "Nombre": v["nombre"],
-                        "Fecha": v["fecha"],
-                        "Tipo": v["tipo"],
-                        "Total Mapeado": v["procesados"],
-                        "Duplicados": v["duplicados"],
-                        "Únicos": v["unicos"]
+                        "Nombre": v.get("nombre", "Sin nombre"),
+                        "Fecha": v.get("fecha", "N/A"),
+                        "Tipo": v.get("tipo", "N/A"),
+                        "Total Mapeado": v.get("procesados", 0),
+                        "Duplicados": v.get("duplicados", 0),
+                        "Únicos": v.get("unicos", 0)
                     })
-                df_bov_vista = pd.DataFrame(lista_boveda_dep)
-                st.dataframe(df_bov_vista.sort_values(by="ID Registro", ascending=False), use_container_width=True, hide_index=True)
+                df_bov_vista = pd.DataFrame(lista_boveda_dep).sort_values(by="ID Registro", ascending=False)
+                
+                # --- CONTROL DE SELECCIÓN DE RECOPILACIÓN ---
+                id_recuperar = st.selectbox("Selecciona Depuración del Historial Histórico:", list(st.session_state.db_depuracion.keys())[::-1], key="sb_rec_dep")
+                
+                # --- APLICACIÓN DEL MARCADOR VERDE PARA FILA SELECCIONADA ---
+                def resaltar_depuracion_activa(row):
+                    color = '#d1e7dd' if row['ID Registro'] == id_recuperar else ''
+                    return [f'background-color: {color}'] * len(row)
+                
+                st.dataframe(df_bov_vista.style.apply(resaltar_depuracion_activa, axis=1), use_container_width=True, hide_index=True)
                 
                 st.markdown("---")
                 col_rec, col_el = st.columns([2.5, 1.5])
                 
                 with col_rec:
-                    st.write("🔍 **Cargar del Historial:**")
-                    id_recuperar = st.selectbox("Selecciona Depuración:", list(st.session_state.db_depuracion.keys())[::-1], key="sb_rec_dep")
                     if id_recuperar:
                         if st.button("🔄 Recuperar a Mesa de Trabajo", use_container_width=True):
                             data_h = st.session_state.db_depuracion[id_recuperar]
@@ -1911,16 +1966,17 @@ else:
                             st.rerun()
                 
                 with col_el:
-                    st.write("🚨 **Zona Crítica:**")
-                    seguro_borrado_f = st.checkbox("🔐 Confirmar eliminación física", key="chk_seg_bov_dep")
+                    seguro_borrado_f = st.checkbox("🔐 Confirmar eliminación física permanente", key="chk_seg_bov_dep")
                     if st.button("🗑️ BORRAR DE BÓVEDA", use_container_width=True, type="secondary", disabled=not seguro_borrado_f):
                         if id_recuperar:
-                            del st.session_state.db_depuracion[id_recuperar]
-                            with open(PATH_DEPURACION_DB, "w", encoding="utf-8") as f:
-                                json.dump(st.session_state.db_depuracion, f, indent=4, ensure_ascii=False)
-                            st.warning(f"Reporte {id_recuperar} eliminado permanentemente.")
-                            time.sleep(0.5)
-                            st.rerun()
+                            try:
+                                cell = ws.find(id_recuperar, in_column=1)
+                                if cell: ws.delete_rows(cell.row)
+                                del st.session_state.db_depuracion[id_recuperar]
+                                st.warning(f"Reporte {id_recuperar} eliminado permanentemente de la nube.")
+                                time.sleep(0.5)
+                                st.rerun()
+                            except Exception as e: st.error(f"Error al borrar de Sheets: {e}")
             else:
                 st.info("La bóveda histórica de depuración está vacía.")
 
