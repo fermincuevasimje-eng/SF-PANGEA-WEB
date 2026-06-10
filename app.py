@@ -448,7 +448,7 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- SINCRONIZACIÓN AUTOMÁTICA ADAPTADA ---
+        # --- SINCRONIZACIÓN AUTOMÁTICA ---
         if "manual_db" not in st.session_state:
             st.session_state.manual_db = []
             try:
@@ -506,7 +506,7 @@ else:
                     st.session_state.reset_key += 1
                     st.rerun()
 
-        # --- CONSOLA DE GESTIÓN (NUEVA) ---
+        # --- CONSOLA DE GESTIÓN (EDIT/ELIMINAR CON SEGURIDAD) ---
         with st.expander("🛠️ GESTIÓN Y EDICIÓN DE REGISTROS", expanded=False):
             if st.session_state.manual_db:
                 df_gest = pd.DataFrame(st.session_state.manual_db)
@@ -524,7 +524,7 @@ else:
                 if "edit" in st.session_state:
                     reg = st.session_state.manual_db[st.session_state.edit]
                     nr = st.number_input("Nueva Rehabilitación:", value=reg['REHAB'])
-                    if st.checkbox("Confirmar edición", key="conf_ed"):
+                    if st.checkbox("🔐 Confirmar edición", key="conf_ed"):
                         if st.button("💾 Guardar Cambios"):
                             st.session_state.manual_db[st.session_state.edit].update({"REHAB": nr})
                             cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
@@ -532,15 +532,15 @@ else:
                             del st.session_state.edit; st.rerun()
                 
                 if "borra" in st.session_state:
-                    if st.checkbox("Confirmar ELIMINACIÓN", key="conf_del"):
-                        if st.button("🚨 EJECUTAR BORRADO"):
+                    if st.checkbox("🔐 Confirmar ELIMINACIÓN", key="conf_del"):
+                        if st.button("🚨 EJECUTAR BORRADO DEFINITIVO"):
                             reg = st.session_state.manual_db.pop(st.session_state.borra)
                             cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
                             if cell: ws.delete_rows(cell.row)
                             del st.session_state.borra; st.rerun()
 
                 if "borra_ult" in st.session_state:
-                    if st.checkbox("Confirmar ELIMINAR ÚLTIMO", key="conf_del_ult"):
+                    if st.checkbox("🔐 Confirmar ELIMINAR ÚLTIMO", key="conf_del_ult"):
                         if st.button("🚨 EJECUTAR BORRADO"):
                             last = st.session_state.manual_db.pop()
                             cell = ws.find(f"SF3-MET-{last['OT']}", in_column=1)
