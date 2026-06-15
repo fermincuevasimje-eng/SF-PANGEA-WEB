@@ -426,15 +426,6 @@ else:
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- LIBRERÍAS DE ACCESO NUBE ---
-        import gspread
-        from google.oauth2.service_account import Credentials
-        import json
-        import pandas as pd
-        import io
-        import time
-        from datetime import datetime
-
         # --- CONEXIÓN DE SEGURIDAD CON GOOGLE SHEETS ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
         creds_dict = {
@@ -602,16 +593,6 @@ else:
             d3.download_button("🚀 Reporte UNIFICADO", generar_reporte(df_final, "UNIFICADO"), "REPORTE_UNIFICADO.xlsx")
     elif st.session_state.menu == "SF2":
         st.title("📁 SF2 - Módulo de Baja de Folios")
-        
-        # --- LIBRERÍAS ---
-        import gspread
-        from google.oauth2.service_account import Credentials
-        import json
-        import pandas as pd
-        import io
-        import base64
-        import time
-        from datetime import datetime, timedelta, timezone
 
         # --- 1. CONEXIÓN ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
