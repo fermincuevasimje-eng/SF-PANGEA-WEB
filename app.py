@@ -2060,17 +2060,6 @@ else:
         
         LEYENDA_OFICIAL = "Este material es propiedad del Ayuntamiento de Toluca y se genera en la Dirección de Alumbrado Público"
 
-        # --- LIBRERÍAS DE ACCESO NUBE ---
-        import gspread
-        from google.oauth2.service_account import Credentials
-        import json
-        import pandas as pd
-        import io
-        import base64
-        import time
-        import re
-        from datetime import datetime, timedelta, timezone
-
         # --- CONEXIÓN DE SEGURIDAD CON GOOGLE SHEETS ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
         creds_dict = {
