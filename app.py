@@ -618,10 +618,14 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- 2. CARGA DE BÓVEDA ---
+        # --- 2. CARGA DE BÓVEDA FILTRADA ---
         if "db_bajas_historico" not in st.session_state:
             registros = ws.get_all_records()
-            st.session_state.db_bajas_historico = {str(r.get("ID Registro")): r for r in registros if r.get("ID Registro")}
+            st.session_state.db_bajas_historico = {
+                str(r.get("ID Registro")): r 
+                for r in registros 
+                if r.get("ID Registro") and str(r.get("ID Registro")).startswith("BAJA-")
+            }
 
         st.write("Cargue el archivo original y digite los folios para generar el documento de cierre.")
         up_sf2 = st.file_uploader("Subir Archivo de Referencia (Excel/CSV)", type=["csv", "xlsx"], key="sf2_up")
