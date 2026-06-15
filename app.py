@@ -2155,26 +2155,40 @@ else:
                 data_manager.guardar_inventario(df_base)
                 st.session_state.db_inventario = df_base
 
-        # CARGA OPTIMIZADA DESDE NUBE: Solo descarga columnas requeridas evitando colapsos
-        if "vales_historial" not in st.session_state:
-            st.session_state.vales_historial = []
-            try:
-                valores_columnas = ws.get_all_values()
-                if valores_columnas:
-                    headers = [str(h).strip() for h in valores_columnas[0]]
-                    try:
-                        idx_id = headers.index("ID Registro")
-                        idx_datos = headers.index("Datos")
-                        for row in valores_columnas[1:]:
-                            if len(row) > idx_id and str(row[idx_id]).startswith("SF6-VAL-"):
-                                try:
-                                    datos_raw = row[idx_datos]
-                                    vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+        # --- SINCRO-BÓVEDA RESILIENTE (ANTI-DESCONEXIONES) ---
+        bovedas_completas = ["db_oficios", "boveda_mmd", "db_depuracion", "vales_historial"]
+        if any(b not in st.session_state for b in bovedas_completas):
+            for _ in range(3):
+                try:
+                    if "db_oficios" not in st.session_state: st.session_state.db_oficios = {}
+                    if "boveda_mmd" not in st.session_state: st.session_state.boveda_mmd = {}
+                    if "db_depuracion" not in st.session_state: st.session_state.db_depuracion = {}
+                    if "vales_historial" not in st.session_state: st.session_state.vales_historial = []
+                    
+                    registros_maestros = ws.get_all_records()
+                    for r in registros_maestros:
+                        reg_id = str(r.get("ID Registro", ""))
+                        if reg_id.startswith("SF4-PRY-"):
+                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            except: pass
+                        elif reg_id.startswith("SF4-OFC-"):
+                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            except: pass
+                        elif reg_id.startswith("SF5-DEP-"):
+                            try:
+                                datos_raw = r.get("Datos", "{}")
+                                st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                            except: pass
+                        elif reg_id.startswith("SF6-VAL-"):
+                            try:
+                                datos_raw = r.get("Datos", "{}")
+                                vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                if vale_parsed not in st.session_state.vales_historial:
                                     st.session_state.vales_historial.append(vale_parsed)
-                                except: pass
-                    except ValueError: pass
-            except Exception as e:
-                st.error(f"⚠️ Alerta de sincronización en red: {e}")
+                            except: pass
+                    break
+                except Exception:
+                    time.sleep(1)
 
         if "carrito_vale" not in st.session_state:
             st.session_state.carrito_vale = []
