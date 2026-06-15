@@ -735,7 +735,7 @@ else:
                                 st.success("¡Datos cargados en Captura Actual!")
                                 st.rerun()
                         with col2:
-                            confirmar_del = st.checkbox("🔐 Habilitar borrado permanente")
+                            confirmar_del = st.checkbox("🔐 Habilitar borrado permanente", key=f"chk_del_{id_rec}")
                             if confirmar_del:
                                 if st.button("🗑️ BORRAR DE BÓVEDA", type="primary", key=f"borrar_{id_rec}"):
                                     try:
