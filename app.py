@@ -703,9 +703,13 @@ else:
                             raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
                             try:
                                 datos_dict = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
+                                # Si datos_dict es una lista o algo que no se pueda iterar como dict, esto fallará
                                 df_det = pd.DataFrame([{"Folio": k, "Detalle": v} for k, v in datos_dict.items()])
                                 st.dataframe(df_det, use_container_width=True, hide_index=True)
-                            except: st.error("Error en vista previa.")
+                            except Exception as e:
+                                st.error(f"Error técnico: {e}")
+                                st.write("Datos crudos encontrados:")
+                                st.code(raw_datos)
 
                         raw_b64 = data.get("Datos Captura") or data.get("Excel Base64") or data.get("Excel") or ""
                         if raw_b64:
