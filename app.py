@@ -746,28 +746,6 @@ else:
                                         time.sleep(1)
                                         st.rerun()
                                     except Exception as e: st.error(f"Error al borrar: {e}")
-                        
-                        st.markdown("---")
-                        st.markdown("#### 🛠️ Administración del Registro")
-                        col1, col2 = st.columns([1, 1])
-                        with col1: 
-                            if st.button("🔄 Retornar a Captura"):
-                                raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
-                                st.session_state.lista_bajas = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
-                                st.success("¡Datos cargados en Captura Actual!")
-                                st.rerun()
-                        with col2:
-                            confirmar_del = st.checkbox("🔐 Habilitar borrado permanente")
-                            if confirmar_del:
-                                if st.button("🗑️ BORRAR DE BÓVEDA", type="primary"):
-                                    try:
-                                        cell = ws.find(id_rec, in_column=1)
-                                        if cell: ws.delete_rows(cell.row)
-                                        del st.session_state.db_bajas_historico[id_rec]
-                                        st.success("¡Eliminado!")
-                                        time.sleep(1)
-                                        st.rerun()
-                                    except Exception as e: st.error(f"Error: {e}")
                 else: st.info("Bóveda vacía.")
 
         with c_input:
