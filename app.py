@@ -1726,17 +1726,6 @@ else:
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
-        # --- LIBRERÍAS ---
-        import gspread
-        from google.oauth2.service_account import Credentials
-        import json
-        import pandas as pd
-        import io
-        import base64
-        import time
-        import re
-        from datetime import datetime, timedelta, timezone
-
         # --- 1. CONEXIÓN A GOOGLE SHEETS ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
         creds_dict = {
