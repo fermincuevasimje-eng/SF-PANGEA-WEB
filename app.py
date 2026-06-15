@@ -1761,17 +1761,40 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- 2. CARGA GLOBAL Y SINCRONIZACIÓN DESDE NUBE ---
-        if "db_depuracion" not in st.session_state:
-            registros = ws.get_all_records()
-            st.session_state.db_depuracion = {}
-            for r in registros:
-                reg_id = str(r.get("ID Registro", ""))
-                if reg_id.startswith("SF5-DEP-"):
-                    try:
-                        datos_raw = r.get("Datos", "{}")
-                        st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                    except: pass
+        # --- SINCRO-BÓVEDA RESILIENTE (ANTI-DESCONEXIONES) ---
+        bovedas_completas = ["db_oficios", "boveda_mmd", "db_depuracion", "vales_historial"]
+        if any(b not in st.session_state for b in bovedas_completas):
+            for _ in range(3):
+                try:
+                    if "db_oficios" not in st.session_state: st.session_state.db_oficios = {}
+                    if "boveda_mmd" not in st.session_state: st.session_state.boveda_mmd = {}
+                    if "db_depuracion" not in st.session_state: st.session_state.db_depuracion = {}
+                    if "vales_historial" not in st.session_state: st.session_state.vales_historial = []
+                    
+                    registros_maestros = ws.get_all_records()
+                    for r in registros_maestros:
+                        reg_id = str(r.get("ID Registro", ""))
+                        if reg_id.startswith("SF4-PRY-"):
+                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            except: pass
+                        elif reg_id.startswith("SF4-OFC-"):
+                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            except: pass
+                        elif reg_id.startswith("SF5-DEP-"):
+                            try:
+                                datos_raw = r.get("Datos", "{}")
+                                st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                            except: pass
+                        elif reg_id.startswith("SF6-VAL-"):
+                            try:
+                                datos_raw = r.get("Datos", "{}")
+                                vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                if vale_parsed not in st.session_state.vales_historial:
+                                    st.session_state.vales_historial.append(vale_parsed)
+                            except: pass
+                    break
+                except Exception:
+                    time.sleep(1)
 
         # Inicialización de variables de sesión para la mesa de trabajo actual
         if "da_actual" not in st.session_state: st.session_state.da_actual = None
