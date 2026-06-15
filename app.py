@@ -701,22 +701,51 @@ else:
                         data = st.session_state.db_bajas_historico[id_rec]
                         with st.expander(f"🔍 Detalle de folios ({id_rec})"):
                             raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
-                            try:
-                                datos_dict = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
-                                # Si datos_dict es una lista o algo que no se pueda iterar como dict, esto fallará
-                                df_det = pd.DataFrame([{"Folio": k, "Detalle": v} for k, v in datos_dict.items()])
-                                st.dataframe(df_det, use_container_width=True, hide_index=True)
-                            except Exception as e:
-                                st.error(f"Error técnico: {e}")
-                                st.write("Datos crudos encontrados:")
-                                st.code(raw_datos)
+                            
+                            # Filtro inteligente: Si es B64, no lo intentamos leer como JSON
+                            if str(raw_datos).startswith("UEsDB"):
+                                st.info("Este registro contiene un archivo Excel. Usa el botón de descarga de abajo.")
+                            else:
+                                try:
+                                    datos_dict = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
+                                    if isinstance(datos_dict, dict):
+                                        df_det = pd.DataFrame([{"Folio": k, "Detalle": v} for k, v in datos_dict.items()])
+                                        st.dataframe(df_det, use_container_width=True, hide_index=True)
+                                    else:
+                                        st.write("Datos encontrados:", datos_dict)
+                                except Exception as e:
+                                    st.error(f"Error al visualizar folios: {e}")
+                                    st.code(raw_datos)
 
+                        # --- ESTA PARTE MANTIENE TU BOTÓN DE DESCARGA Y ADMINISTRACIÓN ---
                         raw_b64 = data.get("Datos Captura") or data.get("Excel Base64") or data.get("Excel") or ""
                         if raw_b64:
                             try:
                                 raw_b64 = str(raw_b64).replace('\n', '').replace('\r', '')
                                 st.download_button("🔄 Descargar Excel", data=base64.b64decode(raw_b64), file_name=f"{id_rec}.xlsx", use_container_width=True)
-                            except Exception as e: st.error(f"Error: {e}")
+                            except Exception as e: st.error(f"Error en descarga: {e}")
+                        
+                        st.markdown("---")
+                        st.markdown("#### 🛠️ Administración del Registro")
+                        col1, col2 = st.columns([1, 1])
+                        with col1: 
+                            if st.button("🔄 Retornar a Captura"):
+                                raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
+                                st.session_state.lista_bajas = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
+                                st.success("¡Datos cargados en Captura Actual!")
+                                st.rerun()
+                        with col2:
+                            confirmar_del = st.checkbox("🔐 Habilitar borrado permanente")
+                            if confirmar_del:
+                                if st.button("🗑️ BORRAR DE BÓVEDA", type="primary"):
+                                    try:
+                                        cell = ws.find(id_rec, in_column=1)
+                                        if cell: ws.delete_rows(cell.row)
+                                        del st.session_state.db_bajas_historico[id_rec]
+                                        st.success("¡Eliminado!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    except Exception as e: st.error(f"Error al borrar: {e}")
                         
                         st.markdown("---")
                         st.markdown("#### 🛠️ Administración del Registro")
