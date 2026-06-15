@@ -1303,17 +1303,6 @@ else:
 
     elif st.session_state.menu == "SF4":
         st.title("🏗️ SF4 - Arquitecto de Procesos & Oficios")
-        
-        # --- LIBRERÍAS ---
-        import gspread
-        from google.oauth2.service_account import Credentials
-        import json
-        import pandas as pd
-        import io
-        import base64
-        import time
-        import re
-        from datetime import datetime, timedelta, timezone
 
         # --- 1. CONEXIÓN A GOOGLE SHEETS ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
