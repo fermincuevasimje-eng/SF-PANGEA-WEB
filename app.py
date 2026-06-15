@@ -360,8 +360,6 @@ if "edit_index" not in st.session_state:
     st.session_state.edit_index = -1
 
 if "boveda_mmd" not in st.session_state:
-    # LINEA TEMPORAL PARA LIMPIAR EL ERROR (SÓLO CORRELA UNA VEZ Y LUEGO LA BORRAS)
-st.session_state.boveda_mmd = {}
     if os.path.exists("boveda_pangea.json"):
         with open("boveda_pangea.json", "r", encoding="utf-8") as f:
             st.session_state.boveda_mmd = json.load(f)
