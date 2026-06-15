@@ -729,7 +729,7 @@ else:
                         st.markdown("#### 🛠️ Administración del Registro")
                         col1, col2 = st.columns([1, 1])
                         with col1: 
-                            if st.button("🔄 Retornar a Captura"):
+                            if st.button("🔄 Retornar a Captura", key=f"retornar_{id_rec}"):
                                 raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
                                 st.session_state.lista_bajas = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
                                 st.success("¡Datos cargados en Captura Actual!")
@@ -737,7 +737,7 @@ else:
                         with col2:
                             confirmar_del = st.checkbox("🔐 Habilitar borrado permanente")
                             if confirmar_del:
-                                if st.button("🗑️ BORRAR DE BÓVEDA", type="primary"):
+                                if st.button("🗑️ BORRAR DE BÓVEDA", type="primary", key=f"borrar_{id_rec}"):
                                     try:
                                         cell = ws.find(id_rec, in_column=1)
                                         if cell: ws.delete_rows(cell.row)
