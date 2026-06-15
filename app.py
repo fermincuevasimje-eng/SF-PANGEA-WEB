@@ -210,7 +210,7 @@ STOCK_INICIAL = [
     {"ID": "MAT-111", "Material": "CLEMA DE PORCELANA 3 POLOS", "Stock": 100, "Min": 25, "Unidad": "Piezas"},
     {"ID": "MAT-112", "Material": "COLETA DE COBRE PARA TIERRA", "Stock": 100, "Min": 15, "Unidad": "Piezas"},
     {"ID": "MAT-113", "Material": "CONDUIT ACERO GALVANIZADO 1/2\"", "Stock": 100, "Min": 10, "Unidad": "Tramos"},
-    {"ID": "MAT-114", "Material": "CONDUIT ACERO GALVANIZADO 3/4\"", "Stock": 100, "Min": 10, "Tramos": "Piezas"},
+    {"ID": "MAT-114", "Material": "CONDUIT ACERO GALVANIZADO 3/4\"", "Stock": 100, "Min": 10, "Unidad": "Tramos"},
     {"ID": "MAT-115", "Material": "CONDUIT ACERO GALVANIZADO 1\"", "Stock": 100, "Min": 5, "Unidad": "Tramos"},
     {"ID": "MAT-116", "Material": "CONDUIT PVC PESADO 1/2\"", "Stock": 100, "Min": 15, "Unidad": "Tramos"},
     {"ID": "MAT-117", "Material": "CONDUIT PVC PESADO 3/4\"", "Stock": 100, "Min": 15, "Unidad": "Tramos"},
