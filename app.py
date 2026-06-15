@@ -702,7 +702,7 @@ else:
                         with st.expander(f"🔍 Detalle de folios ({id_rec})"):
                             raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
                             
-                            # Filtro inteligente: Si es B64, no lo intentamos leer como JSON
+                            # Filtro inteligente: Si es B64 (archivo Excel), no intentamos leerlo como JSON
                             if str(raw_datos).startswith("UEsDB"):
                                 st.info("Este registro contiene un archivo Excel. Usa el botón de descarga de abajo.")
                             else:
@@ -717,7 +717,7 @@ else:
                                     st.error(f"Error al visualizar folios: {e}")
                                     st.code(raw_datos)
 
-                        # --- ESTA PARTE MANTIENE TU BOTÓN DE DESCARGA Y ADMINISTRACIÓN ---
+                        # --- BOTÓN DE DESCARGA Y ADMINISTRACIÓN (SIN DUPLICADOS) ---
                         raw_b64 = data.get("Datos Captura") or data.get("Excel Base64") or data.get("Excel") or ""
                         if raw_b64:
                             try:
