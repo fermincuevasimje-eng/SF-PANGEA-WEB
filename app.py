@@ -1328,20 +1328,40 @@ else:
         except:
             ws = sh.get_worksheet(0)
 
-        # --- 2. CARGA DINÁMICA DE PROYECTOS Y OFICIOS DESDE NUBE ---
-        if "db_oficios" not in st.session_state or "boveda_mmd" not in st.session_state:
-            registros = ws.get_all_records()
-            st.session_state.db_oficios = {}
-            st.session_state.boveda_mmd = {}
-            
-            for r in registros:
-                reg_id = str(r.get("ID Registro", ""))
-                if reg_id.startswith("SF4-PRY-"):
-                    try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
-                    except: pass
-                elif reg_id.startswith("SF4-OFC-"):
-                    try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
-                    except: pass
+        # --- SINCRO-BÓVEDA RESILIENTE (ANTI-DESCONEXIONES) ---
+        bovedas_completas = ["db_oficios", "boveda_mmd", "db_depuracion", "vales_historial"]
+        if any(b not in st.session_state for b in bovedas_completas):
+            for _ in range(3):
+                try:
+                    if "db_oficios" not in st.session_state: st.session_state.db_oficios = {}
+                    if "boveda_mmd" not in st.session_state: st.session_state.boveda_mmd = {}
+                    if "db_depuracion" not in st.session_state: st.session_state.db_depuracion = {}
+                    if "vales_historial" not in st.session_state: st.session_state.vales_historial = []
+                    
+                    registros_maestros = ws.get_all_records()
+                    for r in registros_maestros:
+                        reg_id = str(r.get("ID Registro", ""))
+                        if reg_id.startswith("SF4-PRY-"):
+                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            except: pass
+                        elif reg_id.startswith("SF4-OFC-"):
+                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            except: pass
+                        elif reg_id.startswith("SF5-DEP-"):
+                            try:
+                                datos_raw = r.get("Datos", "{}")
+                                st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                            except: pass
+                        elif reg_id.startswith("SF6-VAL-"):
+                            try:
+                                datos_raw = r.get("Datos", "{}")
+                                vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                if vale_parsed not in st.session_state.vales_historial:
+                                    st.session_state.vales_historial.append(vale_parsed)
+                            except: pass
+                    break
+                except Exception:
+                    time.sleep(1)
 
         tab_c, tab_b, tab_i, tab_o = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa", "📄 GENERADOR DE OFICIOS"])
 
