@@ -1339,28 +1339,30 @@ else:
                     if "db_depuracion" not in st.session_state: st.session_state.db_depuracion = {}
                     if "vales_historial" not in st.session_state: st.session_state.vales_historial = []
                     
-                    registros_maestros = ws.get_all_records()
-                    for r in registros_maestros:
-                        reg_id = str(r.get("ID Registro", ""))
-                        
-                        # Aduana unificada para extraer el JSON sin importar el nombre de la columna
-                        datos_raw = r.get("Datos Captura") or r.get("Datos") or "{}"
-                        
-                        if reg_id.startswith("SF4-PRY-"):
-                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            except: pass
-                        elif reg_id.startswith("SF4-OFC-"):
-                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            except: pass
-                        elif reg_id.startswith("SF5-DEP-"):
-                            try: st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            except: pass
-                        elif reg_id.startswith("SF6-VAL-"):
-                            try:
-                                vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                                if vale_parsed not in st.session_state.vales_historial:
-                                    st.session_state.vales_historial.append(vale_parsed)
-                            except: pass
+                    # Descarga de matriz pura de celdas para ignorar problemas de encabezados
+                    filas_raw = ws.get_all_values()
+                    if len(filas_raw) > 1:
+                        for row in filas_raw[1:]: # Saltamos la fila 1 de encabezados
+                            if len(row) >= 5:
+                                reg_id = str(row[0]).strip()
+                                origen = str(row[2]).strip() if str(row[2]).strip() else "Sin Nombre"
+                                datos_raw = str(row[4]).strip() if row[4] else "{}"
+                                
+                                if reg_id.startswith("SF4-PRY-"):
+                                    try: st.session_state.boveda_mmd[origen] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    except: pass
+                                elif reg_id.startswith("SF4-OFC-"):
+                                    try: st.session_state.db_oficios[origen] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    except: pass
+                                elif reg_id.startswith("SF5-DEP-"):
+                                    try: st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    except: pass
+                                elif reg_id.startswith("SF6-VAL-"):
+                                    try:
+                                        vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                        if vale_parsed not in st.session_state.vales_historial:
+                                            st.session_state.vales_historial.append(vale_parsed)
+                                    except: pass
                     break
                 except Exception:
                     time.sleep(1)
