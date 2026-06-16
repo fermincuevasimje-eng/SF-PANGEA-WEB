@@ -1598,8 +1598,7 @@ else:
                 id_sel = "nuevo"
                 if modo_of == "📂 Consultar Bóveda":
                     if st.session_state.db_oficios:
-                        col_sel, col_del = st.columns([3, 1])
-                        id_sel = col_sel.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1])
+                        id_sel = st.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1])
                         data_previa = st.session_state.db_oficios[id_sel]
                         
                         # --- TABLA RESUMEN CON RESALTADO DINÁMICO ---
@@ -1612,15 +1611,19 @@ else:
                             
                         st.dataframe(df_oficios_vista.style.apply(resaltar_oficio_seleccionado, axis=1), use_container_width=True, hide_index=True)
                         
-                        seguro_borrado = st.checkbox("🔐 Confirmar eliminación permanente de este oficio")
-                        if col_del.button("🗑️ BORRAR", use_container_width=True, disabled=not seguro_borrado):
-                            try:
-                                cell = ws.find(id_sel, in_column=3)
-                                if cell: ws.delete_rows(cell.row)
-                                del st.session_state.db_oficios[id_sel]
-                                st.warning(f"Registro {id_sel} eliminado de la nube.")
-                                time.sleep(1); st.rerun()
-                            except Exception as e: st.error(f"Error al eliminar: {e}")
+                        # Proximidad Máxima: Checkbox y Botón acoplados juntos abajo de la tabla summary
+                        col_chk_del, col_btn_del = st.columns([1.8, 1.2])
+                        with col_chk_del:
+                            seguro_borrado = st.checkbox("🔐 Confirmar eliminación permanente", key=f"chk_del_ofc_{id_sel}")
+                        with col_btn_del:
+                            if st.button("🗑️ BORRAR OFICIO", use_container_width=True, disabled=not seguro_borrado, type="primary", key=f"btn_del_ofc_{id_sel}"):
+                                try:
+                                    cell = ws.find(id_sel, in_column=3)
+                                    if cell: ws.delete_rows(cell.row)
+                                    del st.session_state.db_oficios[id_sel]
+                                    st.warning(f"Registro {id_sel} eliminado de la nube.")
+                                    time.sleep(1); st.rerun()
+                                except Exception as e: st.error(f"Error al eliminar: {e}")
                     else:
                         st.info("La bóveda está vacía.")
                 
@@ -1677,9 +1680,19 @@ else:
                 """, unsafe_allow_html=True)
 
                 st.divider()
-                b_save, b_pdf = st.columns(2)
-
-                if b_save.button("💾 GUARDAR/ACTUALIZAR", use_container_width=True):
+                
+                ejecutar_guardado = False
+                
+                # Separación e identificación de flujos de guardado independientes
+                if modo_of == "📂 Consultar Bóveda":
+                    seguro_actualizar = st.checkbox("🔐 Confirmar cambios y actualización del oficio histórico", key="chk_seguro_actualizar_ofc")
+                    if st.button("🔄 ACTUALIZAR REGISTRO EXISTENTE", use_container_width=True, disabled=not seguro_actualizar, type="primary"):
+                        ejecutar_guardado = True
+                else:
+                    if st.button("💾 GUARDAR NUEVO OFICIO", use_container_width=True, type="primary"):
+                        ejecutar_guardado = True
+                        
+                if ejecutar_guardado:
                     id_r = n_oficio.replace("/", "-")
                     
                     # --- CONTROL DE DUPLICADOS EN OFICIOS (SOLO AL CREAR NUEVOS) ---
@@ -1705,8 +1718,7 @@ else:
                         except: pass
                         
                         ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
-                        st.success("¼️ Bóveda Nube de Oficios Actualizada."); time.sleep(1); st.rerun()
-
+                        st.success("✅ Bóveda Nube de Oficios Actualizada Exitosamente."); time.sleep(1); st.rerun()
                 if motor_pdf_listo:
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf.set_margins(30, 25, 20)
