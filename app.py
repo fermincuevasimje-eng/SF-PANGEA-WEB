@@ -1764,20 +1764,21 @@ else:
                     registros_maestros = ws.get_all_records()
                     for r in registros_maestros:
                         reg_id = str(r.get("ID Registro", ""))
+                        
+                        # Aduana inteligente para unificar Módulo 2 y Módulo 4
+                        datos_raw = r.get("Datos Captura") or r.get("Datos") or "{}"
+                        
                         if reg_id.startswith("SF4-PRY-"):
-                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                             except: pass
                         elif reg_id.startswith("SF4-OFC-"):
-                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                             except: pass
                         elif reg_id.startswith("SF5-DEP-"):
-                            try:
-                                datos_raw = r.get("Datos", "{}")
-                                st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                            try: st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                             except: pass
                         elif reg_id.startswith("SF6-VAL-"):
                             try:
-                                datos_raw = r.get("Datos", "{}")
                                 vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                                 if vale_parsed not in st.session_state.vales_historial:
                                     st.session_state.vales_historial.append(vale_parsed)
