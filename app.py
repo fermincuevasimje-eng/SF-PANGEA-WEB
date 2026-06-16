@@ -1771,26 +1771,28 @@ else:
                     
                     registros_maestros = ws.get_all_records()
                     for r in registros_maestros:
-                        reg_id = str(r.get("ID Registro", ""))
-                        
-                        # Aduana inteligente para unificar Módulo 2 y Módulo 4
-                        datos_raw = r.get("Datos Captura") or r.get("Datos") or "{}"
-                        
-                        if reg_id.startswith("SF4-PRY-"):
-                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            except: pass
-                        elif reg_id.startswith("SF4-OFC-"):
-                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            except: pass
-                        elif reg_id.startswith("SF5-DEP-"):
-                            try: st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            except: pass
-                        elif reg_id.startswith("SF6-VAL-"):
-                            try:
-                                vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                                if vale_parsed not in st.session_state.vales_historial:
-                                    st.session_state.vales_historial.append(vale_parsed)
-                            except: pass
+                        valores = list(r.values())
+                        # Nos aseguramos de que la fila tenga al menos las columnas necesarias
+                        if len(valores) >= 5:
+                            reg_id = str(valores[0]).strip()
+                            origen = str(valores[2]).strip() if str(valores[2]).strip() else "Sin Nombre"
+                            datos_raw = valores[4]
+                            
+                            if reg_id.startswith("SF4-PRY-"):
+                                try: st.session_state.boveda_mmd[origen] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                except: pass
+                            elif reg_id.startswith("SF4-OFC-"):
+                                try: st.session_state.db_oficios[origen] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                except: pass
+                            elif reg_id.startswith("SF5-DEP-"):
+                                try: st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                except: pass
+                            elif reg_id.startswith("SF6-VAL-"):
+                                try:
+                                    vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    if vale_parsed not in st.session_state.vales_historial:
+                                        st.session_state.vales_historial.append(vale_parsed)
+                                except: pass
                     break
                 except Exception:
                     time.sleep(1)
