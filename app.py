@@ -1342,20 +1342,21 @@ else:
                     registros_maestros = ws.get_all_records()
                     for r in registros_maestros:
                         reg_id = str(r.get("ID Registro", ""))
+                        
+                        # Aduana unificada para extraer el JSON sin importar el nombre de la columna
+                        datos_raw = r.get("Datos Captura") or r.get("Datos") or "{}"
+                        
                         if reg_id.startswith("SF4-PRY-"):
-                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                             except: pass
                         elif reg_id.startswith("SF4-OFC-"):
-                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
+                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                             except: pass
                         elif reg_id.startswith("SF5-DEP-"):
-                            try:
-                                datos_raw = r.get("Datos", "{}")
-                                st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                            try: st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                             except: pass
                         elif reg_id.startswith("SF6-VAL-"):
                             try:
-                                datos_raw = r.get("Datos", "{}")
                                 vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                                 if vale_parsed not in st.session_state.vales_historial:
                                     st.session_state.vales_historial.append(vale_parsed)
@@ -1626,7 +1627,13 @@ else:
                 
                 with st.container(border=True):
                     st.markdown("**📌 Configuración**")
-                    tipo_p = st.selectbox("Plantilla:", list(plantillas_maestras.keys()), key=f"tipo_p_{pk}")
+                    
+                    # Recuperar la plantilla de origen para que el selector no se mueva de su lugar
+                    plantilla_guardada = data_previa.get("plantilla", list(plantillas_maestras.keys())[0])
+                    lista_plantillas = list(plantillas_maestras.keys())
+                    idx_plantilla = lista_plantillas.index(plantilla_guardada) if plantilla_guardada in lista_plantillas else 0
+                    
+                    tipo_p = st.selectbox("Plantilla:", lista_plantillas, index=idx_plantilla, key=f"tipo_p_{pk}")
                     c1, c2 = st.columns(2)
                     n_oficio = c1.text_input("No. Oficio:", value=data_previa.get("num", "DAP/___/2026"), key=f"num_{pk}")
                     
@@ -1680,7 +1687,8 @@ else:
                         payload_oficio = {
                             "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
                             "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
-                            "firma": firm, "cargo_f": cargo_firm, "ccp": ccp
+                            "firma": firm, "cargo_f": cargo_firm, "ccp": ccp,
+                            "plantilla": tipo_p
                         }
                         st.session_state.db_oficios[id_r] = payload_oficio
                         
