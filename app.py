@@ -3013,6 +3013,19 @@ else:
                         check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select}", key=f"chk_del_{folio_select}")
                         if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
                             try:
+                                # --- 1. ROLLBACK DE MATERIALES: DEVOLVER EL NETO AL ALMACÉN ---
+                                for mat_item in vale_auditado.get("Materiales", []):
+                                    m_name = mat_item["Material"]
+                                    cant_a_devolver = mat_item["Cantidad"] - mat_item.get("Devuelto", 0)
+                                    if cant_a_devolver > 0:
+                                        if m_name in st.session_state.db_inventario['Material'].tolist():
+                                            idx_inv = st.session_state.db_inventario[st.session_state.db_inventario['Material'] == m_name].index[0]
+                                            st.session_state.db_inventario.at[idx_inv, 'Stock'] += cant_a_devolver
+                                
+                                # Guardar inventario actualizado en la nube inmediatamente
+                                data_manager.guardar_inventario(st.session_state.db_inventario)
+
+                                # --- 2. DESTRUCCIÓN DEL REGISTRO EN LA NUBE ---
                                 id_reg_borrar = f"SF6-VAL-{folio_select}"
                                 cell = ws.find(id_reg_borrar, in_column=1)
                                 if cell:
