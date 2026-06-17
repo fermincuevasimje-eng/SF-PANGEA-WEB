@@ -2885,6 +2885,7 @@ else:
                         st.write(f"**Asignado a:** {vale_auditado['Brigada']} | **Ubicación:** {vale_auditado.get('Delegacion')} - {vale_auditado.get('UTB')}")
                         df_mat_auditoria = pd.DataFrame(vale_auditado.get("Materiales", []))
                         st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
+                        
                         # --- RECONSTRUCCIÓN DE PDF EN VIVO DESDE EL JSON DEL HISTORIAL ---
                             try:
                                 from fpdf import FPDF
@@ -2969,6 +2970,7 @@ else:
                                 st.write("")
                             except Exception as e_pdf:
                                 st.error(f"Error al reconstruir reporte PDF: {e_pdf}")
+                                
                         check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select}", key=f"chk_del_{folio_select}")
                         if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
                             try:
