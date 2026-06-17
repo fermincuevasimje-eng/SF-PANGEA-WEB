@@ -2109,6 +2109,45 @@ else:
             ws = sh.worksheet("Boveda_Bajas")
         except:
             ws = sh.get_worksheet(0)
+            # --- CONEXIÓN CON PESTAÑA DE INVENTARIO EN LA NUBE ---
+        try:
+            ws_inv = sh.worksheet("Inventario_Catalogo")
+        except:
+            try:
+                # Si la pestaña no existe en tu Google Sheets, el sistema la crea automáticamente
+                ws_inv = sh.add_worksheet(title="Inventario_Catalogo", rows="100", cols="5")
+                ws_inv.append_row(["ID", "Material", "Stock", "Min", "Unidad"])
+            except:
+                ws_inv = sh.get_worksheet(0)
+
+        # Redefinición dinámica de data_manager para centralizar el catálogo en la nube
+        def cloud_cargar_inventario():
+            try:
+                rows = ws_inv.get_all_values()
+                if len(rows) > 1:
+                    headers = rows[0]
+                    df = pd.DataFrame(rows[1:], columns=headers)
+                    # Forzamos conversión a números para evitar errores en las alertas críticas de Streamlit
+                    if 'Stock' in df.columns:
+                        df['Stock'] = pd.to_numeric(df['Stock'], errors='coerce').fillna(0).astype(int)
+                    if 'Min' in df.columns:
+                        df['Min'] = pd.to_numeric(df['Min'], errors='coerce').fillna(0).astype(int)
+                    return df
+                return None
+            except:
+                return None
+
+        def cloud_guardar_inventario(df):
+            try:
+                ws_inv.clear()
+                ws_inv.append_row(df.columns.tolist())
+                ws_inv.append_rows(df.values.tolist())
+            except Exception as e:
+                st.error(f"❌ Error de sincronización de inventario en la nube: {e}")
+
+        # Inyectamos las nuevas funciones en el motor local
+        data_manager.cargar_inventario = cloud_cargar_inventario
+        data_manager.guardar_inventario = cloud_guardar_inventario
 
         # Lector ultra-robusto territorial
         try:
