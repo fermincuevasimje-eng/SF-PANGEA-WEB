@@ -397,7 +397,7 @@ else:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
-        if st.button("🏠 Inicio", use_container_width=False): st.session_state.menu = "Inicio"
+        if st.button("🏠 Inicio", use_container_width=True): st.session_state.menu = "Inicio"
         if st.button("🚀 SF1-Generador de Rutas", use_container_width=True): st.session_state.menu = "SF1"
         if st.button("📁 SF2-Bajas", use_container_width=True): st.session_state.menu = "SF2"
         if st.button("📊 SF3-Captura y Métricas", use_container_width=True): st.session_state.menu = "SF3"
