@@ -2446,14 +2446,29 @@ else:
                 with col_v2:
                     if st.button(f"🚀 PROCESAR Y EMITIR VALE ({folio_actual})", type="primary", use_container_width=True):
                         try:
-                            # Validación directa ultrarápida
+                            # --- CÁLCULO DINÁMICO DE FOLIO (ANTI-DUPLICADOS MULTI-USUARIO) ---
                             col_id_vals = ws.col_values(1)
+                            nums_existentes = []
+                            for c_val in col_id_vals:
+                                if str(c_val).startswith("SF6-VAL-DAP-"):
+                                    try:
+                                        nums_existentes.append(int(str(c_val).replace("SF6-VAL-DAP-", "")))
+                                    except:
+                                        pass
+                            
+                            # Si alguien emitió un vale mientras capturábamos, nos movemos dinámicamente al número real disponible
+                            true_num = max(nums_existentes) + 1 if nums_existentes else (len(st.session_state.vales_historial) + 1)
+                            folio_actual = f"DAP-{true_num}"
                             id_reg_vale = f"SF6-VAL-{folio_actual}"
                             
-                            if id_reg_vale in col_id_vals or any(v["Folio"] == folio_actual for v in st.session_state.vales_historial):
-                                st.error(f"🚨 ERROR CRÍTICO: El folio {folio_actual} ya fue emitido previamente. Por seguridad de inventarios, recargue el entorno.")
-                            else:
-                                # --- 1. CONSTRUCCIÓN DEL PDF ---
+                            # Validación secundaria de seguridad en el estado de memoria local
+                            if any(v["Folio"] == folio_actual for v in st.session_state.vales_historial):
+                                local_max = max([int(v["Folio"].replace("DAP-", "")) for v in st.session_state.vales_historial if "DAP-" in v["Folio"]], default=0)
+                                true_num = max(true_num, local_max + 1)
+                                folio_actual = f"DAP-{true_num}"
+                                id_reg_vale = f"SF6-VAL-{folio_actual}"
+
+                            # --- 1. CONSTRUCCIÓN DEL PDF ---
                                 from fpdf import FPDF
                                 pdf = FPDF()
                                 pdf.add_page()
