@@ -981,16 +981,25 @@ else:
 
                             if st.button("💾 REGISTRAR RUTA CLÁSICA EN BITÁCORA", use_container_width=True, key="reg_c"):
                                 try:
+                                    import json
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    
+                                    # Serializamos los puntos clave (lat, lon, nombre) a texto estructurado JSON
+                                    coor_serializadas = json.dumps([(p['lat_aux'], p['lon_aux'], p['ID_Pangea_Nombre']) for p in ruta_ordenada])
                                     info_j = f"Modo: Clásico, Pts: {len(ruta_ordenada)}, Lums: {tot_lums}, Cab: {tot_cable}m, Dist: {round(dist_real_km,1)}km"
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"CLASICA_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    
+                                    n_f = pd.DataFrame([{
+                                        "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), 
+                                        "Nombre_Ruta": f"CLASICA_{up_name}", 
+                                        "Usuario_Generador": st.session_state.usuario_nombre, 
+                                        "Datos_JSON": info_j,
+                                        "Coordenadas_GPS": coor_serializadas  # 👈 Nueva columna oculta de rescate
+                                    }])
+                                    
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                    st.balloons(); st.success("¡Bitácora actualizada!")
+                                    st.balloons(); st.success("¡Bitácora actualizada con datos de mapa!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
-                        else:
-                            st.error("No se pudieron extraer coordenadas válidas en Modo Clásico.")
-                    except Exception as e: st.error(f"Error en Motor Clásico: {e}")
 
 
 
@@ -1231,19 +1240,36 @@ else:
 
                             if st.button("💾 REGISTRAR LOTE EN BITÁCORA", use_container_width=True, key="reg_m"):
                                 try:
+                                    import json
                                     conn = st.connection("gsheets", type=GSheetsConnection)
                                     hist = conn.read(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, ttl=0).dropna(how='all')
+                                    
+                                    # Recopilamos los puntos de todas las sub-rutas generadas en el lote
+                                    puntos_lote = []
+                                    for r_info in lista_rutas_finales:
+                                        for p in r_info["puntos"]:
+                                            puntos_lote.append((p['lat_aux'], p['lon_aux'], f"[{r_info['id_ruta']}] {p['ID_Pangea_Nombre']}"))
+                                    
+                                    coor_serializadas = json.dumps(puntos_lote)
                                     info_j = f"Modo: Multi-Ruta Pro, Rutas: {len(lista_rutas_finales)}, Pts: {tot_puntos_global}, Lums: {tot_lums_global}, Dist: {round(tot_dist_global,1)}km"
-                                    n_f = pd.DataFrame([{"Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Nombre_Ruta": f"MULTIRUTA_PRO_{up_name}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": info_j}])
+                                    
+                                    n_f = pd.DataFrame([{
+                                        "Fecha": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), 
+                                        "Nombre_Ruta": f"MULTIRUTA_PRO_{up_name}", 
+                                        "Usuario_Generador": st.session_state.usuario_nombre, 
+                                        "Datos_JSON": info_j,
+                                        "Coordenadas_GPS": coor_serializadas  # 👈 Nueva columna oculta de rescate
+                                    }])
+                                    
                                     conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=pd.concat([hist, n_f], ignore_index=True))
-                                    st.balloons(); st.success("¡Bitácora actualizada!")
+                                    st.balloons(); st.success("¡Bitácora de lote actualizada con datos de mapa!")
                                 except Exception as e: st.error(f"Error GSheets: {e}")
                         else:
                             st.error("No se pudieron extraer coordenadas válidas en Modo Multi-Ruta.")
                     except Exception as e: st.error(f"Error en Motor Multi-Ruta V24: {e}")
 
         # ==========================================
-        # PESTAÑA 3: BITÁCORA DE PROCESOS
+        # PESTAÑA 3: BITÁCORA DE PROCESOS (CON RESCATE DE MAPA)
         # ==========================================
         with tab2:
             try:
@@ -1252,6 +1278,7 @@ else:
                 if not df_bt.empty:
                     df_bt_v = df_bt.copy()
                     df_bt_v.insert(0, "ID_Reg", range(1, len(df_bt_v) + 1))
+                    
                     if st.session_state.perfil == "ADMIN":
                         c_sel, c_del = st.columns([3, 1])
                         ids_e = st.multiselect("ID para mover a papelera:", df_bt_v["ID_Reg"].tolist())
@@ -1262,7 +1289,44 @@ else:
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[idx_e]], ignore_index=True))
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(idx_e))
                                 st.success("Movido."); time.sleep(1); st.rerun()
-                    st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
+                    
+                    # Mostramos la tabla histórica (ocultando la columna pesada de GPS por estética)
+                    columnas_visibles = [c for c in df_bt_v.columns if c != "Coordenadas_GPS"]
+                    st.dataframe(df_bt_v[columnas_visibles].sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
+                    
+                    # --- MOTOR DE RESCATE DE MAPA INTERACTIVO ---
+                    if "Coordenadas_GPS" in df_bt_v.columns:
+                        st.markdown("---")
+                        st.markdown("### 🗺️ Recuperador de Mapas desde Historial")
+                        
+                        # Filtramos solo los registros nuevos que sí tengan datos geográficos guardados
+                        rutas_con_mapa = df_bt_v[df_bt_v["Coordenadas_GPS"].notna() & (df_bt_v["Coordenadas_GPS"] != "")]
+                        
+                        if not rutas_con_mapa.empty:
+                            seleccion_ruta = st.selectbox(
+                                "Selecciona una ruta del historial para reconstruir su mapa interactivo:", 
+                                rutas_con_mapa["Nombre_Ruta"].tolist(),
+                                key="sb_mapas_historicos"
+                            )
+                            
+                            if seleccion_ruta:
+                                fila_seleccionada = rutas_con_mapa[rutas_con_mapa["Nombre_Ruta"] == seleccion_ruta].iloc[0]
+                                try:
+                                    import json
+                                    # Decodificamos el JSON guardado en la celda de Google Sheets
+                                    puntos_recuperados = json.loads(fila_seleccionada["Coordenadas_GPS"])
+                                    
+                                    # Convertimos a DataFrame para el motor nativo de mapas de Streamlit
+                                    df_mapa_recuperado = pd.DataFrame(puntos_recuperados, columns=["lat", "lon", "Ubicación / Folio"])
+                                    
+                                    # Dibujamos el mapa interactivo centrado en Toluca
+                                    st.map(df_mapa_recuperado, latitude="lat", longitude="lon", size=18, color="#1F4E78")
+                                    st.caption(f"✅ Mostrando los puntos geográficos de la ruta: **{seleccion_ruta}**")
+                                except Exception as e_mapa:
+                                    st.error(f"❌ No se pudo decodificar el mapa de este registro: {e_mapa}")
+                        else:
+                            st.info("💡 Las rutas que generes a partir de este momento guardarán sus coordenadas automáticamente y aparecerán en esta sección para mapearse en vivo.")
+                            
                 else: 
                     st.info("Bitácora vacía.")
             except Exception as e: 
