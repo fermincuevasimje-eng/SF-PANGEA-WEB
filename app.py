@@ -2887,89 +2887,89 @@ else:
                         st.dataframe(df_mat_auditoria, use_container_width=True, hide_index=True)
                         
                         # --- RECONSTRUCCIÓN DE PDF EN VIVO DESDE EL JSON DEL HISTORIAL ---
-                            try:
-                                from fpdf import FPDF
-                                pdf_h = FPDF()
-                                pdf_h.add_page()
-                                
-                                pdf_h.set_font("Arial", 'B', 14)
-                                pdf_h.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
-                                pdf_h.set_font("Arial", 'B', 12)
-                                pdf_h.cell(0, 8, "DIRECCION DE ALUMBRADO PUBLICO", ln=True, align='C')
-                                pdf_h.cell(0, 8, f"VALE OFICIAL DE SALIDA: {vale_auditado['Folio']}", ln=True, align='C')
-                                pdf_h.ln(8)
-                                
-                                pdf_h.set_font("Arial", '', 10)
-                                pdf_h.cell(0, 6, f"Fecha y Hora de Emision: {vale_auditado.get('FechaHora', vale_auditado['Fecha'])}", ln=True)
-                                pdf_h.cell(0, 6, f"Ubicacion Geografica: {vale_auditado.get('Delegacion')} - {vale_auditado.get('UTB')}", ln=True)
-                                pdf_h.set_font("Arial", 'B', 10)
-                                pdf_h.cell(0, 6, f"UNIDAD / BRIGADA DESTINO: {vale_auditado['Brigada'].upper()}", ln=True)
-                                pdf_h.ln(4)
-                                
-                                pdf_h.set_fill_color(230, 235, 240)
-                                pdf_h.set_font("Arial", 'B', 10)
-                                pdf_h.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
-                                pdf_h.cell(36, 8, "Entregado", 1, 0, 'C', True)
-                                pdf_h.cell(22, 8, "Utilizado", 1, 0, 'C', True)
-                                pdf_h.cell(22, 8, "Devuelto", 1, 1, 'C', True)
-                                
-                                pdf_h.set_font("Arial", '', 10)
-                                for it in vale_auditado.get("Materiales", []):
-                                    pdf_h.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
-                                    pdf_h.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
-                                    pdf_h.cell(22, 8, f"{it.get('Utilizado', 0)}", 1, 0, 'C')
-                                    pdf_h.cell(22, 8, f"{it.get('Devuelto', 0)}", 1, 1, 'C')
-                                pdf_h.ln(6)
-                                
-                                pdf_h.set_font("Arial", 'B', 10)
-                                pdf_h.cell(0, 6, "Observaciones del Responsable de Almacen (Sistema):", ln=True)
-                                pdf_h.set_font("Arial", 'I', 9)
-                                msg_obs_h = vale_auditado.get("Observaciones", "Sin observaciones")
-                                pdf_h.multi_cell(0, 5, msg_obs_h.encode('latin-1', 'replace').decode('latin-1'), 1)
-                                pdf_h.ln(4)
-                                
-                                pdf_h.set_font("Arial", 'B', 10)
-                                pdf_h.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Fisico a Mano):", ln=True)
-                                pdf_h.cell(0, 15, "", 1, ln=True)
-                                pdf_h.ln(10)
-                                
-                                pdf_h.set_font("Arial", 'I', 9)
-                                pdf_h.multi_cell(0, 5, LEYENDA_OFICIAL.encode('latin-1', 'replace').decode('latin-1'), align='C')
-                                pdf_h.ln(12)
-                                
-                                y_pos_f = pdf_h.get_y()
-                                pdf_h.set_font("Arial", 'B', 8)
-                                pdf_h.set_xy(15, y_pos_f)
-                                pdf_h.cell(75, 4, "_____________________________________", ln=False, align='C')
-                                pdf_h.set_xy(15, y_pos_f + 4)
-                                pdf_h.cell(75, 4, "RESPONSABLE DE ENTREGA DE MATERIAL", ln=False, align='C')
-                                pdf_h.set_xy(15, y_pos_f + 8)
-                                pdf_h.set_font("Arial", '', 7)
-                                pdf_h.cell(75, 4, "(Firma y Sello de Almacen DAP)", ln=False, align='C')
-                                
-                                pdf_h.set_font("Arial", 'B', 8)
-                                pdf_h.set_xy(115, y_pos_f)
-                                pdf_h.cell(75, 4, "_____________________________________", ln=False, align='C')
-                                pdf_h.set_xy(115, y_pos_f + 4)
-                                pdf_h.cell(75, 4, "RESPONSABLE QUE RECIBE MATERIAL", ln=False, align='C')
-                                pdf_h.set_xy(115, y_pos_f + 8)
-                                pdf_h.set_font("Arial", '', 7)
-                                pdf_h.cell(75, 4, f"({vale_auditado['Brigada'].upper()})", ln=False, align='C')
-                                
-                                pdf_output_h = pdf_h.output(dest='S')
-                                pdf_bytes_h = pdf_output_h.encode('latin-1', 'replace') if isinstance(pdf_output_h, str) else pdf_output_h
-                                
-                                st.download_button(
-                                    label=f"📄 RECONSTRUIR Y DESCARGAR PDF ({vale_auditado['Folio']})",
-                                    data=pdf_bytes_h,
-                                    file_name=f"Vale_Oficial_Salida_{vale_auditado['Folio']}.pdf",
-                                    mime="application/pdf",
-                                    use_container_width=True,
-                                    key=f"dl_h_{vale_auditado['Folio']}"
-                                )
-                                st.write("")
-                            except Exception as e_pdf:
-                                st.error(f"Error al reconstruir reporte PDF: {e_pdf}")
+                        try:
+                            from fpdf import FPDF
+                            pdf_h = FPDF()
+                            pdf_h.add_page()
+                            
+                            pdf_h.set_font("Arial", 'B', 14)
+                            pdf_h.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
+                            pdf_h.set_font("Arial", 'B', 12)
+                            pdf_h.cell(0, 8, "DIRECCION DE ALUMBRADO PUBLICO", ln=True, align='C')
+                            pdf_h.cell(0, 8, f"VALE OFICIAL DE SALIDA: {vale_auditado['Folio']}", ln=True, align='C')
+                            pdf_h.ln(8)
+                            
+                            pdf_h.set_font("Arial", '', 10)
+                            pdf_h.cell(0, 6, f"Fecha y Hora de Emision: {vale_auditado.get('FechaHora', vale_auditado['Fecha'])}", ln=True)
+                            pdf_h.cell(0, 6, f"Ubicacion Geografica: {vale_auditado.get('Delegacion')} - {vale_auditado.get('UTB')}", ln=True)
+                            pdf_h.set_font("Arial", 'B', 10)
+                            pdf_h.cell(0, 6, f"UNIDAD / BRIGADA DESTINO: {vale_auditado['Brigada'].upper()}", ln=True)
+                            pdf_h.ln(4)
+                            
+                            pdf_h.set_fill_color(230, 235, 240)
+                            pdf_h.set_font("Arial", 'B', 10)
+                            pdf_h.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
+                            pdf_h.cell(36, 8, "Entregado", 1, 0, 'C', True)
+                            pdf_h.cell(22, 8, "Utilizado", 1, 0, 'C', True)
+                            pdf_h.cell(22, 8, "Devuelto", 1, 1, 'C', True)
+                            
+                            pdf_h.set_font("Arial", '', 10)
+                            for it in vale_auditado.get("Materiales", []):
+                                pdf_h.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
+                                pdf_h.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
+                                pdf_h.cell(22, 8, f"{it.get('Utilizado', 0)}", 1, 0, 'C')
+                                pdf_h.cell(22, 8, f"{it.get('Devuelto', 0)}", 1, 1, 'C')
+                            pdf_h.ln(6)
+                            
+                            pdf_h.set_font("Arial", 'B', 10)
+                            pdf_h.cell(0, 6, "Observaciones del Responsable de Almacen (Sistema):", ln=True)
+                            pdf_h.set_font("Arial", 'I', 9)
+                            msg_obs_h = vale_auditado.get("Observaciones", "Sin observaciones")
+                            pdf_h.multi_cell(0, 5, msg_obs_h.encode('latin-1', 'replace').decode('latin-1'), 1)
+                            pdf_h.ln(4)
+                            
+                            pdf_h.set_font("Arial", 'B', 10)
+                            pdf_h.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Fisico a Mano):", ln=True)
+                            pdf_h.cell(0, 15, "", 1, ln=True)
+                            pdf_h.ln(10)
+                            
+                            pdf_h.set_font("Arial", 'I', 9)
+                            pdf_h.multi_cell(0, 5, LEYENDA_OFICIAL.encode('latin-1', 'replace').decode('latin-1'), align='C')
+                            pdf_h.ln(12)
+                            
+                            y_pos_f = pdf_h.get_y()
+                            pdf_h.set_font("Arial", 'B', 8)
+                            pdf_h.set_xy(15, y_pos_f)
+                            pdf_h.cell(75, 4, "_____________________________________", ln=False, align='C')
+                            pdf_h.set_xy(15, y_pos_f + 4)
+                            pdf_h.cell(75, 4, "RESPONSABLE DE ENTREGA DE MATERIAL", ln=False, align='C')
+                            pdf_h.set_xy(15, y_pos_f + 8)
+                            pdf_h.set_font("Arial", '', 7)
+                            pdf_h.cell(75, 4, "(Firma y Sello de Almacen DAP)", ln=False, align='C')
+                            
+                            pdf_h.set_font("Arial", 'B', 8)
+                            pdf_h.set_xy(115, y_pos_f)
+                            pdf_h.cell(75, 4, "_____________________________________", ln=False, align='C')
+                            pdf_h.set_xy(115, y_pos_f + 4)
+                            pdf_h.cell(75, 4, "RESPONSABLE QUE RECIBE MATERIAL", ln=False, align='C')
+                            pdf_h.set_xy(115, y_pos_f + 8)
+                            pdf_h.set_font("Arial", '', 7)
+                            pdf_h.cell(75, 4, f"({vale_auditado['Brigada'].upper()})", ln=False, align='C')
+                            
+                            pdf_output_h = pdf_h.output(dest='S')
+                            pdf_bytes_h = pdf_output_h.encode('latin-1', 'replace') if isinstance(pdf_output_h, str) else pdf_output_h
+                            
+                            st.download_button(
+                                label=f"📄 RECONSTRUIR Y DESCARGAR PDF ({vale_auditado['Folio']})",
+                                data=pdf_bytes_h,
+                                file_name=f"Vale_Oficial_Salida_{vale_auditado['Folio']}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                                key=f"dl_h_{vale_auditado['Folio']}"
+                            )
+                            st.write("")
+                        except Exception as e_pdf:
+                            st.error(f"Error al reconstruir reporte PDF: {e_pdf}")
                                 
                         check_seguro = st.checkbox(f"Confirmar destrucción física del Folio {folio_select}", key=f"chk_del_{folio_select}")
                         if st.button(f"🔥 ELIMINAR VALE {folio_select} PERMANENTEMENTE", use_container_width=True, type="secondary", disabled=not check_seguro):
