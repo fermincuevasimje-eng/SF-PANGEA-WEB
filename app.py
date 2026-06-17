@@ -3061,7 +3061,7 @@ else:
                 pin_produccion = st.text_input("🔑 Ingrese PIN Maestro de Despliegue:", type="password", key="pin_despliegue_oficial")
                 check_reset_total = st.checkbox("Confirmar que deseo borrar toda la simulación y dejar stock en 0", key="chk_reset_total_prod")
                 
-                if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
+                if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == config.PIN_MAESTRO)):
                     try:
                         # Purgar en Sheets de forma segura por coordenadas matriciales inversas
                         filas_limpieza = ws.get_all_values()
