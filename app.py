@@ -2516,12 +2516,12 @@ else:
                                 
                                 st.session_state.vales_historial.append(payload_vale)
                                 
-                                # --- 3. ENVÍO EN TIEMPO REAL A LA BÓVEDA NUBE ---
-                                b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8').replace('\n', '').replace('\r', '')
+                                # --- 3. ENVÍO EN TIEMPO REAL A LA BÓVEDA NUBE (OPTIMIZADO) ---
                                 id_reg_vale = f"SF6-VAL-{folio_actual}"
                                 fecha_actual_mx = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")
                                 
-                                ws.append_row([id_reg_vale, fecha_actual_mx, bri_sel, folio_actual, json.dumps(payload_vale), b64_pdf])
+                                # Enviamos un string vacío en la última columna; el PDF se generará en vivo desde el JSON
+                                ws.append_row([id_reg_vale, fecha_actual_mx, bri_sel, folio_actual, json.dumps(payload_vale), ""])
                                 
                                 st.session_state.vale_listo_descarga = {"folio": folio_actual, "bytes": pdf_bytes}
                                 st.session_state.carrito_vale = []
