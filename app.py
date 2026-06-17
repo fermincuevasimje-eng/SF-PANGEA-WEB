@@ -2072,7 +2072,7 @@ else:
             
             pass_maestro = st.text_input("🔑 Ingrese PIN Maestro:", type="password", key="pass_maestro_root")
             if st.button("🔓 Inicializar Sistema", use_container_width=True, type="primary"):
-                if pass_maestro == "1827":
+                if pass_maestro == config.PIN_MAESTRO:
                     st.session_state.maestro_auth = True
                     st.success("🎉 Acceso Maestro concedido. Inicializando entorno...")
                     time.sleep(0.5)
