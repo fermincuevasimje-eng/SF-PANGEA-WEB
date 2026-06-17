@@ -2169,27 +2169,30 @@ else:
                     if "db_depuracion" not in st.session_state: st.session_state.db_depuracion = {}
                     if "vales_historial" not in st.session_state: st.session_state.vales_historial = []
                     
-                    registros_maestros = ws.get_all_records()
-                    for r in registros_maestros:
-                        reg_id = str(r.get("ID Registro", ""))
-                        if reg_id.startswith("SF4-PRY-"):
-                            try: st.session_state.boveda_mmd[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
-                            except: pass
-                        elif reg_id.startswith("SF4-OFC-"):
-                            try: st.session_state.db_oficios[r.get("Origen", "Sin Nombre")] = json.loads(r.get("Datos", "{}"))
-                            except: pass
-                        elif reg_id.startswith("SF5-DEP-"):
-                            try:
-                                datos_raw = r.get("Datos", "{}")
-                                st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            except: pass
-                        elif reg_id.startswith("SF6-VAL-"):
-                            try:
-                                datos_raw = r.get("Datos", "{}")
-                                vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                                if vale_parsed not in st.session_state.vales_historial:
-                                    st.session_state.vales_historial.append(vale_parsed)
-                            except: pass
+                    # Motor de lectura por coordenadas físicas puras para el almacén (SF6)
+                    filas_raw = ws.get_all_values()
+                    if len(filas_raw) > 1:
+                        for row in filas_raw[1:]: # Saltamos los encabezados de la fila 1
+                            if len(row) >= 5:
+                                reg_id = str(row[0]).strip()
+                                origen = str(row[2]).strip() if str(row[2]).strip() else "Sin Nombre"
+                                datos_raw = str(row[4]).strip() if row[4] else "{}"
+                                
+                                if reg_id.startswith("SF4-PRY-"):
+                                    try: st.session_state.boveda_mmd[origen] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    except: pass
+                                elif reg_id.startswith("SF4-OFC-"):
+                                    try: st.session_state.db_oficios[origen] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    except: pass
+                                elif reg_id.startswith("SF5-DEP-"):
+                                    try: st.session_state.db_depuracion[reg_id] = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                    except: pass
+                                elif reg_id.startswith("SF6-VAL-"):
+                                    try:
+                                        vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                        if vale_parsed not in st.session_state.vales_historial:
+                                            st.session_state.vales_historial.append(vale_parsed)
+                                    except: pass
                     break
                 except Exception:
                     time.sleep(1)
@@ -2908,13 +2911,15 @@ else:
                 
                 if st.button("💥 PURGAR SIMULACIÓN Y ARRANCAR EN CEROS", use_container_width=True, type="secondary", disabled=not (check_reset_total and pin_produccion == "1827")):
                     try:
-                        # Purgar en Sheets ultrarápido por lote de IDs
-                        registros_limpieza = ws.get_all_records()
-                        for i, r in enumerate(reversed(registros_limpieza), start=1):
-                            idx_real = len(registros_limpieza) - i + 2 
-                            reg_id = str(r.get("ID Registro", ""))
-                            if reg_id.startswith("SF6-VAL-"):
-                                ws.delete_rows(idx_real)
+                        # Purgar en Sheets de forma segura por coordenadas matriciales inversas
+                        filas_limpieza = ws.get_all_values()
+                        if len(filas_limpieza) > 1:
+                            # Recorremos la hoja desde la última fila hacia arriba para no alterar los índices
+                            for idx_real in range(len(filas_limpieza), 1, -1):
+                                row = filas_limpieza[idx_real - 1]
+                                reg_id = str(row[0]).strip()
+                                if reg_id.startswith("SF6-VAL-"):
+                                    ws.delete_rows(idx_real)
                         
                         data_manager.reiniciar_sistema()
                         
