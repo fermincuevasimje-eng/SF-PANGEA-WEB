@@ -669,18 +669,16 @@ else:
                             id_reg = f"BAJA-{ahora.strftime('%Y%m%d-%H%M%S')}"
                             fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
                             
-                            b64_str = base64.b64encode(excel_data).decode('utf-8').replace('\n', '').replace('\r', '')
-                        # Guardamos de forma limpia y ordenada por posición en la hoja de cálculo
-                        ws.append_row([id_reg, fecha_mx, up_sf2.name, len(mapa_limpio), json.dumps(mapa_limpio), b64_str])
-                        # Sincronizamos las llaves internas usando los nombres exactos de las columnas de la boveda
-                        st.session_state.db_bajas_historico[id_reg] = {
-                            "ID Registro": id_reg, 
-                            "Fecha": fecha_mx, 
-                            "Origen": up_sf2.name, 
-                            "Folios": len(mapa_limpio), 
-                            "Datos Captura": json.dumps(mapa_limpio), 
-                            "Excel Base64": b64_str
-                        }
+                           b64_str = base64.b64encode(excel_data).decode('utf-8').replace('\n', '').replace('\r', '')
+                            ws.append_row([id_reg, fecha_mx, up_sf2.name, len(mapa_limpio), json.dumps(mapa_limpio), b64_str])
+                            st.session_state.db_bajas_historico[id_reg] = {
+                                "ID Registro": id_reg, 
+                                "Fecha": fecha_mx, 
+                                "Origen": up_sf2.name, 
+                                "Folios": len(mapa_limpio), 
+                                "Datos Captura": json.dumps(mapa_limpio), 
+                                "Excel Base64": b64_str
+                            }
                             
                             st.success(f"✅ ¡Guardado! ID: {id_reg}")
                             st.download_button("📗 Descargar Excel", data=excel_data, file_name=f"BAJAS_{up_sf2.name}", use_container_width=True)
