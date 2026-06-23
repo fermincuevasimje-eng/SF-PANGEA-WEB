@@ -668,8 +668,7 @@ else:
                             ahora = datetime.now(tz_mx)
                             id_reg = f"BAJA-{ahora.strftime('%Y%m%d-%H%M%S')}"
                             fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
-                            
-                          b64_str = base64.b64encode(excel_data).decode('utf-8').replace('\n', '').replace('\r', '')
+                            b64_str = base64.b64encode(excel_data).decode('utf-8').replace('\n', '').replace('\r', '')
                             ws.append_row([id_reg, fecha_mx, up_sf2.name, len(mapa_limpio), json.dumps(mapa_limpio), b64_str])
                             st.session_state.db_bajas_historico[id_reg] = {
                                 "ID Registro": id_reg, 
