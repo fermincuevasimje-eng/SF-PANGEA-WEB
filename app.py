@@ -706,25 +706,28 @@ else:
                     if id_rec:
                         data = st.session_state.db_bajas_historico[id_rec]
                         with st.expander(f"🔍 Detalle de folios ({id_rec})"):
-                            raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
+                            # Auto-detección por contenido: identifica el JSON y el Excel sin importar el orden de la columna
+                            v1 = data.get("Datos Captura") or data.get("Datos") or ""
+                            v2 = data.get("Excel Base64") or data.get("Excel") or ""
                             
-                            # Filtro inteligente: Si es B64 (archivo Excel), no intentamos leerlo como JSON
-                            if str(raw_datos).startswith("UEsDB"):
-                                st.info("Este registro contiene un archivo Excel. Usa el botón de descarga de abajo.")
-                            else:
-                                try:
-                                    datos_dict = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
-                                    if isinstance(datos_dict, dict):
-                                        df_det = pd.DataFrame([{"Folio": k, "Detalle": v} for k, v in datos_dict.items()])
-                                        st.dataframe(df_det, use_container_width=True, hide_index=True)
-                                    else:
-                                        st.write("Datos encontrados:", datos_dict)
-                                except Exception as e:
-                                    st.error(f"Error al visualizar folios: {e}")
-                                    st.code(raw_datos)
+                            str_v1, str_v2 = str(v1).strip(), str(v2).strip()
+                            raw_datos = str_v2 if str_v2.startswith(("{", "[")) else (str_v1 if str_v1.startswith(("{", "[")) else "{}")
+                            raw_b64 = str_v1 if str_v1.startswith("UEsDB") else (str_v2 if str_v2.startswith("UEsDB") else "")
+                            
+                            try:
+                                datos_dict = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
+                                if isinstance(datos_dict, dict) and datos_dict:
+                                    df_det = pd.DataFrame([{"Folio": k, "Detalle": v} for k, v in datos_dict.items()])
+                                    st.dataframe(df_det, use_container_width=True, hide_index=True)
+                                elif str_v1.startswith("UEsDB") or str_v2.startswith("UEsDB"):
+                                    st.info("Este registro contiene un archivo Excel. Usa el botón de descarga de abajo.")
+                                else:
+                                    st.info("No hay folios individuales capturados para este registro.")
+                            except Exception as e:
+                                st.error(f"Error al visualizar folios: {e}")
+                                st.code(raw_datos)
 
-                        # --- BOTÓN DE DESCARGA Y ADMINISTRACIÓN (SIN DUPLICADOS) ---
-                        raw_b64 = data.get("Datos Captura") or data.get("Excel Base64") or data.get("Excel") or ""
+                        # --- BOTÓN DE DESCARGA Y ADMINISTRACIÓN ---
                         if raw_b64:
                             try:
                                 raw_b64 = str(raw_b64).replace('\n', '').replace('\r', '')
@@ -736,10 +739,12 @@ else:
                         col1, col2 = st.columns([1, 1])
                         with col1: 
                             if st.button("🔄 Retornar a Captura", key=f"retornar_{id_rec}"):
-                                raw_datos = data.get("Datos Captura") or data.get("Datos") or "{}"
-                                st.session_state.lista_bajas = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
-                                st.success("¡Datos cargados en Captura Actual!")
-                                st.rerun()
+                                try:
+                                    st.session_state.lista_bajas = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
+                                    st.success("¡Datos cargados en Captura Actual!")
+                                    st.rerun()
+                                except Exception as e_ret:
+                                    st.error("⚠️ El archivo original rebasó el límite de Google Sheets y quedó incompleto en la nube. No se puede retornar automáticamente.")
                         with col2:
                             confirmar_del = st.checkbox("🔐 Habilitar borrado permanente", key=f"chk_del_{id_rec}")
                             if confirmar_del:
