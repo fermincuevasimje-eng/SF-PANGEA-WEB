@@ -108,7 +108,7 @@ MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lis
 # --- 1.6 INVENTARIO MAESTRO () ---
 # --- 1.6 INVENTARIO MAESTRO () ---
 STOCK_INICIAL = [
-    {"ID": "MAT-01", "Material": "FOTOCELDA 220V", "Stock": 100, "Min": 0, "Unidad": "Piezas"},
+    {"ID": "MAT-01", "Material": "FOTOCELDA 220V", "Stock": 100, "Min": 10, "Unidad": "Piezas"},
     {"ID": "MAT-02", "Material": "CABLE 2+1 # 6 BOBINA DE 300", "Stock": 100, "Min": 10, "Unidad": "Metros"},
     {"ID": "MAT-03", "Material": "ALAMBRE RECOCIDO", "Stock": 100, "Min": 10, "Unidad": "Kilos"},
     {"ID": "MAT-04", "Material": "CINTA AISLAR", "Stock": 100, "Min": 10, "Unidad": "Piezas"},
