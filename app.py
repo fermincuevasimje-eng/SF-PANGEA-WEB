@@ -2592,8 +2592,8 @@ else:
                                 
                                 # Enviamos un string vacío en la última columna; el PDF se generará en vivo desde el JSON
                                 # Inserción segura usando el dataframe y la conexión activa de Streamlit
-                            nuevo_vale_fila = pd.DataFrame([{"ID_Reg": id_reg_vale, "Fecha": fecha_actual_mx, "Brigada": bri_sel, "Folio": folio_actual, "Datos_JSON": json.dumps(payload_vale), "Firmas": ""}])
-                            conn.update(spreadsheet=URL_DB, worksheet="Sheet2", data=pd.concat([df_vales_db, nuevo_vale_fila], ignore_index=True))
+                                nuevo_vale_fila = pd.DataFrame([{"ID_Reg": id_reg_vale, "Fecha": fecha_actual_mx, "Brigada": bri_sel, "Folio": folio_actual, "Datos_JSON": json.dumps(payload_vale), "Firmas": ""}])
+                                conn.update(spreadsheet=URL_DB, worksheet="Sheet2", data=pd.concat([df_vales_db, nuevo_vale_fila], ignore_index=True))
                                 st.session_state.vale_listo_descarga = {"folio": folio_actual, "bytes": pdf_bytes}
                                 st.session_state.carrito_vale = []
                                 st.success("✅ Vale Oficial sincronizado en la Bóveda Nube con éxito.")
