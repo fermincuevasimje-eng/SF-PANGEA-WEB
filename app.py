@@ -2457,15 +2457,20 @@ else:
                 with col_v2:
                     if st.button(f"🚀 PROCESAR Y EMITIR VALE ({folio_actual})", type="primary", use_container_width=True):
                         try:
-                            # --- CÁLCULO DINÁMICO DE FOLIO (ANTI-DUPLICADOS MULTI-USUARIO) ---
-                            col_id_vals = ws.col_values(1)
+                            # --- CÁLCULO DINÁMICO DE FOLIO CORREGIDO (SF6) ---
+                            conn = st.connection("gsheets", type=GSheetsConnection)
+                            # Reemplaza 'Sheet2' por el nombre exacto de la pestaña donde guardas los vales en tu Google Sheets si es diferente
+                            df_vales_db = conn.read(spreadsheet=URL_DB, worksheet="Sheet2", ttl=0).dropna(how='all')
+                            
                             nums_existentes = []
-                            for c_val in col_id_vals:
-                                if str(c_val).startswith("SF6-VAL-DAP-"):
-                                    try:
-                                        nums_existentes.append(int(str(c_val).replace("SF6-VAL-DAP-", "")))
-                                    except:
-                                        pass
+                            if not df_vales_db.empty and df_vales_db.shape[1] > 0:
+                                col_id_vals = df_vales_db.iloc[:, 0].astype(str).tolist()
+                                for c_val in col_id_vals:
+                                    if "SF6-VAL-DAP-" in c_val:
+                                        try:
+                                            nums_existentes.append(int(c_val.split("SF6-VAL-DAP-")[-1]))
+                                        except:
+                                            pass
                             
                             # Si alguien emitió un vale mientras capturábamos, nos movemos dinámicamente al número real disponible
                             true_num = max(nums_existentes) + 1 if nums_existentes else (len(st.session_state.vales_historial) + 1)
@@ -2586,8 +2591,9 @@ else:
                                 fecha_actual_mx = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")
                                 
                                 # Enviamos un string vacío en la última columna; el PDF se generará en vivo desde el JSON
-                                ws.append_row([id_reg_vale, fecha_actual_mx, bri_sel, folio_actual, json.dumps(payload_vale), ""])
-                                
+                                # Inserción segura usando el dataframe y la conexión activa de Streamlit
+                            nuevo_vale_fila = pd.DataFrame([{"ID_Reg": id_reg_vale, "Fecha": fecha_actual_mx, "Brigada": bri_sel, "Folio": folio_actual, "Datos_JSON": json.dumps(payload_vale), "Firmas": ""}])
+                            conn.update(spreadsheet=URL_DB, worksheet="Sheet2", data=pd.concat([df_vales_db, nuevo_vale_fila], ignore_index=True))
                                 st.session_state.vale_listo_descarga = {"folio": folio_actual, "bytes": pdf_bytes}
                                 st.session_state.carrito_vale = []
                                 st.success("✅ Vale Oficial sincronizado en la Bóveda Nube con éxito.")
