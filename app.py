@@ -2316,7 +2316,14 @@ else:
             
             st.markdown(
                 """
-                <div style='background-color: #eef4f8; padding: 15px; border-left: 6px solid #1f4e78; border-radius: 6px; margin-bottom: 15px;'>
+                <style>
+                @media print {
+                    .no-imprimir {
+                        display: none !important;
+                    }
+                }
+                </style>
+                <div class='no-imprimir' style='background-color: #eef4f8; padding: 15px; border-left: 6px solid #1f4e78; border-radius: 6px; margin-bottom: 15px;'>
                     <h4 style='margin:0; color: #1f4e78;'>🚚 ASIGNACIÓN DE UNIDAD Y UBICACIÓN DE DESTINO</h4>
                     <p style='margin:0; font-size:13px; color:#555;'>Asigne la brigada y la delimitación territorial para el seguimiento posterior del material.</p>
                 </div>
@@ -2457,13 +2464,12 @@ else:
                 with col_v2:
                     if st.button(f"🚀 PROCESAR Y EMITIR VALE ({folio_actual})", type="primary", use_container_width=True):
                         try:
-                            # --- CÁLCULO DINÁMICO DE FOLIO CORREGIDO (SF6) ---
+                            # --- CÁLCULO DINÁMICO DE FOLIO CORREGIDO (APUNTANDO A SHEET1) ---
                             conn = st.connection("gsheets", type=GSheetsConnection)
-                            # Reemplaza 'Sheet2' por el nombre exacto de la pestaña donde guardas los vales en tu Google Sheets si es diferente
-                            df_vales_db = conn.read(spreadsheet=URL_DB, worksheet="Sheet2", ttl=0).dropna(how='all')
+                            df_vales_db = conn.read(spreadsheet=URL_DB, worksheet="Sheet1", ttl=0).dropna(how='all')
                             
                             nums_existentes = []
-                            if not df_vales_db.empty and df_vales_db.shape[1] > 0:
+                            if not df_vales_db.empty and df_vales_db.shape[1] > 3:
                                 col_id_vals = df_vales_db.iloc[:, 0].astype(str).tolist()
                                 for c_val in col_id_vals:
                                     if "SF6-VAL-DAP-" in c_val:
@@ -2472,12 +2478,11 @@ else:
                                         except:
                                             pass
                             
-                            # Si alguien emitió un vale mientras capturábamos, nos movemos dinámicamente al número real disponible
+                            # Ajuste dinámico del folio anti-duplicados
                             true_num = max(nums_existentes) + 1 if nums_existentes else (len(st.session_state.vales_historial) + 1)
                             folio_actual = f"DAP-{true_num}"
                             id_reg_vale = f"SF6-VAL-{folio_actual}"
                             
-                            # Validación secundaria de seguridad en el estado de memoria local
                             if any(v["Folio"] == folio_actual for v in st.session_state.vales_historial):
                                 local_max = max([int(v["Folio"].replace("DAP-", "")) for v in st.session_state.vales_historial if "DAP-" in v["Folio"]], default=0)
                                 true_num = max(true_num, local_max + 1)
@@ -2485,126 +2490,122 @@ else:
                                 id_reg_vale = f"SF6-VAL-{folio_actual}"
 
                             # --- 1. CONSTRUCCIÓN DEL PDF ---
-                                from fpdf import FPDF
-                                pdf = FPDF()
-                                pdf.add_page()
-                                
-                                pdf.set_font("Arial", 'B', 14)
-                                pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
-                                pdf.set_font("Arial", 'B', 12)
-                                pdf.cell(0, 8, "DIRECCION DE ALUMBRADO PUBLICO", ln=True, align='C')
-                                pdf.cell(0, 8, f"VALE OFICIAL DE SALIDA: {folio_actual}", ln=True, align='C')
-                                pdf.ln(8)
-                                
-                                pdf.set_font("Arial", '', 10)
-                                pdf.cell(0, 6, f"Fecha y Hora de Emision: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
-                                pdf.cell(0, 6, f"Ubicacion Geografica: {delegacion_sel} - {utb_sel}", ln=True)
-                                pdf.set_font("Arial", 'B', 10)
-                                pdf.cell(0, 6, f"UNIDAD / BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
-                                pdf.ln(4)
-                                
-                                pdf.set_fill_color(230, 235, 240)
-                                pdf.set_font("Arial", 'B', 10)
-                                pdf.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
-                                pdf.cell(36, 8, "Entregado", 1, 0, 'C', True)
-                                pdf.cell(22, 8, "Utilizado", 1, 0, 'C', True)
-                                pdf.cell(22, 8, "Devuelto", 1, 1, 'C', True)
-                                
-                                pdf.set_font("Arial", '', 10)
-                                for it in st.session_state.carrito_vale:
-                                    pdf.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
-                                    pdf.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
-                                    pdf.cell(22, 8, "", 1, 0, 'C')
-                                    pdf.cell(22, 8, "", 1, 1, 'C')
-                                pdf.ln(6)
-                                
-                                pdf.set_font("Arial", 'B', 10)
-                                pdf.cell(0, 6, "Observaciones del Responsable de Almacen (Sistema):", ln=True)
-                                pdf.set_font("Arial", 'I', 9)
-                                msg_obs = obs_digital if obs_digital.strip() else "Ninguna anotada en sistema al momento de la salida."
-                                pdf.multi_cell(0, 5, msg_obs.encode('latin-1', 'replace').decode('latin-1'), 1)
-                                pdf.ln(4)
-                                
-                                pdf.set_font("Arial", 'B', 10)
-                                pdf.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Fisico a Mano):", ln=True)
-                                pdf.set_fill_color(255, 255, 255)
-                                pdf.cell(0, 15, "", 1, ln=True, fill=True)
-                                pdf.ln(10)
-                                
-                                pdf.set_font("Arial", 'I', 9)
-                                pdf.multi_cell(0, 5, LEYENDA_OFICIAL.encode('latin-1', 'replace').decode('latin-1'), align='C')
-                                pdf.ln(12)
-                                
-                                # (Firmas)
-                                y_pos_firmas = pdf.get_y()
-                                pdf.set_font("Arial", 'B', 8)
-                                pdf.set_xy(15, y_pos_firmas)
-                                pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
-                                pdf.set_xy(15, y_pos_firmas + 4)
-                                pdf.cell(75, 4, "RESPONSABLE DE ENTREGA DE MATERIAL", ln=False, align='C')
-                                pdf.set_xy(15, y_pos_firmas + 8)
-                                pdf.set_font("Arial", '', 7)
-                                pdf.cell(75, 4, "(Firma y Sello de Almacen DAP)", ln=False, align='C')
-                                pdf.set_font("Arial", 'B', 8)
-                                pdf.set_xy(115, y_pos_firmas)
-                                pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
-                                pdf.set_xy(115, y_pos_firmas + 4)
-                                pdf.cell(75, 4, "RESPONSABLE QUE RECIBE MATERIAL", ln=False, align='C')
-                                pdf.set_xy(115, y_pos_firmas + 8)
-                                pdf.set_font("Arial", '', 7)
-                                pdf.cell(75, 4, f"({bri_sel.upper()})", ln=False, align='C')
-                                
-                                pdf_output = pdf.output(dest='S')
-                                pdf_bytes = pdf_output.encode('latin-1', 'replace') if isinstance(pdf_output, str) else pdf_output
+                            from fpdf import FPDF
+                            pdf = FPDF()
+                            pdf.add_page()
+                            
+                            pdf.set_font("Arial", 'B', 14)
+                            pdf.cell(0, 10, "AYUNTAMIENTO DE TOLUCA", ln=True, align='C')
+                            pdf.set_font("Arial", 'B', 12)
+                            pdf.cell(0, 8, "DIRECCION DE ALUMBRADO PUBLICO", ln=True, align='C')
+                            pdf.cell(0, 8, f"VALE OFICIAL DE SALIDA: {folio_actual}", ln=True, align='C')
+                            pdf.ln(8)
+                            
+                            pdf.set_font("Arial", '', 10)
+                            pdf.cell(0, 6, f"Fecha y Hora de Emision: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
+                            pdf.cell(0, 6, f"Ubicacion Geografica: {delegacion_sel} - {utb_sel}", ln=True)
+                            pdf.set_font("Arial", 'B', 10)
+                            pdf.cell(0, 6, f"UNIDAD / BRIGADA DESTINO: {bri_sel.upper()}", ln=True)
+                            pdf.ln(4)
+                            
+                            pdf.set_fill_color(230, 235, 240)
+                            pdf.set_font("Arial", 'B', 10)
+                            pdf.cell(110, 8, " Descripcion del Material / Insumo", 1, 0, 'L', True)
+                            pdf.cell(36, 8, "Entregado", 1, 0, 'C', True)
+                            pdf.cell(22, 8, "Utilizado", 1, 0, 'C', True)
+                            pdf.cell(22, 8, "Devuelto", 1, 1, 'C', True)
+                            
+                            pdf.set_font("Arial", '', 10)
+                            for it in st.session_state.carrito_vale:
+                                pdf.cell(110, 8, f" {str(it['Material'])}", 1, 0, 'L')
+                                pdf.cell(36, 8, f"{it['Cantidad']} {it['Unidad']}", 1, 0, 'C')
+                                pdf.cell(22, 8, "", 1, 0, 'C')
+                                pdf.cell(22, 8, "", 1, 1, 'C')
+                            pdf.ln(6)
+                            
+                            pdf.set_font("Arial", 'B', 10)
+                            pdf.cell(0, 6, "Observaciones del Responsable de Almacen (Sistema):", ln=True)
+                            pdf.set_font("Arial", 'I', 9)
+                            msg_obs = obs_digital if obs_digital.strip() else "Ninguna anotada en sistema al momento de la salida."
+                            pdf.multi_cell(0, 5, msg_obs.encode('latin-1', 'replace').decode('latin-1'), 1)
+                            pdf.ln(4)
+                            
+                            pdf.set_font("Arial", 'B', 10)
+                            pdf.cell(0, 6, "Observaciones de la Brigada al Recibir (Llenar en Fisico a Mano):", ln=True)
+                            pdf.set_fill_color(255, 255, 255)
+                            pdf.cell(0, 15, "", 1, ln=True, fill=True)
+                            pdf.ln(10)
+                            
+                            pdf.set_font("Arial", 'I', 9)
+                            pdf.multi_cell(0, 5, LEYENDA_OFICIAL.encode('latin-1', 'replace').decode('latin-1'), align='C')
+                            pdf.ln(12)
+                            
+                            y_pos_firmas = pdf.get_y()
+                            pdf.set_font("Arial", 'B', 8)
+                            pdf.set_xy(15, y_pos_firmas)
+                            pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
+                            pdf.set_xy(15, y_pos_firmas + 4)
+                            pdf.cell(75, 4, "RESPONSABLE DE ENTREGA DE MATERIAL", ln=False, align='C')
+                            pdf.set_xy(15, y_pos_firmas + 8)
+                            pdf.set_font("Arial", '', 7)
+                            pdf.cell(75, 4, "(Firma y Sello de Almacen DAP)", ln=False, align='C')
+                            pdf.set_font("Arial", 'B', 8)
+                            pdf.set_xy(115, y_pos_firmas)
+                            pdf.cell(75, 4, "_____________________________________", ln=False, align='C')
+                            pdf.set_xy(115, y_pos_firmas + 4)
+                            pdf.cell(75, 4, "RESPONSABLE QUE RECIBE MATERIAL", ln=False, align='C')
+                            pdf.set_xy(115, y_pos_firmas + 8)
+                            pdf.set_font("Arial", '', 7)
+                            pdf.cell(75, 4, f"({bri_sel.upper()})", ln=False, align='C')
+                            
+                            pdf_output = pdf.output(dest='S')
+                            pdf_bytes = pdf_output.encode('latin-1', 'replace') if isinstance(pdf_output, str) else pdf_output
 
-                                # --- 2. DEDUCCIÓN LOCAL DEL STOCK ---
-                                for item in st.session_state.carrito_vale:
-                                    idx = df_inv[df_inv['Material'] == item['Material']].index[0]
-                                    st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
-                                
-                                data_manager.guardar_inventario(st.session_state.db_inventario)
-                                
-                                materiales_con_cierres = []
-                                for m_car in st.session_state.carrito_vale:
-                                    m_car["Utilizado"] = 0
-                                    m_car["Devuelto"] = 0
-                                    materiales_con_cierres.append(m_car)
-                                
-                                payload_vale = {
-                                    "Folio": folio_actual, 
-                                    "Fecha": pd.Timestamp.now().strftime('%Y-%m-%d'),
-                                    "FechaHora": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
-                                    "Brigada": bri_sel,
-                                    "Delegacion": delegacion_sel,      
-                                    "UTB": utb_sel,               
-                                    "Delegacion_Real": delegacion_sel, 
-                                    "UTB_Real": utb_sel,             
-                                    "Estado": "Pendiente",
-                                    "Materiales": materiales_con_cierres,
-                                    "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
-                                }
-                                
-                                st.session_state.vales_historial.append(payload_vale)
-                                
-                                # --- 3. ENVÍO EN TIEMPO REAL A LA BÓVEDA NUBE (OPTIMIZADO) ---
-                                id_reg_vale = f"SF6-VAL-{folio_actual}"
-                                fecha_actual_mx = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")
-                                
-                                # Inserción segura usando el dataframe y la conexión activa de Streamlit
-                                nuevo_vale_fila = pd.DataFrame([{"ID_Reg": id_reg_vale, "Fecha": fecha_actual_mx, "Brigada": bri_sel, "Folio": folio_actual, "Datos_JSON": json.dumps(payload_vale), "Firmas": ""}])
-                                conn.update(spreadsheet=URL_DB, worksheet="Sheet2", data=pd.concat([df_vales_db, nuevo_vale_fila], ignore_index=True))
-                                st.session_state.vale_listo_descarga = {"folio": folio_actual, "bytes": pdf_bytes}
-                                st.session_state.carrito_vale = []
-                                st.success("✅ Vale Oficial sincronizado en la Bóveda Nube con éxito.")
+                            # --- 2. DEDUCCIÓN LOCAL DEL STOCK ---
+                            for item in st.session_state.carrito_vale:
+                                idx = df_inv[df_inv['Material'] == item['Material']].index[0]
+                                st.session_state.db_inventario.at[idx, 'Stock'] -= item['Cantidad']
+                            
+                            data_manager.guardar_inventario(st.session_state.db_inventario)
+                            
+                            materiales_con_cierres = []
+                            for m_car in st.session_state.carrito_vale:
+                                m_car["Utilizado"] = 0
+                                m_car["Devuelto"] = 0
+                                materiales_con_cierres.append(m_car)
+                            
+                            payload_vale = {
+                                "Folio": folio_actual, 
+                                "Fecha": pd.Timestamp.now().strftime('%Y-%m-%d'),
+                                "FechaHora": pd.Timestamp.now().strftime('%d/%m/%Y %H:%M'),
+                                "Brigada": bri_sel,
+                                "Delegacion": delegacion_sel,      
+                                "UTB": utb_sel,               
+                                "Delegacion_Real": delegacion_sel, 
+                                "UTB_Real": utb_sel,             
+                                "Estado": "Pendiente",
+                                "Materiales": materiales_con_cierres,
+                                "Observaciones": obs_digital if obs_digital.strip() else "Sin observaciones"
+                            }
+                            
+                            st.session_state.vales_historial.append(payload_vale)
+                            
+                            # --- 3. INSERCIÓN EN SHEET1 ---
+                            fecha_actual_mx = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")
+                            nuevo_vale_fila = pd.DataFrame([{"Fecha": fecha_actual_mx, "Nombre_Ruta": f"VALE_{folio_actual}", "Usuario_Generador": st.session_state.usuario_nombre, "Datos_JSON": json.dumps(payload_vale)}])
+                            conn.update(spreadsheet=URL_DB, worksheet="Sheet1", data=pd.concat([df_vales_db, nuevo_vale_fila], ignore_index=True))
+                            
+                            st.session_state.vale_listo_descarga = {"folio": folio_actual, "bytes": pdf_bytes}
+                            st.session_state.carrito_vale = []
+                            st.success("✅ Vale Oficial sincronizado con éxito.")
                         except Exception as e:
                             st.error(f"❌ Error al procesar datos: {e}")
                         st.rerun()
 
-            # --- COMPROBANTE DE DESCARGA ACTIVO ---
             if "vale_listo_descarga" in st.session_state and st.session_state.vale_listo_descarga:
                 st.write("---")
                 vale_data = st.session_state.vale_listo_descarga
-                st.success(f"🎉 ¡Vale Oficial **{vale_data['folio']}** registrado exitosamente en la Bóveda de Almacén!")
+                st.success(f"🎉 ¡Vale Oficial **{vale_data['folio']}** registrado exitosamente!")
                 
                 c_dl1, c_dl2 = st.columns([3, 1])
                 c_dl1.download_button(
