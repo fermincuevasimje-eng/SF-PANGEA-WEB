@@ -2590,7 +2590,6 @@ else:
                                 id_reg_vale = f"SF6-VAL-{folio_actual}"
                                 fecha_actual_mx = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")
                                 
-                                # Enviamos un string vacío en la última columna; el PDF se generará en vivo desde el JSON
                                 # Inserción segura usando el dataframe y la conexión activa de Streamlit
                                 nuevo_vale_fila = pd.DataFrame([{"ID_Reg": id_reg_vale, "Fecha": fecha_actual_mx, "Brigada": bri_sel, "Folio": folio_actual, "Datos_JSON": json.dumps(payload_vale), "Firmas": ""}])
                                 conn.update(spreadsheet=URL_DB, worksheet="Sheet2", data=pd.concat([df_vales_db, nuevo_vale_fila], ignore_index=True))
