@@ -1861,19 +1861,28 @@ else:
                         f_inicio = c_f1.date_input("Fecha Inicio:", value=def_f1, key=f"date_ini_r_{pk_j}")
                         f_fin = c_f2.date_input("Fecha Fin:", value=def_f2, key=f"date_fin_r_{pk_j}")
 
+                    # Catálogo Oficial No Consecutivo con Buscador Predictivo (Texto o Clave)
                     cat_hand_punch = [
-                        "3 | FALTA INJUSTIFICADA", "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
-                        "9 | LICENCIA CON GOCE DE SUELDO", "10 | LICENCIA SIN GOCE DE SUELDO", 
-                        "11 | VACACIONES", "12 | INCAPACIDAD", "14 | COMISIÓN", 
-                        "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", "17 | LICENCIA POR GRAVIDEZ", 
-                        "18 | HORA DE LACTANCIA", "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
-                        "20 | LICENCIA POR NACIMIENTO", "23 | OMISIÓN DE CHECADA", 
-                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", "34 | CUMPLEAÑOS (SINDICALIZADO)", 
-                        "CM | CUIDADOS MÉCIDOS"
+                        "3 | FALTA INJUSTIFICADA", 
+                        "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
+                        "9 | LICENCIA CON GOCE DE SUELDO", 
+                        "10 | LICENCIA SIN GOCE DE SUELDO", 
+                        "11 | VACACIONES", 
+                        "12 | INCAPACIDAD", 
+                        "14 | COMISIÓN", 
+                        "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", 
+                        "17 | LICENCIA POR GRAVIDEZ", 
+                        "18 | HORA DE LACTANCIA", 
+                        "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
+                        "20 | LICENCIA POR NACIMIENTO", 
+                        "23 | OMISIÓN DE CHECADA", 
+                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", 
+                        "34 | CUMPLEAÑOS (SINDICALIZADO)", 
+                        "CM | CUIDADOS MÉDICOS"
                     ]
                     concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
                     concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
-                    clave_concepto = st.selectbox("Clave y Concepto (Hand Punch):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
+                    clave_concepto = st.selectbox("Clave y Concepto (Escribe clave o texto para buscar):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
 
                 with st.container(border=True):
                     st.markdown("**📝 Justificación Técnica**")
