@@ -1825,8 +1825,32 @@ else:
                     accion_idx = ["JUSTIFICAR", "SANCIONAR"].index(data_previa_j.get("accion", "JUSTIFICAR")) if data_previa_j.get("accion") in ["JUSTIFICAR", "SANCIONAR"] else 0
                     accion = st.selectbox("Acción Administrativa:", ["JUSTIFICAR", "SANCIONAR"], index=accion_idx, key=f"sel_accion_{pk_j}")
                     
-                    solicita_raw = st.text_input("Solicita:", value=data_previa_j.get("solicita", "ING. ELFEGO GUTIÉRREZ GALVÁN"), key=f"txt_sol_{pk_j}")
-                    adscrito_raw = st.text_input("Adscrito a:", value=data_previa_j.get("adscrito", "DEPTO MANTENIMIENTO DE ALUMBRADO PÚBLICO"), key=f"txt_ads_{pk_j}")
+                    # --- SE MOVIÓ CLAVE Y CONCEPTO JUSTO DEBAJO DE ACCIÓN ADMINISTRATIVA ---
+                    cat_hand_punch = [
+                        "3 | FALTA INJUSTIFICADA", 
+                        "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
+                        "9 | LICENCIA CON GOCE DE SUELDO", 
+                        "10 | LICENCIA SIN GOCE DE SUELDO", 
+                        "11 | VACACIONES", 
+                        "12 | INCAPACIDAD", 
+                        "14 | COMISIÓN", 
+                        "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", 
+                        "17 | LICENCIA POR GRAVIDEZ", 
+                        "18 | HORA DE LACTANCIA", 
+                        "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
+                        "20 | LICENCIA POR NACIMIENTO", 
+                        "23 | OMISIÓN DE CHECADA", 
+                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", 
+                        "34 | CUMPLEAÑOS (SINDICALIZADO)", 
+                        "CM | CUIDADOS MÉDICOS"
+                    ]
+                    concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
+                    concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
+                    clave_concepto = st.selectbox("Clave y Concepto (Escribe clave o texto para buscar):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
+                    
+                    # --- CAMPOS DE TEXTO LIBRE SIN NOMBRES PRECARGADOS ---
+                    solicita_raw = st.text_input("Solicita:", value=data_previa_j.get("solicita", ""), key=f"txt_sol_{pk_j}")
+                    adscrito_raw = st.text_input("Adscrito a:", value=data_previa_j.get("adscrito", ""), key=f"txt_ads_{pk_j}")
                     nombre_emp_raw = st.text_input("C. (Nombre del Empleado):", value=data_previa_j.get("nombre", ""), key=f"txt_nom_emp_{pk_j}")
                     num_emp_raw = st.text_input("No. de Empleado:", value=data_previa_j.get("num_emp", ""), key=f"txt_num_emp_{pk_j}")
 
@@ -1861,37 +1885,14 @@ else:
                         f_inicio = c_f1.date_input("Fecha Inicio:", value=def_f1, key=f"date_ini_r_{pk_j}")
                         f_fin = c_f2.date_input("Fecha Fin:", value=def_f2, key=f"date_fin_r_{pk_j}")
 
-                    # Catálogo Oficial No Consecutivo con Buscador Predictivo (Texto o Clave)
-                    cat_hand_punch = [
-                        "3 | FALTA INJUSTIFICADA", 
-                        "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
-                        "9 | LICENCIA CON GOCE DE SUELDO", 
-                        "10 | LICENCIA SIN GOCE DE SUELDO", 
-                        "11 | VACACIONES", 
-                        "12 | INCAPACIDAD", 
-                        "14 | COMISIÓN", 
-                        "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", 
-                        "17 | LICENCIA POR GRAVIDEZ", 
-                        "18 | HORA DE LACTANCIA", 
-                        "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
-                        "20 | LICENCIA POR NACIMIENTO", 
-                        "23 | OMISIÓN DE CHECADA", 
-                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", 
-                        "34 | CUMPLEAÑOS (SINDICALIZADO)", 
-                        "CM | CUIDADOS MÉDICOS"
-                    ]
-                    concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
-                    concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
-                    clave_concepto = st.selectbox("Clave y Concepto (Escribe clave o texto para buscar):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
-
                 with st.container(border=True):
                     st.markdown("**📝 Justificación Técnica**")
                     motivo_raw = st.text_area("Motivo de la Incidencia:", value=data_previa_j.get("motivo", ""), height=100, key=f"area_mot_{pk_j}")
                     
-                    st.markdown("**✏️ Validación de Personal (Firmas)**")
-                    revisa_n_raw = st.text_input("Revisa (Nombre):", value=data_previa_j.get("revisa_n", "LIC. OLGA ESTHER ORTÍZ MARTÍNEZ"), key=f"txt_rev_{pk_j}")
-                    autoriza_n_raw = st.text_input("Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", "ING. ELFEGO GUTIÉRREZ GALVÁN"), key=f"txt_aut_{pk_j}")
-                    recibe_n_raw = st.text_input("Recibe (Nombre):", value=data_previa_j.get("recibe_n", "L.A. IRAI RIVERA GARCÍA"), key=f"txt_rec_{pk_j}")
+                    st.markdown("**✏️ Validación de Personal (Firmas - Texto Libre)**")
+                    revisa_n_raw = st.text_input("Revisa (Nombre):", value=data_previa_j.get("revisa_n", ""), key=f"txt_rev_{pk_j}")
+                    autoriza_n_raw = st.text_input("Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", ""), key=f"txt_aut_{pk_j}")
+                    recibe_n_raw = st.text_input("Recibe (Nombre):", value=data_previa_j.get("recibe_n", ""), key=f"txt_rec_{pk_j}")
 
                 # --- FILTRO DE FUERZA BRUTA: PROCESAMIENTO ESTRICTO EN MAYÚSCULAS ---
                 solicita = solicita_raw.upper().strip()
@@ -1920,13 +1921,13 @@ else:
                     <table style="width:100%; border-collapse: collapse; margin-bottom: 15px;">
                         <tr>
                             <td style="font-weight: bold; width: 15%;">SOLICITA:</td>
-                            <td style="border-bottom: 1px solid black;">{solicita}</td>
+                            <td style="border-bottom: 1px solid black; color: blue;">{solicita}</td>
                             <td style="font-weight: bold; width: 10%; text-align: right;">FECHA:</td>
                             <td style="border-bottom: 1px solid black; width: 20%; text-align: center;">{pd.Timestamp.now().strftime('%d/%m/%Y')}</td>
                         </tr>
                         <tr>
                             <td style="font-weight: bold; padding-top: 8px;">ADSCRITO A:</td>
-                            <td style="border-bottom: 1px solid black; padding-top: 8px;" colspan="3">{adscrito}</td>
+                            <td style="border-bottom: 1px solid black; padding-top: 8px; color: blue;" colspan="3">{adscrito}</td>
                         </tr>
                     </table>
 
@@ -1971,16 +1972,16 @@ else:
 
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; text-align: center; margin-top: 25px; font-size: 10px;">
                         <div style="border-top: 1px solid black; padding-top: 5px;">
-                            <strong>{solicita}</strong><br>SOLICITANTE
+                            <strong style="color: blue;">{solicita if solicita else "__________________________"}</strong><br>SOLICITANTE
                         </div>
                         <div style="border-top: 1px solid black; padding-top: 5px;">
-                            <strong>{autoriza_n}</strong><br>Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO
+                            <strong style="color: blue;">{autoriza_n if autoriza_n else "__________________________"}</strong><br>Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO
                         </div>
                         <div style="border-top: 1px solid black; padding-top: 40px;">
-                            <strong>{revisa_n}</strong><br>DELEGADA ADMINISTRATIVA
+                            <strong style="color: blue;">{revisa_n if revisa_n else "__________________________"}</strong><br>DELEGADA ADMINISTRATIVA
                         </div>
                         <div style="border-top: 1px solid black; padding-top: 40px;">
-                            <strong>{recibe_n}</strong><br>DIRECTORA DE RECURSOS HUMANOS
+                            <strong style="color: blue;">{recibe_n if recibe_n else "__________________________"}</strong><br>DIRECTORA DE RECURSOS HUMANOS
                         </div>
                     </div>
                 </div>
