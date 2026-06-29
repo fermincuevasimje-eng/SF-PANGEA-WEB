@@ -1819,7 +1819,7 @@ else:
                 with st.container(border=True):
                     st.markdown("**📌 Secuencia Oficial de Llenado**")
                     
-                    # --- 1. FECHA DEL DOCUMENTO (CON ESCUDO ANTI-NaT) ---
+                    # --- 1. FECHA DEL DOCUMENTO ---
                     try:
                         f_doc_raw = data_previa_j.get("fecha_doc")
                         if f_doc_raw and str(f_doc_raw) != "NaT" and str(f_doc_raw).strip() != "":
@@ -1869,7 +1869,7 @@ else:
                     # 8. Modalidad de Fechas
                     tipo_fecha_j = st.radio("8. Modalidad de Fecha de la Incidencia:", ["Día Único", "Rango de Fechas"], index=0 if data_previa_j.get("tipo_fecha", "Día Único") == "Día Único" else 1, horizontal=True, key=f"radio_tipo_f_{pk_j}")
                     
-                    # --- VALIDACIÓN ANTICRASH DE FECHAS DE INCIDENCIA ---
+                    # --- VALIDACIÓN DE FECHAS DE INCIDENCIA ---
                     try:
                         f1_raw = data_previa_j.get("fecha_inicio")
                         if f1_raw and str(f1_raw) != "NaT" and str(f1_raw).strip() != "":
@@ -1880,7 +1880,8 @@ else:
 
                     try:
                         f2_raw = data_previa_j.get("fecha_fin")
-                        if f2_raw pinning and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
+                        # LÍNEA CORREGIDA AQUÍ (Se eliminó la palabra fantasma)
+                        if f2_raw and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
                             t2 = pd.to_datetime(f2_raw)
                             def_f2 = t2.date() if not pd.isna(t2) else pd.Timestamp.now().date()
                         else: def_f2 = pd.Timestamp.now().date()
