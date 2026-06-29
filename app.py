@@ -1817,65 +1817,65 @@ else:
                 pk_j = f"{modo_j}_{id_sel_j}"
 
                 with st.container(border=True):
-                    st.markdown("**📌 Configuración del Formato**")
+                    st.markdown("**📌 Secuencia Oficial de Llenado**")
                     
-                    f_reg_idx = ["LISTA", "HAND PUNCH"].index(data_previa_j.get("f_registro", "LISTA")) if data_previa_j.get("f_registro") in ["LISTA", "HAND PUNCH"] else 0
-                    f_registro = st.selectbox("F. Registro:", ["LISTA", "HAND PUNCH"], index=f_reg_idx, key=f"sel_f_reg_{pk_j}")
+                    # 1. Fecha del Documento
+                    try: def_f_doc = pd.to_datetime(data_previa_j.get("fecha_doc")).date()
+                    except: def_f_doc = pd.Timestamp.now().date()
+                    f_doc = st.date_input("1. Fecha de Emisión del Documento:", value=def_f_doc, key=f"f_doc_{pk_j}")
                     
+                    # 2. Solicita
+                    solicita_raw = st.text_input("2. Solicita (Área o Persona):", value=data_previa_j.get("solicita", ""), key=f"txt_sol_{pk_j}")
+                    
+                    # 3. Acción Administrativa
                     accion_idx = ["JUSTIFICAR", "SANCIONAR"].index(data_previa_j.get("accion", "JUSTIFICAR")) if data_previa_j.get("accion") in ["JUSTIFICAR", "SANCIONAR"] else 0
-                    accion = st.selectbox("Acción Administrativa:", ["JUSTIFICAR", "SANCIONAR"], index=accion_idx, key=f"sel_accion_{pk_j}")
+                    accion = st.selectbox("3. Acción Administrativa:", ["JUSTIFICAR", "SANCIONAR"], index=accion_idx, key=f"sel_accion_{pk_j}")
                     
-                    # --- SE MOVIÓ CLAVE Y CONCEPTO JUSTO DEBAJO DE ACCIÓN ADMINISTRATIVA ---
+                    # 4. No. de Empleado y Nombre
+                    c_emp1, c_emp2 = st.columns([1, 2])
+                    num_emp_raw = c_emp1.text_input("4. No. de Empleado:", value=data_previa_j.get("num_emp", ""), key=f"txt_num_emp_{pk_j}")
+                    nombre_emp_raw = c_emp2.text_input("Nombre Completo del Empleado:", value=data_previa_j.get("nombre", ""), key=f"txt_nom_emp_{pk_j}")
+                    
+                    # 5. Adscrito a
+                    adscrito_raw = st.text_input("5. Adscrito a (Departamento/Área):", value=data_previa_j.get("adscrito", ""), key=f"txt_ads_{pk_j}")
+                    
+                    # 6. F. Registro
+                    f_reg_idx = ["LISTA", "HAND PUNCH"].index(data_previa_j.get("f_registro", "LISTA")) if data_previa_j.get("f_registro") in ["LISTA", "HAND PUNCH"] else 0
+                    f_registro = st.selectbox("6. F. Registro:", ["LISTA", "HAND PUNCH"], index=f_reg_idx, key=f"sel_f_reg_{pk_j}")
+                    
+                    # 7. Clave y Concepto
                     cat_hand_punch = [
-                        "3 | FALTA INJUSTIFICADA", 
-                        "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
-                        "9 | LICENCIA CON GOCE DE SUELDO", 
-                        "10 | LICENCIA SIN GOCE DE SUELDO", 
-                        "11 | VACACIONES", 
-                        "12 | INCAPACIDAD", 
-                        "14 | COMISIÓN", 
-                        "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", 
-                        "17 | LICENCIA POR GRAVIDEZ", 
-                        "18 | HORA DE LACTANCIA", 
-                        "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
-                        "20 | LICENCIA POR NACIMIENTO", 
-                        "23 | OMISIÓN DE CHECADA", 
-                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", 
-                        "34 | CUMPLEAÑOS (SINDICALIZADO)", 
+                        "3 | FALTA INJUSTIFICADA", "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
+                        "9 | LICENCIA CON GOCE DE SUELDO", "10 | LICENCIA SIN GOCE DE SUELDO", 
+                        "11 | VACACIONES", "12 | INCAPACIDAD", "14 | COMISIÓN", 
+                        "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", "17 | LICENCIA POR GRAVIDEZ", 
+                        "18 | HORA DE LACTANCIA", "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
+                        "20 | LICENCIA POR NACIMIENTO", "23 | OMISIÓN DE CHECADA", 
+                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", "34 | CUMPLEAÑOS (SINDICALIZADO)", 
                         "CM | CUIDADOS MÉDICOS"
                     ]
                     concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
                     concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
-                    clave_concepto = st.selectbox("Clave y Concepto (Escribe clave o texto para buscar):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
-                    
-                    # --- CAMPOS DE TEXTO LIBRE SIN NOMBRES PRECARGADOS ---
-                    solicita_raw = st.text_input("Solicita:", value=data_previa_j.get("solicita", ""), key=f"txt_sol_{pk_j}")
-                    adscrito_raw = st.text_input("Adscrito a:", value=data_previa_j.get("adscrito", ""), key=f"txt_ads_{pk_j}")
-                    nombre_emp_raw = st.text_input("C. (Nombre del Empleado):", value=data_previa_j.get("nombre", ""), key=f"txt_nom_emp_{pk_j}")
-                    num_emp_raw = st.text_input("No. de Empleado:", value=data_previa_j.get("num_emp", ""), key=f"txt_num_emp_{pk_j}")
+                    clave_concepto = st.selectbox("7. Clave y Concepto (Escribe clave o texto para buscar):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
 
-                    tipo_fecha_j = st.radio("Modalidad de Fecha:", ["Día Único", "Rango de Fechas"], index=0 if data_previa_j.get("tipo_fecha", "Día Único") == "Día Único" else 1, horizontal=True, key=f"radio_tipo_f_{pk_j}")
+                    # 8. Modalidad de Fechas
+                    tipo_fecha_j = st.radio("8. Modalidad de Fecha de la Incidencia:", ["Día Único", "Rango de Fechas"], index=0 if data_previa_j.get("tipo_fecha", "Día Único") == "Día Único" else 1, horizontal=True, key=f"radio_tipo_f_{pk_j}")
                     
-                    # --- VALIDACIÓN ANTICRASH DE FECHAS (EVITA FILTRACIONES DE NaT) ---
                     try:
                         f1_raw = data_previa_j.get("fecha_inicio")
                         if f1_raw and str(f1_raw) != "NaT" and str(f1_raw).strip() != "":
                             t1 = pd.to_datetime(f1_raw)
                             def_f1 = t1.date() if not pd.isna(t1) else pd.Timestamp.now().date()
-                        else:
-                            def_f1 = pd.Timestamp.now().date()
-                    except:
-                        def_f1 = pd.Timestamp.now().date()
+                        else: def_f1 = pd.Timestamp.now().date()
+                    except: def_f1 = pd.Timestamp.now().date()
 
                     try:
                         f2_raw = data_previa_j.get("fecha_fin")
                         if f2_raw and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
                             t2 = pd.to_datetime(f2_raw)
                             def_f2 = t2.date() if not pd.isna(t2) else pd.Timestamp.now().date()
-                        else:
-                            def_f2 = pd.Timestamp.now().date()
-                    except:
-                        def_f2 = pd.Timestamp.now().date()
+                        else: def_f2 = pd.Timestamp.now().date()
+                    except: def_f2 = pd.Timestamp.now().date()
 
                     if tipo_fecha_j == "Día Único":
                         f_inicio = st.date_input("Fecha de Incidencia:", value=def_f1, key=f"date_ini_{pk_j}")
@@ -1886,13 +1886,28 @@ else:
                         f_fin = c_f2.date_input("Fecha Fin:", value=def_f2, key=f"date_fin_r_{pk_j}")
 
                 with st.container(border=True):
-                    st.markdown("**📝 Justificación Técnica**")
-                    motivo_raw = st.text_area("Motivo de la Incidencia:", value=data_previa_j.get("motivo", ""), height=100, key=f"area_mot_{pk_j}")
+                    st.markdown("**📝 Sección de Cierre Técnico**")
+                    # 9. Motivo
+                    motivo_raw = st.text_area("9. Motivo de la Incidencia / Justificación:", value=data_previa_j.get("motivo", ""), height=100, key=f"area_mot_{pk_j}")
                     
-                    st.markdown("**✏️ Validación de Personal (Firmas - Texto Libre)**")
-                    revisa_n_raw = st.text_input("Revisa (Nombre):", value=data_previa_j.get("revisa_n", ""), key=f"txt_rev_{pk_j}")
-                    autoriza_n_raw = st.text_input("Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", ""), key=f"txt_aut_{pk_j}")
-                    recibe_n_raw = st.text_input("Recibe (Nombre):", value=data_previa_j.get("recibe_n", ""), key=f"txt_rec_{pk_j}")
+                    st.markdown("**✏️ Bloques de Validación y Firmas (Texto Libre)**")
+                    # 10. Solicitante
+                    firma_solicita_raw = st.text_input("10. Solicitante (Nombre):", value=data_previa_j.get("firma_solicita", ""), key=f"txt_firm_sol_{pk_j}")
+                    
+                    # 11. Autoriza (Nombre y Cargo)
+                    c_aut1, c_aut2 = st.columns(2)
+                    autoriza_n_raw = c_aut1.text_input("11. Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", ""), key=f"txt_aut_{pk_j}")
+                    autoriza_c_raw = c_aut2.text_input("Autoriza (Cargo):", value=data_previa_j.get("autoriza_c", "Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO"), key=f"txt_aut_c_{pk_j}")
+                    
+                    # 12. Vo. Bo. / Revisa (Nombre y Cargo)
+                    c_vob1, c_vob2 = st.columns(2)
+                    revisa_n_raw = c_vob1.text_input("12. Vo. Bo. / Revisa (Nombre):", value=data_previa_j.get("revisa_n", ""), key=f"txt_rev_{pk_j}")
+                    revisa_c_raw = c_vob2.text_input("Vo. Bo. / Revisa (Cargo):", value=data_previa_j.get("revisa_c", "DELEGADA ADMINISTRATIVA"), key=f"txt_rev_c_{pk_j}")
+                    
+                    # 13. Recursos Humanos (Nombre y Cargo)
+                    c_rh1, c_rh2 = st.columns(2)
+                    recibe_n_raw = c_rh1.text_input("13. Recursos Humanos (Nombre):", value=data_previa_j.get("recibe_n", ""), key=f"txt_rec_{pk_j}")
+                    recibe_c_raw = c_rh2.text_input("Recursos Humanos (Cargo):", value=data_previa_j.get("recibe_c", "DIRECTORA DE RECURSOS HUMANOS"), key=f"txt_rec_c_{pk_j}")
 
                 # --- FILTRO DE FUERZA BRUTA: PROCESAMIENTO ESTRICTO EN MAYÚSCULAS ---
                 solicita = solicita_raw.upper().strip()
@@ -1900,9 +1915,16 @@ else:
                 nombre_emp = nombre_emp_raw.upper().strip()
                 num_emp = num_emp_raw.upper().strip()
                 motivo = motivo_raw.upper().strip()
-                revisa_n = revisa_n_raw.upper().strip()
+                
+                # Auto-completado inteligente del nombre de firma del solicitante
+                firma_solicita = firma_solicita_raw.upper().strip() if firma_solicita_raw else solicita
+                
                 autoriza_n = autoriza_n_raw.upper().strip()
+                autoriza_c = autoriza_c_raw.upper().strip()
+                revisa_n = revisa_n_raw.upper().strip()
+                revisa_c = revisa_c_raw.upper().strip()
                 recibe_n = recibe_n_raw.upper().strip()
+                recibe_c = recibe_c_raw.upper().strip()
 
             with c_preview:
                 st.markdown("### 👁️ Vista Previa del Formato")
@@ -1923,7 +1945,7 @@ else:
                             <td style="font-weight: bold; width: 15%;">SOLICITA:</td>
                             <td style="border-bottom: 1px solid black; color: blue;">{solicita}</td>
                             <td style="font-weight: bold; width: 10%; text-align: right;">FECHA:</td>
-                            <td style="border-bottom: 1px solid black; width: 20%; text-align: center;">{pd.Timestamp.now().strftime('%d/%m/%Y')}</td>
+                            <td style="border-bottom: 1px solid black; width: 20%; text-align: center; color: blue;">{f_doc.strftime('%d/%m/%Y')}</td>
                         </tr>
                         <tr>
                             <td style="font-weight: bold; padding-top: 8px;">ADSCRITO A:</td>
@@ -1972,16 +1994,16 @@ else:
 
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; text-align: center; margin-top: 25px; font-size: 10px;">
                         <div style="border-top: 1px solid black; padding-top: 5px;">
-                            <strong style="color: blue;">{solicita if solicita else "__________________________"}</strong><br>SOLICITANTE
+                            <strong style="color: blue;">{firma_solicita if firma_solicita else "__________________________"}</strong><br>SOLICITANTE
                         </div>
                         <div style="border-top: 1px solid black; padding-top: 5px;">
-                            <strong style="color: blue;">{autoriza_n if autoriza_n else "__________________________"}</strong><br>Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO
+                            <strong style="color: blue;">{autoriza_n if autoriza_n else "__________________________"}</strong><br>{autoriza_c}
                         </div>
                         <div style="border-top: 1px solid black; padding-top: 40px;">
-                            <strong style="color: blue;">{revisa_n if revisa_n else "__________________________"}</strong><br>DELEGADA ADMINISTRATIVA
+                            <strong style="color: blue;">{revisa_n if revisa_n else "__________________________"}</strong><br>{revisa_c}
                         </div>
                         <div style="border-top: 1px solid black; padding-top: 40px;">
-                            <strong style="color: blue;">{recibe_n if recibe_n else "__________________________"}</strong><br>DIRECTORA DE RECURSOS HUMANOS
+                            <strong style="color: blue;">{recibe_n if recibe_n else "__________________________"}</strong><br>{recibe_c}
                         </div>
                     </div>
                 </div>
@@ -2014,7 +2036,8 @@ else:
                         "adscrito": adscrito, "nombre": nombre_emp, "num_emp": num_emp,
                         "tipo_fecha": tipo_fecha_j, "fecha_inicio": str(f_inicio), "fecha_fin": str(f_fin),
                         "clave_concepto": clave_concepto, "motivo": motivo, "revisa_n": revisa_n,
-                        "autoriza_n": autoriza_n, "recibe_n": recibe_n
+                        "autoriza_n": autoriza_n, "recibe_n": recibe_n, "fecha_doc": str(f_doc),
+                        "firma_solicita": firma_solicita, "autoriza_c": autoriza_c, "revisa_c": revisa_c, "recibe_c": recibe_c
                     }
                     
                     st.session_state.db_justificaciones[id_reg_j] = payload_j
@@ -2044,7 +2067,7 @@ else:
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(20, 6, txt="FECHA: ", ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(0, 6, txt=pd.Timestamp.now().strftime('%d/%m/%Y'), ln=True, align='R')
+                    pdf_j.cell(0, 6, txt=f_doc.strftime('%d/%m/%Y'), ln=True, align='R')
                     
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(30, 6, txt="ADSCRITO A: ", ln=False)
@@ -2108,25 +2131,24 @@ else:
                     
                     pdf_j.line(20, y_firmas, 95, y_firmas)
                     pdf_j.set_xy(20, y_firmas + 2)
-                    pdf_j.multi_cell(75, 4, txt=f"{solicita}\nSOLICITANTE", align='C')
+                    pdf_j.multi_cell(75, 4, txt=f"{firma_solicita}\nSOLICITANTE", align='C')
                     
                     pdf_j.line(120, y_firmas, 196, y_firmas)
                     pdf_j.set_xy(120, y_firmas + 2)
-                    pdf_j.multi_cell(76, 4, txt=f"{autoriza_n}\nVo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO", align='C')
+                    pdf_j.multi_cell(76, 4, txt=f"{autoriza_n}\n{autoriza_c}", align='C')
                     
                     pdf_j.line(20, y_firmas + 25, 95, y_firmas + 25)
                     pdf_j.set_xy(20, y_firmas + 27)
-                    pdf_j.multi_cell(75, 4, txt=f"{revisa_n}\nDELEGADA ADMINISTRATIVA", align='C')
+                    pdf_j.multi_cell(75, 4, txt=f"{revisa_n}\n{revisa_c}", align='C')
                     
                     pdf_j.line(120, y_firmas + 25, 196, y_firmas + 25)
                     pdf_j.set_xy(120, y_firmas + 27)
-                    pdf_j.multi_cell(76, 4, txt=f"{recibe_n}\nDIRECTORA DE RECURSOS HUMANOS", align='C')
+                    pdf_j.multi_cell(76, 4, txt=f"{recibe_n}\n{recibe_c}", align='C')
                     
                     pdf_data_j = pdf_j.output(dest='S').encode('latin-1', 'replace')
                     st.download_button(label="🚀 DESCARGAR JUSTIFICACIÓN PDF", data=pdf_data_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
                     st.error("❌ Función PDF no disponible.")
-
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
