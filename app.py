@@ -1378,7 +1378,7 @@ else:
                 except Exception:
                     time.sleep(1)
 
-        tab_c, tab_b, tab_i, tab_o = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa", "📄 GENERADOR DE OFICIOS"])
+        tab_c, tab_b, tab_i, tab_o, tab_j = st.tabs(["🆕 Constructor Inteligente", "🗄️ Bóveda de Proyectos", "📥 Importación Externa", "📄 GENERADOR DE OFICIOS", "📝 JUSTIFICACIONES OPERATIVAS"])
 
         with tab_c:
             with st.expander("📝 CONFIGURAR PASO", expanded=True):
