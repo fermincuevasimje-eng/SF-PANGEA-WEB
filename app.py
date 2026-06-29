@@ -1755,8 +1755,11 @@ else:
                     st.download_button(label="🚀 DESCARGAR OFICIO PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
                     st.error("❌ Función PDF no disponible.")
-                    with tab_j:
-                        st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
+                    # ==================================================================================
+        # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
+        # ==================================================================================
+        with tab_j:
+            st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
             
             # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
             if "db_justificaciones" not in st.session_state:
@@ -1866,7 +1869,7 @@ else:
                         "18 | HORA DE LACTANCIA", "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
                         "20 | LICENCIA POR NACIMIENTO", "23 | OMISIÓN DE CHECADA", 
                         "24 | DÍA ECONÓMICO (SINDICALIZADO)", "34 | CUMPLEAÑOS (SINDICALIZADO)", 
-                        "CM | CUIDADOS MÉDICOS"
+                        "CM | CUIDADOS MÉCIDOS"
                     ]
                     concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
                     concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
