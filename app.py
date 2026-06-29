@@ -1819,9 +1819,17 @@ else:
                 with st.container(border=True):
                     st.markdown("**📌 Secuencia Oficial de Llenado**")
                     
-                    # 1. Fecha del Documento
-                    try: def_f_doc = pd.to_datetime(data_previa_j.get("fecha_doc")).date()
-                    except: def_f_doc = pd.Timestamp.now().date()
+                    # --- 1. FECHA DEL DOCUMENTO (CON ESCUDO ANTI-NaT) ---
+                    try:
+                        f_doc_raw = data_previa_j.get("fecha_doc")
+                        if f_doc_raw and str(f_doc_raw) != "NaT" and str(f_doc_raw).strip() != "":
+                            t_doc = pd.to_datetime(f_doc_raw)
+                            def_f_doc = t_doc.date() if not pd.isna(t_doc) else pd.Timestamp.now().date()
+                        else:
+                            def_f_doc = pd.Timestamp.now().date()
+                    except:
+                        def_f_doc = pd.Timestamp.now().date()
+                        
                     f_doc = st.date_input("1. Fecha de Emisión del Documento:", value=def_f_doc, key=f"f_doc_{pk_j}")
                     
                     # 2. Solicita
@@ -1861,6 +1869,7 @@ else:
                     # 8. Modalidad de Fechas
                     tipo_fecha_j = st.radio("8. Modalidad de Fecha de la Incidencia:", ["Día Único", "Rango de Fechas"], index=0 if data_previa_j.get("tipo_fecha", "Día Único") == "Día Único" else 1, horizontal=True, key=f"radio_tipo_f_{pk_j}")
                     
+                    # --- VALIDACIÓN ANTICRASH DE FECHAS DE INCIDENCIA ---
                     try:
                         f1_raw = data_previa_j.get("fecha_inicio")
                         if f1_raw and str(f1_raw) != "NaT" and str(f1_raw).strip() != "":
@@ -1871,7 +1880,7 @@ else:
 
                     try:
                         f2_raw = data_previa_j.get("fecha_fin")
-                        if f2_raw and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
+                        if f2_raw pinning and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
                             t2 = pd.to_datetime(f2_raw)
                             def_f2 = t2.date() if not pd.isna(t2) else pd.Timestamp.now().date()
                         else: def_f2 = pd.Timestamp.now().date()
@@ -1916,7 +1925,6 @@ else:
                 num_emp = num_emp_raw.upper().strip()
                 motivo = motivo_raw.upper().strip()
                 
-                # Auto-completado inteligente del nombre de firma del solicitante
                 firma_solicita = firma_solicita_raw.upper().strip() if firma_solicita_raw else solicita
                 
                 autoriza_n = autoriza_n_raw.upper().strip()
