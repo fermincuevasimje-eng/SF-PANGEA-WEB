@@ -1756,7 +1756,7 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
                     with tab_j:
-            st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
+                        st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
             
             # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
             if "db_justificaciones" not in st.session_state:
