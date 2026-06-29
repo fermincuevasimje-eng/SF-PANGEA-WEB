@@ -1880,7 +1880,6 @@ else:
 
                     try:
                         f2_raw = data_previa_j.get("fecha_fin")
-                        # LÍNEA CORREGIDA AQUÍ (Se eliminó la palabra fantasma)
                         if f2_raw and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
                             t2 = pd.to_datetime(f2_raw)
                             def_f2 = t2.date() if not pd.isna(t2) else pd.Timestamp.now().date()
@@ -1900,24 +1899,33 @@ else:
                     # 9. Motivo
                     motivo_raw = st.text_area("9. Motivo de la Incidencia / Justificación:", value=data_previa_j.get("motivo", ""), height=100, key=f"area_mot_{pk_j}")
                     
-                    st.markdown("**✏️ Bloques de Validación y Firmas (Texto Libre)**")
+                    st.markdown("**✏️ Bloques de Validación y Firmas (Selección de Cargo)**")
                     # 10. Solicitante
                     firma_solicita_raw = st.text_input("10. Solicitante (Nombre):", value=data_previa_j.get("firma_solicita", ""), key=f"txt_firm_sol_{pk_j}")
                     
-                    # 11. Autoriza (Nombre y Cargo)
+                    # 11. Autoriza (Nombre y Selección de Cargo)
                     c_aut1, c_aut2 = st.columns(2)
                     autoriza_n_raw = c_aut1.text_input("11. Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", ""), key=f"txt_aut_{pk_j}")
-                    autoriza_c_raw = c_aut2.text_input("Autoriza (Cargo):", value=data_previa_j.get("autoriza_c", "Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO"), key=f"txt_aut_c_{pk_j}")
+                    aut_opts = ["Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO", "Vo. Bo. DIRECTORA DE ALUMBRADO PÚBLICO"]
+                    prev_aut = data_previa_j.get("autoriza_c", aut_opts[0])
+                    idx_aut = aut_opts.index(prev_aut) if prev_aut in aut_opts else 0
+                    autoriza_c_raw = c_aut2.selectbox("Cargo Autoriza:", aut_opts, index=idx_aut, key=f"sel_aut_c_{pk_j}")
                     
-                    # 12. Vo. Bo. / Revisa (Nombre y Cargo)
+                    # 12. Vo. Bo. / Revisa (Nombre y Selección de Cargo)
                     c_vob1, c_vob2 = st.columns(2)
                     revisa_n_raw = c_vob1.text_input("12. Vo. Bo. / Revisa (Nombre):", value=data_previa_j.get("revisa_n", ""), key=f"txt_rev_{pk_j}")
-                    revisa_c_raw = c_vob2.text_input("Vo. Bo. / Revisa (Cargo):", value=data_previa_j.get("revisa_c", "DELEGADA ADMINISTRATIVA"), key=f"txt_rev_c_{pk_j}")
+                    rev_opts = ["DELEGADO ADMINISTRATIVO", "DELEGADA ADMINISTRATIVA"]
+                    prev_rev = data_previa_j.get("revisa_c", rev_opts[1])
+                    idx_rev = rev_opts.index(prev_rev) if prev_rev in rev_opts else 1
+                    revisa_c_raw = c_vob2.selectbox("Cargo Revisa:", rev_opts, index=idx_rev, key=f"sel_rev_c_{pk_j}")
                     
-                    # 13. Recursos Humanos (Nombre y Cargo)
+                    # 13. Recursos Humanos (Nombre y Selección de Cargo)
                     c_rh1, c_rh2 = st.columns(2)
                     recibe_n_raw = c_rh1.text_input("13. Recursos Humanos (Nombre):", value=data_previa_j.get("recibe_n", ""), key=f"txt_rec_{pk_j}")
-                    recibe_c_raw = c_rh2.text_input("Recursos Humanos (Cargo):", value=data_previa_j.get("recibe_c", "DIRECTORA DE RECURSOS HUMANOS"), key=f"txt_rec_c_{pk_j}")
+                    rec_opts = ["DIRECTOR DE RECURSOS HUMANOS", "DIRECTORA DE RECURSOS HUMANOS"]
+                    prev_rec = data_previa_j.get("recibe_c", rec_opts[1])
+                    idx_rec = rec_opts.index(prev_rec) if prev_rec in rec_opts else 1
+                    recibe_c_raw = c_rh2.selectbox("Cargo RRHH:", rec_opts, index=idx_rec, key=f"sel_rec_c_{pk_j}")
 
                 # --- FILTRO DE FUERZA BRUTA: PROCESAMIENTO ESTRICTO EN MAYÚSCULAS ---
                 solicita = solicita_raw.upper().strip()
