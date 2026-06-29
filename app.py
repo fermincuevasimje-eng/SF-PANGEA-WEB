@@ -1953,78 +1953,80 @@ else:
 
                 f_string = f_inicio.strftime('%d/%m/%Y') if tipo_fecha_j == "Día Único" else f"{f_inicio.strftime('%d/%m/%Y')} AL {f_fin.strftime('%d/%m/%Y')}"
 
-                st.markdown(f"""
-                <div style="background: white; color: black; padding: 30px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.4; font-size: 12px;">
-                    <div style="text-align: center; font-weight: bold; font-size: 14px; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 15px;">FORMATO ÚNICO DE JUSTIFICACIÓN</div>
-                    
-                    <table style="width:100%; border-collapse: collapse; margin-bottom: 15px;">
-                        <tr>
-                            <td style="font-weight: bold; width: 15%;">SOLICITA:</td>
-                            <td style="border-bottom: 1px solid black; color: blue;">{solicita}</td>
-                            <td style="font-weight: bold; width: 10%; text-align: right;">FECHA:</td>
-                            <td style="border-bottom: 1px solid black; width: 20%; text-align: center; color: blue;">{f_doc.strftime('%d/%m/%Y')}</td>
-                        </tr>
-                        <tr>
-                            <td style="font-weight: bold; padding-top: 8px;">ADSCRITO A:</td>
-                            <td style="border-bottom: 1px solid black; padding-top: 8px; color: blue;" colspan="3">{adscrito}</td>
-                        </tr>
-                    </table>
+                # --- ESCUDO CONTRA SANGRIAS DE MARKDOWN: EL HTML DEBE IR SIN INDENTACIÓN ---
+                html_formato = f"""
+<div style="background: white; color: black; padding: 30px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.4; font-size: 12px;">
+    <div style="text-align: center; font-weight: bold; font-size: 14px; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 15px;">FORMATO ÚNICO DE JUSTIFICACIÓN</div>
+    
+    <table style="width:100%; border-collapse: collapse; margin-bottom: 15px;">
+        <tr>
+            <td style="font-weight: bold; width: 15%;">SOLICITA:</td>
+            <td style="border-bottom: 1px solid black; color: blue;">{solicita}</td>
+            <td style="font-weight: bold; width: 10%; text-align: right;">FECHA:</td>
+            <td style="border-bottom: 1px solid black; width: 20%; text-align: center; color: blue;">{f_doc.strftime('%d/%m/%Y')}</td>
+        </tr>
+        <tr>
+            <td style="font-weight: bold; padding-top: 8px;">ADSCRITO A:</td>
+            <td style="border-bottom: 1px solid black; padding-top: 8px; color: blue;" colspan="3">{adscrito}</td>
+        </tr>
+    </table>
 
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px; gap: 10px;">
-                        <div style="width: 50%; border: 1px solid black; padding: 8px;">
-                            <div style="font-weight: bold; margin-bottom: 5px; text-align: center; background: #f2f2f2;">F. REGISTRO</div>
-                            <div style="display: flex; justify-content: space-around; text-align: center;">
-                                <div style="padding: 3px 8px; {bg_lista} width: 40%;">LISTA</div>
-                                <div style="padding: 3px 8px; {bg_hp} width: 50%;">HAND PUNCH</div>
-                            </div>
-                        </div>
-                        <div style="width: 50%; border: 1px solid black; padding: 8px;">
-                            <div style="font-weight: bold; margin-bottom: 5px; text-align: center; background: #f2f2f2;">ACCION ADMINISTRATIVA</div>
-                            <div style="display: flex; justify-content: space-around; text-align: center;">
-                                <div style="padding: 3px 8px; {bg_just} width: 45%;">JUSTIFICAR</div>
-                                <div style="padding: 3px 8px; {bg_sanc} width: 45%;">SANCIONAR</div>
-                            </div>
-                        </div>
-                    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 15px; gap: 10px;">
+        <div style="width: 50%; border: 1px solid black; padding: 8px;">
+            <div style="font-weight: bold; margin-bottom: 5px; text-align: center; background: #f2f2f2;">F. REGISTRO</div>
+            <div style="display: flex; justify-content: space-around; text-align: center;">
+                <div style="padding: 3px 8px; {bg_lista} width: 40%;">LISTA</div>
+                <div style="padding: 3px 8px; {bg_hp} width: 50%;">HAND PUNCH</div>
+            </div>
+        </div>
+        <div style="width: 50%; border: 1px solid black; padding: 8px;">
+            <div style="font-weight: bold; margin-bottom: 5px; text-align: center; background: #f2f2f2;">ACCION ADMINISTRATIVA</div>
+            <div style="display: flex; justify-content: space-around; text-align: center;">
+                <div style="padding: 3px 8px; {bg_just} width: 45%;">JUSTIFICAR</div>
+                <div style="padding: 3px 8px; {bg_sanc} width: 45%;">SANCIONAR</div>
+            </div>
+        </div>
+    </div>
 
-                    <table style="width:100%; border-collapse: collapse; margin-bottom: 15px; background: #fafafa; border: 1px solid black;">
-                        <tr style="border-bottom: 1px solid black;">
-                            <td style="padding: 6px; font-weight: bold; width: 25%;">C. EMPLEADO:</td>
-                            <td style="padding: 6px; font-weight: bold; color: blue;">{nombre_emp if nombre_emp else "___________________________________"}</td>
-                            <td style="padding: 6px; font-weight: bold; width: 15%; text-align: right;">NO. EMP:</td>
-                            <td style="padding: 6px; font-weight: bold; color: blue; width: 15%;">{num_emp if num_emp else "_____"}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 6px; font-weight: bold;">PERIODO / FECHA:</td>
-                            <td style="padding: 6px; font-weight: bold; color: red;" colspan="3">{f_string}</td>
-                        </tr>
-                        <tr style="border-top: 1px solid black; background: #eef2f7;">
-                            <td style="padding: 6px; font-weight: bold;">CONCEPTO SELECCIONADO:</td>
-                            <td style="padding: 6px; font-weight: bold;" colspan="3">{clave_concepto}</td>
-                        </tr>
-                    </table>
+    <table style="width:100%; border-collapse: collapse; margin-bottom: 15px; background: #fafafa; border: 1px solid black;">
+        <tr style="border-bottom: 1px solid black;">
+            <td style="padding: 6px; font-weight: bold; width: 25%;">C. EMPLEADO:</td>
+            <td style="padding: 6px; font-weight: bold; color: blue;">{nombre_emp if nombre_emp else "___________________________________"}</td>
+            <td style="padding: 6px; font-weight: bold; width: 15%; text-align: right;">NO. EMP:</td>
+            <td style="padding: 6px; font-weight: bold; color: blue; width: 15%;">{num_emp if num_emp else "_____"}</td>
+        </tr>
+        <tr>
+            <td style="padding: 6px; font-weight: bold;">PERIODO / FECHA:</td>
+            <td style="padding: 6px; font-weight: bold; color: red;" colspan="3">{f_string}</td>
+        </tr>
+        <tr style="border-top: 1px solid black; background: #eef2f7;">
+            <td style="padding: 6px; font-weight: bold;">CONCEPTO SELECCIONADO:</td>
+            <td style="padding: 6px; font-weight: bold;" colspan="3">{clave_concepto}</td>
+        </tr>
+    </table>
 
-                    <div style="border: 1px solid black; padding: 8px; margin-bottom: 20px; min-height: 60px;">
-                        <div style="font-weight: bold; background: #f2f2f2; padding: 2px; margin-bottom: 5px;">MOTIVO O JUSTIFICACIÓN:</div>
-                        <div style="text-align: justify; white-space: pre-line; padding: 2px;">{motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO."}</div>
-                    </div>
+    <div style="border: 1px solid black; padding: 8px; margin-bottom: 20px; min-height: 60px;">
+        <div style="font-weight: bold; background: #f2f2f2; padding: 2px; margin-bottom: 5px;">MOTIVO O JUSTIFICACIÓN:</div>
+        <div style="text-align: justify; white-space: pre-line; padding: 2px;">{motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO."}</div>
+    </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; text-align: center; margin-top: 25px; font-size: 10px;">
-                        <div style="border-top: 1px solid black; padding-top: 5px;">
-                            <strong style="color: blue;">{firma_solicita if firma_solicita else "__________________________"}</strong><br>SOLICITANTE
-                        </div>
-                        <div style="border-top: 1px solid black; padding-top: 5px;">
-                            <strong style="color: blue;">{autoriza_n if autoriza_n else "__________________________"}</strong><br>{autoriza_c}
-                        </div>
-                        <div style="border-top: 1px solid black; padding-top: 40px;">
-                            <strong style="color: blue;">{revisa_n if revisa_n else "__________________________"}</strong><br>{revisa_c}
-                        </div>
-                        <div style="border-top: 1px solid black; padding-top: 40px;">
-                            <strong style="color: blue;">{recibe_n if recibe_n else "__________________________"}</strong><br>{recibe_c}
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; text-align: center; margin-top: 25px; font-size: 10px;">
+        <div style="border-top: 1px solid black; padding-top: 5px;">
+            <strong style="color: blue;">{firma_solicita if firma_solicita else "__________________________"}</strong><br>SOLICITANTE
+        </div>
+        <div style="border-top: 1px solid black; padding-top: 5px;">
+            <strong style="color: blue;">{autoriza_n if autoriza_n else "__________________________"}</strong><br>{autoriza_c}
+        </div>
+        <div style="border-top: 1px solid black; padding-top: 40px;">
+            <strong style="color: blue;">{revisa_n if revisa_n else "__________________________"}</strong><br>{revisa_c}
+        </div>
+        <div style="border-top: 1px solid black; padding-top: 40px;">
+            <strong style="color: blue;">{recibe_n if recibe_n else "__________________________"}</strong><br>{recibe_c}
+        </div>
+    </div>
+</div>
+"""
+                st.markdown(html_formato, unsafe_allow_html=True)
 
                 st.divider()
                 
