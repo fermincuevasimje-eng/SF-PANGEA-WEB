@@ -1756,7 +1756,7 @@ else:
                 else:
                     st.error("❌ Función PDF no disponible.")
                     with tab_j:
-                        st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
+            st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
             
             # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
             if "db_justificaciones" not in st.session_state:
@@ -1829,10 +1829,26 @@ else:
 
                     tipo_fecha_j = st.radio("Modalidad de Fecha:", ["Día Único", "Rango de Fechas"], index=0 if data_previa_j.get("tipo_fecha", "Día Único") == "Día Único" else 1, horizontal=True, key=f"radio_tipo_f_{pk_j}")
                     
-                    try: def_f1 = pd.to_datetime(data_previa_j.get("fecha_inicio")).date()
-                    except: def_f1 = pd.Timestamp.now().date()
-                    try: def_f2 = pd.to_datetime(data_previa_j.get("fecha_fin")).date()
-                    except: def_f2 = pd.Timestamp.now().date()
+                    # --- VALIDACIÓN ANTICRASH DE FECHAS (EVITA FILTRACIONES DE NaT) ---
+                    try:
+                        f1_raw = data_previa_j.get("fecha_inicio")
+                        if f1_raw and str(f1_raw) != "NaT" and str(f1_raw).strip() != "":
+                            t1 = pd.to_datetime(f1_raw)
+                            def_f1 = t1.date() if not pd.isna(t1) else pd.Timestamp.now().date()
+                        else:
+                            def_f1 = pd.Timestamp.now().date()
+                    except:
+                        def_f1 = pd.Timestamp.now().date()
+
+                    try:
+                        f2_raw = data_previa_j.get("fecha_fin")
+                        if f2_raw and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
+                            t2 = pd.to_datetime(f2_raw)
+                            def_f2 = t2.date() if not pd.isna(t2) else pd.Timestamp.now().date()
+                        else:
+                            def_f2 = pd.Timestamp.now().date()
+                    except:
+                        def_f2 = pd.Timestamp.now().date()
 
                     if tipo_fecha_j == "Día Único":
                         f_inicio = st.date_input("Fecha de Incidencia:", value=def_f1, key=f"date_ini_{pk_j}")
@@ -1998,7 +2014,7 @@ else:
                     ws.append_row([id_reg_j, fecha_mx, nombre_emp, num_emp, json.dumps(payload_j), ""])
                     st.success("✅ Formato Único de Justificación Sincronizado en la Nube."); time.sleep(1); st.rerun()
 
-                # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL CON AMBAS OPCIONES VISIBLES ---
+                # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL ---
                 if motor_pdf_listo:
                     pdf_j = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf_j.set_margins(20, 20, 20)
