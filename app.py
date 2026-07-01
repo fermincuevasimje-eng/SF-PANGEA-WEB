@@ -1581,14 +1581,14 @@ else:
                     st.warning("⚠️ El área de texto está vacía.")
 
         with tab_o:
-    st.subheader("📄 Correspondencia Oficial y Control de Bóveda")
-
-    try:
-        from fpdf import FPDF
-        motor_pdf_listo = True
-    except ImportError:
-        motor_pdf_listo = False
-        st.warning("⚠️ Motor PDF (fpdf) no detectado. Las descargas están deshabilitadas.")
+            st.subheader("📄 Correspondencia Oficial y Control de Bóveda")
+        
+            try:
+                from fpdf import FPDF
+                motor_pdf_listo = True
+            except ImportError:
+                motor_pdf_listo = False
+                st.warning("⚠️ Motor PDF (fpdf) no detectado. Las descargas están deshabilitadas.")
 
     plantillas_maestras = {
         "✅ Atención Exitosa": "Por medio de la presente, se hace de su conocimiento que la petición con folio [FOLIO] ha sido atendida exitosamente por las brigadas de esta Dirección, quedando el servicio en óptimas condiciones de operación.",
