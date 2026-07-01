@@ -1759,24 +1759,24 @@ else:
         # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
         # ==================================================================================
             with tab_j:
-                    st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
-                    
-                    # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
-                    if "db_justificaciones" not in st.session_state:
-                        st.session_state.db_justificaciones = {}
-                        try:
-                            filas_raw = ws.get_all_values()
-                            if len(filas_raw) > 1:
-                                for row in filas_raw[1:]:
-                                    if len(row) >= 5:
-                                        reg_id = str(row[0]).strip()
-                                        datos_raw = str(row[4]).strip() if row[4] else "{}"
-                                        if reg_id.startswith("SF4-JST-"):
-                                            try: st.session_state.db_justificaciones[reg_id] = json.loads(datos_raw)
-                                            except: pass
-                        except: pass
+            st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
             
-                    c_config, c_preview = st.columns([1, 1.1])
+            # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
+            if "db_justificaciones" not in st.session_state:
+                st.session_state.db_justificaciones = {}
+                try:
+                    filas_raw = ws.get_all_values()
+                    if len(filas_raw) > 1:
+                        for row in filas_raw[1:]:
+                            if len(row) >= 5:
+                                reg_id = str(row[0]).strip()
+                                datos_raw = str(row[4]).strip() if row[4] else "{}"
+                                if reg_id.startswith("SF4-JST-"):
+                                    try: st.session_state.db_justificaciones[reg_id] = json.loads(datos_raw)
+                                    except: pass
+                except: pass
+
+            c_config, c_preview = st.columns([1, 1.1])
 
             with c_config:
                 modo_j = st.radio("Operación Justificaciones:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True, key="radio_modo_justificaciones")
@@ -1811,8 +1811,8 @@ else:
                                     st.warning(f"Registro {id_sel_j} eliminado de la nube.")
                                     time.sleep(1); st.rerun()
                                 except Exception as e: st.error(f"Error al eliminar: {e}")
-                    else:
-                        st.info("La bóveda de justificaciones está vacía.")
+                else:
+                    st.info("La bóveda de justificaciones está vacía.")
 
                 pk_j = f"{modo_j}_{id_sel_j}"
 
@@ -1858,7 +1858,7 @@ else:
                         "18 | HORA DE LACTANCIA", "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
                         "20 | LICENCIA POR NACIMIENTO", "23 | OMISIÓN DE CHECADA", 
                         "24 | DÍA ECONÓMICO (SINDICALIZADO)", "34 | CUMPLEAÑOS (SINDICALIZADO)", 
-                        "CM | CUIDADOS MÉDICOS"
+                        "CM | CUIDADOS MÉCIDOS"
                     ]
                     concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
                     concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
@@ -1900,15 +1900,15 @@ else:
                     # 10. Solicitante
                     firma_solicita_raw = st.text_input("10. Solicitante (Nombre):", value=data_previa_j.get("firma_solicita", ""), key=f"txt_firm_sol_{pk_j}")
                     
-                    # 11. Autoriza (Nombre y Selección de Cargo)
+                    # 11. Autoriza
                     c_aut1, c_aut2 = st.columns(2)
                     autoriza_n_raw = c_aut1.text_input("11. Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", ""), key=f"txt_aut_{pk_j}")
-                    aut_opts = ["Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO", "Vo. Bo. DIRECTORA DE ALUMBRADO PÚBLICO"]
+                    aut_opts = ["DIRECTOR DE ALUMBRADO PÚBLICO", "DIRECTORA DE ALUMBRADO PÚBLICO"]
                     prev_aut = data_previa_j.get("autoriza_c", aut_opts[0])
                     idx_aut = aut_opts.index(prev_aut) if prev_aut in aut_opts else 0
                     autoriza_c_raw = c_aut2.selectbox("Cargo Autoriza:", aut_opts, index=idx_aut, key=f"sel_aut_c_{pk_j}")
                     
-                    # 12. Vo. Bo. / Revisa (Nombre y Selección de Cargo)
+                    # 12. Vo. Bo. / Revisa
                     c_vob1, c_vob2 = st.columns(2)
                     revisa_n_raw = c_vob1.text_input("12. Vo. Bo. / Revisa (Nombre):", value=data_previa_j.get("revisa_n", ""), key=f"txt_rev_{pk_j}")
                     rev_opts = ["DELEGADO ADMINISTRATIVO", "DELEGADA ADMINISTRATIVA"]
@@ -1916,7 +1916,7 @@ else:
                     idx_rev = rev_opts.index(prev_rev) if prev_rev in rev_opts else 1
                     revisa_c_raw = c_vob2.selectbox("Cargo Revisa:", rev_opts, index=idx_rev, key=f"sel_rev_c_{pk_j}")
                     
-                    # 13. Recursos Humanos (Nombre y Selección de Cargo)
+                    # 13. Recursos Humanos
                     c_rh1, c_rh2 = st.columns(2)
                     recibe_n_raw = c_rh1.text_input("13. Recursos Humanos (Nombre):", value=data_previa_j.get("recibe_n", ""), key=f"txt_rec_{pk_j}")
                     rec_opts = ["DIRECTOR DE RECURSOS HUMANOS", "DIRECTORA DE RECURSOS HUMANOS"]
@@ -1948,10 +1948,8 @@ else:
                 f_ini_str = f"DEL {f_inicio.day} DE {meses_mx[f_inicio.month]} DEL {f_inicio.year}"
                 f_fin_str = f"AL {f_fin.day} DE {meses_mx[f_fin.month]} DEL {f_fin.year}"
 
-                # Extracción del código clave
                 cod_sel = clave_concepto.split(" | ")[0].strip()
                 
-                # Armado dinámico de renglones JUSTIFICAR / SANCIONAR según la imagen oficial
                 if accion == "JUSTIFICAR":
                     just_line = f"[{cod_sel}] A: {nombre_emp}"
                     sanc_line = "______ A: ________________________________________"
@@ -1959,11 +1957,10 @@ else:
                     just_line = "______ A: ________________________________________"
                     sanc_line = f"[{cod_sel}] A: {nombre_emp}"
 
-                # Configuración de bloques del F. Registro
                 bg_reg_lista = "background: #bcbcbc; font-weight: bold;" if f_registro == "LISTA" else ""
                 bg_reg_hp = "background: #bcbcbc; font-weight: bold;" if f_registro == "HAND PUNCH" else ""
 
-                # --- MATRIZ ESTÁTICA DE LOS 16 CONCEPTOS OFICIALES ---
+                # Matriz estática de conceptos oficiales
                 conceptos_grid = [
                     ("3", "FALTA INJUSTIFICADA", "17", "LICENCIA POR GRAVIDEZ"),
                     ("4", "FALTA JUSTIFICADA (TIEMPO X TIEMPO)", "18", "HORA DE LACTANCIA"),
@@ -1975,12 +1972,10 @@ else:
                     ("16", "LICENCIA POR MATRIMONIO(SINDICALIZADO)", "CM", "CUIDADOS MÉDICOS")
                 ]
 
-                # Renderizado de la tabla HTML central con iluminado dinámico de celda elegida
                 tabla_html_conceptos = ""
                 for c1, n1, c2, n2 in conceptos_grid:
                     style_c1 = "background: #bcbcbc; font-weight: bold;" if cod_sel == c1 else ""
                     style_c2 = "background: #bcbcbc; font-weight: bold;" if cod_sel == c2 else ""
-                    
                     tabla_html_conceptos += f"""
                     <tr>
                         <td style="border: 1px solid black; text-align: center; width: 8%; font-size: 10px; {style_c1}">{c1}</td>
@@ -1990,10 +1985,11 @@ else:
                     </tr>
                     """
 
-                # --- CONSTRUCTOR DE LA VISTA PREVIA PURO (SANGRE CERO - ENCAPSULADO HTML) ---
+                # --- CONSTRUCTOR DE LA VISTA PREVIA CON RECUADROS DE FIRMAS EXACTOS ---
                 html_formato = f"""
                 <div style="background: white; color: black; padding: 25px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; width: 100%; box-sizing: border-box;">
                     
+                    <!-- ENCABEZADO OFICIAL -->
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px;">
                         <tr>
                             <td style="width: 25%; font-size: 22px; font-family: 'Arial Black', Gadget, sans-serif; font-weight: 900; vertical-align: top; line-height: 0.9;">
@@ -2013,6 +2009,7 @@ else:
                     
                     <div style="text-align: center; font-weight: bold; font-size: 13px; margin-top: 10px; margin-bottom: 15px; letter-spacing: 0.5px;">FORMATO ÚNICO DE JUSTIFICACIÓN</div>
                     
+                    <!-- CAMPOS DEL CONTENEDOR SUPERIOR -->
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px;">
                         <tr>
                             <td style="font-weight: bold; width: 12%; padding: 4px 0;">SOLICITA:</td>
@@ -2041,6 +2038,7 @@ else:
                         </tr>
                     </table>
                     
+                    <!-- TABLA COMPLETA DE CONCEPTOS -->
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 8px;">
                         <thead>
                             <tr style="background: #e1e1e1; font-weight: bold; font-size: 10px; text-align: center;">
@@ -2055,6 +2053,7 @@ else:
                         </tbody>
                     </table>
                     
+                    <!-- BLOQUE DE FECHAS PERIODO -->
                     <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 11px; margin-bottom: 10px; text-align: center;">
                         <tr>
                             <td style="font-weight: bold; text-align: left; padding: 4px; border-bottom: 1px solid black; background: #f5f5f5;" colspan="2">&nbsp;FECHA:</td>
@@ -2065,6 +2064,7 @@ else:
                         </tr>
                     </table>
                     
+                    <!-- RECUADRO DE MOTIVO -->
                     <div style="border: 1px solid black; margin-bottom: 15px; font-size: 11px;">
                         <div style="font-weight: bold; text-align: center; background: #e1e1e1; padding: 3px; border-bottom: 1px solid black; letter-spacing: 1px;">MOTIVO</div>
                         <div style="padding: 10px; text-align: center; min-height: 40px; font-weight: bold; line-height: 1.4; color: #333;">
@@ -2072,27 +2072,35 @@ else:
                         </div>
                     </div>
                     
-                    <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 9.5px; margin-top: 25px; margin-bottom: 15px;">
+                    <!-- --- RECUADROS INSTITUCIONALES DE FIRMAS EN GRID COMPLETO --- -->
+                    <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 10px; margin-top: 20px; margin-bottom: 10px;">
+                        <tr style="font-weight: bold; font-size: 9.5px;">
+                            <td style="border: 1px solid black; width: 25%; height: 20px; background: #fafafa;"></td>
+                            <td style="border: 1px solid black; width: 25%; height: 20px; background: #e1e1e1; vertical-align: middle;">AUTORIZACIÓN</td>
+                            <td style="border: 1px solid black; width: 25%; height: 20px; background: #e1e1e1; vertical-align: middle;">Vo. Bo.</td>
+                            <td style="border: 1px solid black; width: 25%; height: 20px; background: #fafafa;"></td>
+                        </tr>
                         <tr>
-                            <td style="width: 23%; vertical-align: bottom; padding: 0 5px;">
-                                <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{firma_solicita}</div>
-                                <div style="margin-top: 4px; font-weight: bold; font-size: 9px; height: 24px; display: flex; align-items: center; justify-content: center;">SOLICITANTE</div>
-                            </td>
-                            <td style="width: 23%; vertical-align: bottom; padding: 0 5px;">
-                                <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{autoriza_n}</div>
-                                <div style="margin-top: 4px; font-weight: bold; font-size: 9px; height: 24px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{autoriza_c}</div>
-                            </td>
-                            <td style="width: 23%; vertical-align: bottom; padding: 0 5px;">
-                                <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{revisa_n}</div>
-                                <div style="margin-top: 4px; font-weight: bold; font-size: 9px; height: 24px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{revisa_c}</div>
-                            </td>
-                            <td style="width: 23%; vertical-align: bottom; padding: 0 5px;">
-                                <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{recibe_n}</div>
-                                <div style="margin-top: 4px; font-weight: bold; font-size: 9px; height: 24px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{recibe_c}</div>
-                            </td>
+                            <td style="border: 1px solid black; height: 50px;"></td>
+                            <td style="border: 1px solid black; height: 50px;"></td>
+                            <td style="border: 1px solid black; height: 50px;"></td>
+                            <td style="border: 1px solid black; height: 50px;"></td>
+                        </tr>
+                        <tr style="font-weight: bold; color: blue; font-size: 10px; background: #fafafa;">
+                            <td style="border: 1px solid black; padding: 6px; vertical-align: middle;">{firma_solicita}</td>
+                            <td style="border: 1px solid black; padding: 6px; vertical-align: middle;">{autoriza_n}</td>
+                            <td style="border: 1px solid black; padding: 6px; vertical-align: middle;">{revisa_n}</td>
+                            <td style="border: 1px solid black; padding: 6px; vertical-align: middle;">{recibe_n}</td>
+                        </tr>
+                        <tr style="font-weight: bold; font-size: 9px; background: #e1e1e1; height: 28px;">
+                            <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">SOLICITANTE</td>
+                            <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">{autoriza_c}</td>
+                            <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">{revisa_c}</td>
+                            <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">DIRECTORA DE<br>RECURSOS HUMANOS" if "DIRECTORA" in recibe_c else "DIRECTOR DE<br>RECURSOS HUMANOS"</td>
                         </tr>
                     </table>
                     
+                    <!-- PIE DE PÁGINA -->
                     <div style="border-top: 1px solid black; text-align: center; font-size: 10px; font-weight: bold; padding-top: 3px; margin-top: 10px;">
                         H. Ayuntamiento de Toluca
                     </div>
@@ -2103,8 +2111,8 @@ else:
                 </div>
                 """
                 
-                # Despliegue seguro de la página web de vista previa (alto de 800px para evitar scroll interno feo)
-                st.components.v1.html(html_formato, height=800, scrolling=True)
+                # Despliegue de la web viva con margen de visualización óptimo
+                st.components.v1.html(html_formato, height=830, scrolling=True)
 
                 st.divider()
                 
@@ -2147,13 +2155,13 @@ else:
                     ws.append_row([id_reg_j, fecha_mx, nombre_emp, num_emp, json.dumps(payload_j), ""])
                     st.success("✅ Formato Único de Justificación Sincronizado en la Nube."); time.sleep(1); st.rerun()
 
-                # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA) ---
+                # --- CONSTRUCTOR DEL DOCUMENTO PDF CON RECUADROS DE FIRMAS REGLAMENTARIOS ---
                 if motor_pdf_listo:
                     pdf_j = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf_j.set_margins(15, 15, 15)
                     pdf_j.add_page()
                     
-                    # Encabezado Toluca
+                    # Logotipos texto oficial
                     pdf_j.set_font("Arial", 'B', 18)
                     pdf_j.cell(50, 6, txt="Toluca", ln=False)
                     pdf_j.set_font("Arial", 'B', 9)
@@ -2175,7 +2183,7 @@ else:
                     pdf_j.cell(0, 5, txt="FORMATO ÚNICO DE JUSTIFICACIÓN", ln=True, align='C')
                     pdf_j.ln(3)
                     
-                    # Renglón 1: Solicita y Fecha
+                    # Bloque superior estructurado
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(22, 6, txt="SOLICITA: ", ln=False)
                     pdf_j.set_font("Arial", '', 10)
@@ -2187,14 +2195,12 @@ else:
                     pdf_j.line(37, pdf_j.get_y()-1, 135, pdf_j.get_y()-1)
                     pdf_j.line(153, pdf_j.get_y()-1, 200, pdf_j.get_y()-1)
                     
-                    # Renglón 2: Justificar
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(26, 6, txt="JUSTIFICAR: ", ln=False)
                     pdf_j.set_font("Arial", '', 10)
                     pdf_j.cell(0, 6, txt=just_line, ln=True)
                     pdf_j.line(41, pdf_j.get_y()-1, 200, pdf_j.get_y()-1)
                     
-                    # Renglón 3: Sancionar y No Emp
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(26, 6, txt="SANCIONAR: ", ln=False)
                     pdf_j.set_font("Arial", '', 10)
@@ -2206,7 +2212,6 @@ else:
                     pdf_j.line(41, pdf_j.get_y()-1, 135, pdf_j.get_y()-1)
                     pdf_j.line(163, pdf_j.get_y()-1, 200, pdf_j.get_y()-1)
                     
-                    # Renglón 4: Adscrito y F Registro
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(26, 6, txt="ADSCRITO A: ", ln=False)
                     pdf_j.set_font("Arial", '', 10)
@@ -2215,7 +2220,6 @@ else:
                     pdf_j.set_font("Arial", 'B', 8.5)
                     pdf_j.cell(24, 6, txt="F. REGISTRO: ", ln=False)
                     
-                    # Pequeño recuadro para LISTA
                     x_list = pdf_j.get_x()
                     y_list = pdf_j.get_y()
                     if f_registro == "LISTA":
@@ -2225,7 +2229,6 @@ else:
                         pdf_j.rect(x_list, y_list+1, 13, 4)
                     pdf_j.cell(15, 6, txt=" LISTA", ln=False)
                     
-                    # Pequeño recuadro para HAND PUNCH
                     x_hp = pdf_j.get_x()
                     if f_registro == "HAND PUNCH":
                         pdf_j.set_fill_color(188, 188, 188)
@@ -2237,7 +2240,7 @@ else:
                     
                     pdf_j.ln(3)
                     
-                    # --- CONSTRUCCIÓN DE LA TABLA COMPLETA EN PDF ---
+                    # Estructura del Grid Central
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.set_fill_color(225, 225, 225)
                     pdf_j.cell(13, 5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
@@ -2247,11 +2250,8 @@ else:
                     
                     pdf_j.set_font("Arial", '', 8)
                     for c1, n1, c2, n2 in conceptos_grid:
-                        # Resaltado de celda izquierda
                         fill_l = True if cod_sel == c1 else False
-                        # Resaltado de celda derecha
                         fill_r = True if cod_sel == c2 else False
-                        
                         if fill_l or fill_r:
                             pdf_j.set_fill_color(188, 188, 188)
                         
@@ -2262,7 +2262,7 @@ else:
                         
                     pdf_j.ln(3)
                     
-                    # Recuadro de Periodo / Fechas
+                    # Fechas Periodo
                     pdf_j.set_font("Arial", 'B', 9.5)
                     pdf_j.set_fill_color(245, 245, 245)
                     pdf_j.cell(0, 5, txt=" FECHA:", border=1, ln=True, fill=True)
@@ -2274,7 +2274,7 @@ else:
                     
                     pdf_j.ln(3)
                     
-                    # Recuadro del Motivo
+                    # Motivo
                     pdf_j.set_font("Arial", 'B', 9.5)
                     pdf_j.set_fill_color(225, 225, 225)
                     pdf_j.cell(0, 5, txt="MOTIVO", border=1, ln=True, align='C', fill=True)
@@ -2283,45 +2283,63 @@ else:
                     pdf_j.set_y(pdf_j.get_y() + 2)
                     pdf_j.multi_cell(186, 4.5, txt=motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO.", align='C')
                     
-                    # Bloque de Firmas de 4 columnas
-                    pdf_j.set_y(240)
+                    # --- CONSTRUCTOR DE RECUADROS EN PDF (MÁXIMA FIDELIDAD IMPRESA) ---
+                    pdf_j.set_y(214)
+                    y_recuadros = pdf_j.get_y()
+                    
+                    # Fila 1: Encabezados de Validación
+                    pdf_j.set_font("Arial", 'B', 8)
+                    pdf_j.set_fill_color(250, 250, 250)
+                    pdf_j.cell(46.5, 4.5, txt="", border=1, ln=False, fill=True)
+                    pdf_j.set_fill_color(225, 225, 225)
+                    pdf_j.cell(46.5, 4.5, txt="AUTORIZACIÓN", border=1, ln=False, align='C', fill=True)
+                    pdf_j.cell(46.5, 4.5, txt="Vo. Bo.", border=1, ln=False, align='C', fill=True)
+                    pdf_j.set_fill_color(250, 250, 250)
+                    pdf_j.cell(46.5, 4.5, txt="", border=1, ln=True, fill=True)
+                    
+                    # Fila 2: Espacio Firma Física
+                    pdf_j.cell(46.5, 15, txt="", border=1, ln=False)
+                    pdf_j.cell(46.5, 15, txt="", border=1, ln=False)
+                    pdf_j.cell(46.5, 15, txt="", border=1, ln=False)
+                    pdf_j.cell(46.5, 15, txt="", border=1, ln=True)
+                    
+                    # Fila 3: Nombres de Servidores Públicos
                     pdf_j.set_font("Arial", 'B', 8.5)
+                    pdf_j.set_text_color(0, 0, 255)
+                    pdf_j.set_fill_color(250, 250, 250)
+                    pdf_j.cell(46.5, 6.5, txt=firma_solicita, border=1, ln=False, align='C', fill=True)
+                    pdf_j.cell(46.5, 6.5, txt=autoriza_n, border=1, ln=False, align='C', fill=True)
+                    pdf_j.cell(46.5, 6.5, txt=revisa_n, border=1, ln=False, align='C', fill=True)
+                    pdf_j.cell(46.5, 6.5, txt=recibe_n, border=1, ln=True, align='C', fill=True)
+                    pdf_j.set_text_color(0, 0, 0)
                     
-                    # Líneas de las 4 firmas
-                    pdf_j.line(15, 247, 56, 247)
-                    pdf_j.line(61, 247, 102, 247)
-                    pdf_j.line(107, 247, 148, 247)
-                    pdf_j.line(153, 247, 199, 247)
+                    # Fila 4: Cargos con Fondos Grises e Inyección Multilínea
+                    y_cargos = pdf_j.get_y()
+                    pdf_j.set_font("Arial", 'B', 7)
+                    pdf_j.set_fill_color(225, 225, 225)
                     
-                    # Nombres e identificadores debajo de las líneas
-                    pdf_j.set_xy(15, 248)
-                    pdf_j.multi_cell(41, 3.5, txt=firma_solicita, align='C')
-                    pdf_j.set_xy(61, 248)
-                    pdf_j.multi_cell(41, 3.5, txt=autoriza_n, align='C')
-                    pdf_j.set_xy(107, 248)
-                    pdf_j.multi_cell(41, 3.5, txt=revisa_n, align='C')
-                    pdf_j.set_xy(153, 248)
-                    pdf_j.multi_cell(46, 3.5, txt=recibe_n, align='C')
+                    pdf_j.rect(15, y_cargos, 46.5, 9, 'DF')
+                    pdf_j.rect(61.5, y_cargos, 46.5, 9, 'DF')
+                    pdf_j.rect(108, y_cargos, 46.5, 9, 'DF')
+                    pdf_j.rect(154.5, y_cargos, 46.5, 9, 'DF')
                     
-                    # Cargos institucionales oficiales
-                    pdf_j.set_font("Arial", 'B', 7.5)
-                    pdf_j.set_xy(15, 256)
-                    pdf_j.multi_cell(41, 3, txt="SOLICITANTE", align='C')
-                    pdf_j.set_xy(61, 256)
-                    pdf_j.multi_cell(41, 3, txt=autoriza_c, align='C')
-                    pdf_j.set_xy(107, 256)
-                    pdf_j.multi_cell(41, 3, txt=revisa_c, align='C')
-                    pdf_j.set_xy(153, 256)
-                    pdf_j.multi_cell(46, 3, txt=recibe_c, align='C')
+                    pdf_j.set_xy(15, y_cargos + 1)
+                    pdf_j.multi_cell(46.5, 3.5, txt="SOLICITANTE", align='C')
+                    pdf_j.set_xy(61.5, y_cargos + 1)
+                    pdf_j.multi_cell(46.5, 3.5, txt=autoriza_c, align='C')
+                    pdf_j.set_xy(108, y_cargos + 1)
+                    pdf_j.multi_cell(46.5, 3.5, txt=revisa_c, align='C')
+                    pdf_j.set_xy(154.5, y_cargos + 1)
+                    pdf_j.multi_cell(46.5, 3.2, txt="DIRECTORA DE\nRECURSOS HUMANOS" if "DIRECTORA" in recibe_c else "DIRECTOR DE\nRECURSOS HUMANOS", align='C')
                     
-                    # Pie de página reglamentario
-                    pdf_j.set_y(267)
+                    # Cintillo e Información Base Toluca
+                    pdf_j.set_y(266)
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.cell(0, 4, txt="H. Ayuntamiento de Toluca", ln=True, align='C')
                     pdf_j.set_font("Arial", '', 7.5)
                     pdf_j.cell(0, 3, txt="Rafael Alducin s/n esquina Primero de Mayo, Col. Reforma y Ferrocarriles | Tel: 7223171747", ln=True, align='C')
                     pdf_j.set_fill_color(0, 0, 0)
-                    pdf_j.rect(15, 275, 186, 2.5, 'F')
+                    pdf_j.rect(15, 274, 186, 2.5, 'F')
                     
                     pdf_data_j = pdf_j.output(dest='S').encode('latin-1', 'replace')
                     st.download_button(label="🚀 DESCARGAR JUSTIFICACIÓN PDF", data=pdf_data_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True)
