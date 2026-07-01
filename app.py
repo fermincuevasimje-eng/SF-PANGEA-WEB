@@ -1857,8 +1857,8 @@ else:
                         "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", "17 | LICENCIA POR GRAVIDEZ", 
                         "18 | HORA DE LACTANCIA", "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
                         "20 | LICENCIA POR NACIMIENTO", "23 | OMISIÓN DE CHECADA", 
-                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", "34 | CUMPLEAÑOS (SINDICALIZADO)", 
-                        "CM | CUIDADOS MÉCIDOS"
+                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", "34 | CUMPLEANYOS (SINDICALIZADO)", 
+                        "CM | CUIDADOS MÉDICOS"
                     ]
                     concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
                     concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
@@ -1985,11 +1985,10 @@ else:
                     </tr>
                     """
 
-                # --- CONSTRUCTOR DE LA VISTA PREVIA CON RECUADROS DE FIRMAS EXACTOS ---
+                # Variable del renderizado web
                 html_formato = f"""
                 <div style="background: white; color: black; padding: 25px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; width: 100%; box-sizing: border-box;">
                     
-                    <!-- ENCABEZADO OFICIAL -->
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px;">
                         <tr>
                             <td style="width: 25%; font-size: 22px; font-family: 'Arial Black', Gadget, sans-serif; font-weight: 900; vertical-align: top; line-height: 0.9;">
@@ -2009,7 +2008,6 @@ else:
                     
                     <div style="text-align: center; font-weight: bold; font-size: 13px; margin-top: 10px; margin-bottom: 15px; letter-spacing: 0.5px;">FORMATO ÚNICO DE JUSTIFICACIÓN</div>
                     
-                    <!-- CAMPOS DEL CONTENEDOR SUPERIOR -->
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px;">
                         <tr>
                             <td style="font-weight: bold; width: 12%; padding: 4px 0;">SOLICITA:</td>
@@ -2038,7 +2036,6 @@ else:
                         </tr>
                     </table>
                     
-                    <!-- TABLA COMPLETA DE CONCEPTOS -->
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 8px;">
                         <thead>
                             <tr style="background: #e1e1e1; font-weight: bold; font-size: 10px; text-align: center;">
@@ -2053,7 +2050,6 @@ else:
                         </tbody>
                     </table>
                     
-                    <!-- BLOQUE DE FECHAS PERIODO -->
                     <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 11px; margin-bottom: 10px; text-align: center;">
                         <tr>
                             <td style="font-weight: bold; text-align: left; padding: 4px; border-bottom: 1px solid black; background: #f5f5f5;" colspan="2">&nbsp;FECHA:</td>
@@ -2064,7 +2060,6 @@ else:
                         </tr>
                     </table>
                     
-                    <!-- RECUADRO DE MOTIVO -->
                     <div style="border: 1px solid black; margin-bottom: 15px; font-size: 11px;">
                         <div style="font-weight: bold; text-align: center; background: #e1e1e1; padding: 3px; border-bottom: 1px solid black; letter-spacing: 1px;">MOTIVO</div>
                         <div style="padding: 10px; text-align: center; min-height: 40px; font-weight: bold; line-height: 1.4; color: #333;">
@@ -2072,7 +2067,6 @@ else:
                         </div>
                     </div>
                     
-                    <!-- --- RECUADROS INSTITUCIONALES DE FIRMAS EN GRID COMPLETO --- -->
                     <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 10px; margin-top: 20px; margin-bottom: 10px;">
                         <tr style="font-weight: bold; font-size: 9.5px;">
                             <td style="border: 1px solid black; width: 25%; height: 20px; background: #fafafa;"></td>
@@ -2096,11 +2090,10 @@ else:
                             <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">SOLICITANTE</td>
                             <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">{autoriza_c}</td>
                             <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">{revisa_c}</td>
-                            <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">DIRECTORA DE<br>RECURSOS HUMANOS" if "DIRECTORA" in recibe_c else "DIRECTOR DE<br>RECURSOS HUMANOS"</td>
+                            <td style="border: 1px solid black; padding: 4px; vertical-align: middle;">{"DIRECTORA DE<br>RECURSOS HUMANOS" if "DIRECTORA" in recibe_c else "DIRECTOR DE<br>RECURSOS HUMANOS"}</td>
                         </tr>
                     </table>
                     
-                    <!-- PIE DE PÁGINA -->
                     <div style="border-top: 1px solid black; text-align: center; font-size: 10px; font-weight: bold; padding-top: 3px; margin-top: 10px;">
                         H. Ayuntamiento de Toluca
                     </div>
@@ -2111,7 +2104,6 @@ else:
                 </div>
                 """
                 
-                # Despliegue de la web viva con margen de visualización óptimo
                 st.components.v1.html(html_formato, height=830, scrolling=True)
 
                 st.divider()
@@ -2155,13 +2147,13 @@ else:
                     ws.append_row([id_reg_j, fecha_mx, nombre_emp, num_emp, json.dumps(payload_j), ""])
                     st.success("✅ Formato Único de Justificación Sincronizado en la Nube."); time.sleep(1); st.rerun()
 
-                # --- CONSTRUCTOR DEL DOCUMENTO PDF CON RECUADROS DE FIRMAS REGLAMENTARIOS ---
+                # --- CONSTRUCTOR DEL PDF ---
                 if motor_pdf_listo:
                     pdf_j = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf_j.set_margins(15, 15, 15)
                     pdf_j.add_page()
                     
-                    # Logotipos texto oficial
+                    # Logotipos oficiales
                     pdf_j.set_font("Arial", 'B', 18)
                     pdf_j.cell(50, 6, txt="Toluca", ln=False)
                     pdf_j.set_font("Arial", 'B', 9)
@@ -2240,7 +2232,7 @@ else:
                     
                     pdf_j.ln(3)
                     
-                    # Estructura del Grid Central
+                    # Estructura de la Tabla Central
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.set_fill_color(225, 225, 225)
                     pdf_j.cell(13, 5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
@@ -2283,11 +2275,11 @@ else:
                     pdf_j.set_y(pdf_j.get_y() + 2)
                     pdf_j.multi_cell(186, 4.5, txt=motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO.", align='C')
                     
-                    # --- CONSTRUCTOR DE RECUADROS EN PDF (MÁXIMA FIDELIDAD IMPRESA) ---
+                    # Recuadros Firmas PDF
                     pdf_j.set_y(214)
                     y_recuadros = pdf_j.get_y()
                     
-                    # Fila 1: Encabezados de Validación
+                    # Fila 1: Encabezados
                     pdf_j.set_font("Arial", 'B', 8)
                     pdf_j.set_fill_color(250, 250, 250)
                     pdf_j.cell(46.5, 4.5, txt="", border=1, ln=False, fill=True)
@@ -2297,13 +2289,13 @@ else:
                     pdf_j.set_fill_color(250, 250, 250)
                     pdf_j.cell(46.5, 4.5, txt="", border=1, ln=True, fill=True)
                     
-                    # Fila 2: Espacio Firma Física
+                    # Fila 2: Espacio Firma
                     pdf_j.cell(46.5, 15, txt="", border=1, ln=False)
                     pdf_j.cell(46.5, 15, txt="", border=1, ln=False)
                     pdf_j.cell(46.5, 15, txt="", border=1, ln=False)
                     pdf_j.cell(46.5, 15, txt="", border=1, ln=True)
                     
-                    # Fila 3: Nombres de Servidores Públicos
+                    # Fila 3: Nombres
                     pdf_j.set_font("Arial", 'B', 8.5)
                     pdf_j.set_text_color(0, 0, 255)
                     pdf_j.set_fill_color(250, 250, 250)
@@ -2313,7 +2305,7 @@ else:
                     pdf_j.cell(46.5, 6.5, txt=recibe_n, border=1, ln=True, align='C', fill=True)
                     pdf_j.set_text_color(0, 0, 0)
                     
-                    # Fila 4: Cargos con Fondos Grises e Inyección Multilínea
+                    # Fila 4: Cargos
                     y_cargos = pdf_j.get_y()
                     pdf_j.set_font("Arial", 'B', 7)
                     pdf_j.set_fill_color(225, 225, 225)
@@ -2332,7 +2324,7 @@ else:
                     pdf_j.set_xy(154.5, y_cargos + 1)
                     pdf_j.multi_cell(46.5, 3.2, txt="DIRECTORA DE\nRECURSOS HUMANOS" if "DIRECTORA" in recibe_c else "DIRECTOR DE\nRECURSOS HUMANOS", align='C')
                     
-                    # Cintillo e Información Base Toluca
+                    # Pie de página base
                     pdf_j.set_y(266)
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.cell(0, 4, txt="H. Ayuntamiento de Toluca", ln=True, align='C')
