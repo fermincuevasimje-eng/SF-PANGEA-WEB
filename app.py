@@ -1759,7 +1759,7 @@ else:
         # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
         # ==================================================================================
             with tab_j:
-        st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
+                st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
         
         # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
         if "db_justificaciones" not in st.session_state:
