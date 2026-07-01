@@ -1816,7 +1816,7 @@ else:
 
                 pk_j = f"{modo_j}_{id_sel_j}"
 
-                with st.container(border=True):
+                with st.container(border=False):
                     st.markdown("**📌 Secuencia Oficial de Llenado**")
                     
                     # 1. Fecha del Documento
