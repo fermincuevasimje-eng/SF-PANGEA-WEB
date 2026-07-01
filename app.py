@@ -1759,24 +1759,24 @@ else:
         # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
         # ==================================================================================
             with tab_j:
-    st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
-        
-    # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
-    if "db_justificaciones" not in st.session_state:
-        st.session_state.db_justificaciones = {}
-        try:
-            # Sincronización limpia desde su propia hoja de cálculo de incidencias
-            filas_raw = ws_justificaciones.get_all_values()
-            if len(filas_raw) > 1:
-                for row in filas_raw[1:]:
-                    if len(row) >= 5:
-                        reg_id = str(row[0]).strip()
-                        datos_raw = str(row[4]).strip() if row[4] else "{}"
-                        if reg_id.startswith("SF4-JST-"):
-                            try: 
-                                st.session_state.db_justificaciones[reg_id] = json.loads(datos_raw)
-                            except: pass
-        except: pass
+                st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
+                    
+                # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
+                if "db_justificaciones" not in st.session_state:
+                    st.session_state.db_justificaciones = {}
+                    try:
+                        # Sincronización limpia desde su propia hoja de cálculo de incidencias
+                        filas_raw = ws_justificaciones.get_all_values()
+                        if len(filas_raw) > 1:
+                            for row in filas_raw[1:]:
+                                if len(row) >= 5:
+                                    reg_id = str(row[0]).strip()
+                                    datos_raw = str(row[4]).strip() if row[4] else "{}"
+                                    if reg_id.startswith("SF4-JST-"):
+                                        try: 
+                                            st.session_state.db_justificaciones[reg_id] = json.loads(datos_raw)
+                                        except: pass
+                    except: pass
 
     # Columnas exclusivas para Justificaciones (_j) con la indentación correcta dentro de la pestaña
     c_config_j, c_preview_j = st.columns([1, 1.1])
