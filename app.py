@@ -1582,14 +1582,14 @@ else:
 
         with tab_o:
             st.subheader("📄 Correspondencia Oficial y Control de Bóveda")
-        
+
             try:
                 from fpdf import FPDF
                 motor_pdf_listo = True
             except ImportError:
                 motor_pdf_listo = False
                 st.warning("⚠️ Motor PDF (fpdf) no detectado. Las descargas están deshabilitadas.")
-        
+
             plantillas_maestras = {
                 "✅ Atención Exitosa": "Por medio de la presente, se hace de su conocimiento que la petición con folio [FOLIO] ha sido atendida exitosamente por las brigadas de esta Dirección, quedando el servicio en óptimas condiciones de operación.",
                 "💡 Ya en Servicio": "Tras la inspección realizada por el personal técnico, se hace de su conocimiento que la luminaria correspondiente al folio [FOLIO] ya se encuentra en servicio y funcionando correctamente.",
@@ -1598,18 +1598,17 @@ else:
                 "❌ Atención Negativa": "Respecto a la petición [FOLIO], se informa que tras el análisis técnico, la solicitud ha sido determinada como improcedente debido a restricciones normativas o técnicas vigentes.",
                 "✏️ Libre (Escribir desde cero)": ""
             }
-        
-            # Columnas exclusivas de Oficios para evitar duplicados visuales
-            c_config_o, c_preview_o = st.columns([1, 1.1])
-        
-            with c_config_o:
-                modo_of = st.radio("Operación:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True, key="radio_modo_oficios")
+
+            c_config, c_preview = st.columns([1, 1.1])
+
+            with c_config:
+                modo_of = st.radio("Operación:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True)
                 
                 data_previa = {}
                 id_sel = "nuevo"
                 if modo_of == "📂 Consultar Bóveda":
                     if st.session_state.db_oficios:
-                        id_sel = st.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1], key="select_boveda_oficios")
+                        id_sel = st.selectbox("Seleccionar Oficio:", list(st.session_state.db_oficios.keys())[::-1])
                         data_previa = st.session_state.db_oficios[id_sel]
                         
                         # --- TABLA RESUMEN CON RESALTADO DINÁMICO ---
@@ -1629,9 +1628,8 @@ else:
                         with col_btn_del:
                             if st.button("🗑️ BORRAR OFICIO", use_container_width=True, disabled=not seguro_borrado, type="primary", key=f"btn_del_ofc_{id_sel}"):
                                 try:
-                                    # Utiliza la bóveda exclusiva para oficios
-                                    cell = ws_oficios.find(id_sel, in_column=3)
-                                    if cell: ws_oficios.delete_rows(cell.row)
+                                    cell = ws.find(id_sel, in_column=3)
+                                    if cell: ws.delete_rows(cell.row)
                                     del st.session_state.db_oficios[id_sel]
                                     st.warning(f"Registro {id_sel} eliminado de la nube.")
                                     time.sleep(1); st.rerun()
@@ -1664,7 +1662,7 @@ else:
                     dest = st.text_area("Destinatario:", value=data_previa.get("dest", ""), height=70, key=f"dest_{pk}", kwargs={"spellcheck": "true"})
                     cargo = st.text_input("Cargo:", value=data_previa.get("cargo", "P R E S E N T E"), key=f"cargo_{pk}")
                     f_ref = st.text_input("Folio Ref:", value=data_previa.get("folio", ""), key=f"folio_{pk}")
-        
+
                 with st.container(border=True):
                     st.markdown("**📝 Mensaje**")
                     v_cuerpo = data_previa.get("cuerpo", plantillas_maestras[tipo_p])
@@ -1672,14 +1670,14 @@ else:
                     firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"), key=f"firma_{pk}")
                     cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"), key=f"cargo_f_{pk}")
                     ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."), height=65, key=f"ccp_{pk}", kwargs={"spellcheck": "true"})
-        
+
                 h_membrete = st.toggle("🛰️ Modo Hoja Membretada", value=False, key=f"memb_{pk}")
-        
-            with c_preview_o:
+
+            with c_preview:
                 st.markdown("### 👁️ Vista Previa")
                 c_final = cuerpo_txt.replace("[FOLIO]", f"**{f_ref}**" if f_ref else "**_______**")
                 e_sup = "100px" if h_membrete else "20px"
-        
+
                 st.markdown(f"""
                 <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.6; min-height: 550px;">
                     <div style="height: {e_sup};"></div>
@@ -1690,7 +1688,7 @@ else:
                     <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px; white-space: pre-line;">C.c.p. {ccp}</div>
                 </div>
                 """, unsafe_allow_html=True)
-        
+
                 st.divider()
                 
                 ejecutar_guardado = False
@@ -1725,13 +1723,12 @@ else:
                         fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
                         
                         try:
-                            cell = ws_oficios.find(id_r, in_column=3)
-                            if cell: ws_oficios.delete_rows(cell.row)
+                            cell = ws.find(id_r, in_column=3)
+                            if cell: ws.delete_rows(cell.row)
                         except: pass
                         
-                        ws_oficios.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
+                        ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
                         st.success("✅ Bóveda Nube de Oficios Actualizada Exitosamente."); time.sleep(1); st.rerun()
-        
                 if motor_pdf_listo:
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf.set_margins(30, 25, 20)
@@ -1761,8 +1758,8 @@ else:
         # ==================================================================================
         # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
         # ==================================================================================
-        with tab_j:
-            st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
+            with tab_j:
+                    st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
                     
                     # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
                     if "db_justificaciones" not in st.session_state:
@@ -2329,7 +2326,7 @@ else:
                     pdf_data_j = pdf_j.output(dest='S').encode('latin-1', 'replace')
                     st.download_button(label="🚀 DESCARGAR JUSTIFICACIÓN PDF", data=pdf_data_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
-                    st.error("❌ Función PDF no disponible.")                    
+                    st.error("❌ Función PDF no disponible.")
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
