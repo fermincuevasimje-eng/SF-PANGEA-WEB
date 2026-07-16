@@ -414,7 +414,7 @@ else:
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-        st.info("SF PANGEA V24")
+        st.info("SF PANGEA VPLUS ULTRA")
 
 # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
