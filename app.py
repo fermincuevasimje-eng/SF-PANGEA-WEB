@@ -2249,7 +2249,7 @@ else:
                     pdf_j.cell(14, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
                     pdf_j.cell(2, 5.5, txt="", border=0, ln=False)
                     fill_hp = (f_registro == "HAND PUNCH")
-                    pdf_j.cell(17 Vintage if fill_hp else 17, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
+                    pdf_j.cell(17, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
                     
                     pdf_j.ln(4)
                     
