@@ -715,14 +715,38 @@ else:
                             raw_b64 = str_v1 if str_v1.startswith("UEsDB") else (str_v2 if str_v2.startswith("UEsDB") else "")
                             
                             try:
-                                datos_dict = json.loads(raw_datos) if isinstance(raw_datos, str) else raw_datos
-                                if isinstance(datos_dict, dict) and datos_dict:
-                                    df_det = pd.DataFrame([{"Folio": k, "Detalle": v} for k, v in datos_dict.items()])
-                                    st.dataframe(df_det, use_container_width=True, hide_index=True)
-                                elif str_v1.startswith("UEsDB") or str_v2.startswith("UEsDB"):
+                                df_mostrar = None
+                                
+                                # 1. Intento por JSON de captura (Texto de respaldo rápido)
+                                if raw_datos and raw_datos != "{}":
+                                    try:
+                                        datos_dict = json.loads(raw_datos)
+                                        if isinstance(datos_dict, str):
+                                            datos_dict = json.loads(datos_dict)
+                                        
+                                        if isinstance(datos_dict, dict) and datos_dict:
+                                            df_mostrar = pd.DataFrame([{"Folio": k, "Detalle": v} for k, v in datos_dict.items()])
+                                        elif isinstance(datos_dict, list) and datos_dict:
+                                            df_mostrar = pd.DataFrame(datos_dict)
+                                    except Exception:
+                                        pass
+                                
+                                # 2. Intento por Reconstrucción Binaria (Decodifica el Excel Base64 guardado)
+                                if df_mostrar is None and raw_b64:
+                                    try:
+                                        excel_bytes = base64.b64decode(raw_b64)
+                                        df_mostrar = pd.read_excel(io.BytesIO(excel_bytes))
+                                    except Exception as e_excel:
+                                        st.warning(f"⚠️ Archivo Excel detectado, pero la vista previa falló: {e_excel}")
+                                
+                                # 3. Renderizado final en la interfaz
+                                if df_mostrar is not None:
+                                    st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
+                                elif raw_b64:
                                     st.info("Este registro contiene un archivo Excel. Usa el botón de descarga de abajo.")
                                 else:
                                     st.info("No hay folios individuales capturados para este registro.")
+                                    
                             except Exception as e:
                                 st.error(f"Error al visualizar folios: {e}")
                                 st.code(raw_datos)
