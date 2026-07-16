@@ -2164,12 +2164,14 @@ else:
 
                 # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA) ---
                 if motor_pdf_listo:
+                    # Definición de coordenadas elásticas para alineación física en papel
+                    X_START = 19.0  # Incrementado para centrar más a la derecha
+                    W_TOTAL = 185.9
+                    
                     pdf_j = FPDF(orientation='P', unit='mm', format='Letter')
-                    pdf_j.set_margins(15, 15, 15)
+                    pdf_j.set_margins(X_START, 22, 11)  # Bajado a 22mm para dar aire al encabezado
                     pdf_j.set_auto_page_break(auto=False)
                     pdf_j.add_page()
-                    
-                    W_TOTAL = 185.9
                     
                     # Filtro defensivo anti-crash para caracteres especiales (Nombres Mexicanos)
                     solicita_enc = solicita.encode('latin-1', 'replace').decode('latin-1')
@@ -2188,7 +2190,7 @@ else:
                     revisa_c_enc = revisa_c.encode('latin-1', 'replace').decode('latin-1')
                     recibe_c_enc = recibe_c.encode('latin-1', 'replace').decode('latin-1')
                     
-                    # Encabezado Estandarizado
+                    # Encabezado Estandarizado (Alineado a la nueva coordenada X)
                     pdf_j.set_font("Arial", 'B', 18)
                     pdf_j.cell(45, 6, txt="Toluca", ln=False)
                     pdf_j.set_font("Arial", 'B', 9)
@@ -2197,7 +2199,7 @@ else:
                     pdf_j.cell(40.9, 4, txt="[ TIMBRE ]", ln=True, align='R')
                     
                     pdf_j.set_font("Arial", 'B', 8)
-                    pdf_j.set_xy(15, 21)
+                    pdf_j.set_xy(X_START, 28) # Ajustado proporcionalmente hacia abajo
                     pdf_j.cell(45, 4, txt="CAPITAL DE OPORTUNIDADES", ln=False)
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.cell(100, 4, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
@@ -2295,64 +2297,63 @@ else:
                     pdf_j.set_font("Arial", 'B', 9.5)
                     
                     y_antes_motivo = pdf_j.get_y()
-                    pdf_j.rect(15, y_antes_motivo, W_TOTAL, 22)
+                    pdf_j.rect(X_START, y_antes_motivo, W_TOTAL, 22)
                     pdf_j.set_y(y_antes_motivo + 2)
                     pdf_j.multi_cell(W_TOTAL, 5, txt=motivo_enc, align='C')
                     pdf_j.set_y(y_antes_motivo + 22)
                     
                     # --- GRID DE FIRMAS INTEGRADO ESTILO IMAGEN OFICIAL ---
-                    # Acoplamos el bloque justo abajo del motivo llenando la hoja al 100%
-                    y_g = pdf_j.get_y() + 4
+                    y_g = pdf_j.get_y() + 6  # Bajado ligeramente para una distribución uniforme
                     h_grid = 54
                     w_col = W_TOTAL / 4
                     
-                    # Marco contenedor y divisiones de columnas
-                    pdf_j.rect(15, y_g, W_TOTAL, h_grid)
-                    pdf_j.line(15 + w_col, y_g, 15 + w_col, y_g + h_grid)
-                    pdf_j.line(15 + 2*w_col, y_g, 15 + 2*w_col, y_g + h_grid)
-                    pdf_j.line(15 + 3*w_col, y_g, 15 + 3*w_col, y_g + h_grid)
+                    # Marco contenedor y divisiones utilizando la variable elástica X_START
+                    pdf_j.rect(X_START, y_g, W_TOTAL, h_grid)
+                    pdf_j.line(X_START + w_col, y_g, X_START + w_col, y_g + h_grid)
+                    pdf_j.line(X_START + 2*w_col, y_g, X_START + 2*w_col, y_g + h_grid)
+                    pdf_j.line(X_START + 3*w_col, y_g, X_START + 3*w_col, y_g + h_grid)
                     
-                    # Divisiones internas del formato de firmas
-                    pdf_j.line(15, y_g + 36, 15 + W_TOTAL, y_g + 36) # Renglón superior de firmas
-                    pdf_j.line(15, y_g + 45, 15 + W_TOTAL, y_g + 45) # Renglón inferior de roles
+                    # Divisiones de los renglones internos
+                    pdf_j.line(X_START, y_g + 36, X_START + W_TOTAL, y_g + 36)
+                    pdf_j.line(X_START, y_g + 45, X_START + W_TOTAL, y_g + 45)
                     
-                    # Títulos superiores internos de validación
+                    # Títulos de validación
                     pdf_j.set_font("Arial", 'B', 8.5)
-                    pdf_j.set_xy(15 + w_col, y_g + 2)
+                    pdf_j.set_xy(X_START + w_col, y_g + 2)
                     pdf_j.cell(w_col, 4, txt="AUTORIZACIÓN", align='C')
-                    pdf_j.set_xy(15 + 2*w_col, y_g + 2)
+                    pdf_j.set_xy(X_START + 2*w_col, y_g + 2)
                     pdf_j.cell(w_col, 4, txt="Vo. Bo.", align='C')
                     
-                    # Inyección de Nombres del Personal
+                    # Nombres del Personal
                     pdf_j.set_font("Arial", 'B', 8)
-                    pdf_j.set_xy(15, y_g + 37.5)
+                    pdf_j.set_xy(X_START, y_g + 37.5)
                     pdf_j.multi_cell(w_col, 3.2, txt=firma_solicita_enc, align='C')
-                    pdf_j.set_xy(15 + w_col, y_g + 37.5)
+                    pdf_j.set_xy(X_START + w_col, y_g + 37.5)
                     pdf_j.multi_cell(w_col, 3.2, txt=autoriza_n_enc, align='C')
-                    pdf_j.set_xy(15 + 2*w_col, y_g + 37.5)
+                    pdf_j.set_xy(X_START + 2*w_col, y_g + 37.5)
                     pdf_j.multi_cell(w_col, 3.2, txt=revisa_n_enc, align='C')
-                    pdf_j.set_xy(15 + 3*w_col, y_g + 37.5)
+                    pdf_j.set_xy(X_START + 3*w_col, y_g + 37.5)
                     pdf_j.multi_cell(w_col, 3.2, txt=recibe_n_enc, align='C')
                     
-                    # Inyección de Cargos Oficiales
+                    # Cargos Oficiales
                     pdf_j.set_font("Arial", 'B', 7.5)
-                    pdf_j.set_xy(15, y_g + 46.5)
+                    pdf_j.set_xy(X_START, y_g + 46.5)
                     pdf_j.multi_cell(w_col, 3, txt="SOLICITANTE", align='C')
-                    pdf_j.set_xy(15 + w_col, y_g + 46.5)
+                    pdf_j.set_xy(X_START + w_col, y_g + 46.5)
                     pdf_j.multi_cell(w_col, 3, txt=autoriza_c_enc, align='C')
-                    pdf_j.set_xy(15 + 2*w_col, y_g + 46.5)
+                    pdf_j.set_xy(X_START + 2*w_col, y_g + 46.5)
                     pdf_j.multi_cell(w_col, 3, txt=revisa_c_enc, align='C')
-                    pdf_j.set_xy(15 + 3*w_col, y_g + 46.5)
+                    pdf_j.set_xy(X_START + 3*w_col, y_g + 46.5)
                     pdf_j.multi_cell(w_col, 3, txt=recibe_c_enc, align='C')
                     
                     # Pie de página y cinturón negro inferior institucional
-                    pdf_j.set_xy(15, y_g + 58)
+                    pdf_j.set_xy(X_START, y_g + 58)
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.cell(W_TOTAL, 4, txt="H. Ayuntamiento de Toluca", ln=True, align='C')
                     pdf_j.set_font("Arial", '', 7.5)
                     pdf_j.cell(W_TOTAL, 3, txt="Rafael Alducin s/n esquina Primero de Mayo, Col. Reforma y Ferrocarriles | Tel: 7223171747", ln=True, align='C')
                     pdf_j.set_fill_color(0, 0, 0)
-                    pdf_j.rect(15, pdf_j.get_y() + 2, W_TOTAL, 2.5, 'F')
+                    pdf_j.rect(X_START, pdf_j.get_y() + 2, W_TOTAL, 2.5, 'F')
                     
                     pdf_data_j = pdf_j.output(dest='S').encode('latin-1', 'replace')
                     st.download_button(label="🚀 DESCARGAR JUSTIFICACIÓN PDF", data=pdf_data_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True)
