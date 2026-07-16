@@ -20,7 +20,7 @@ import config
 import data_manager
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA V24", layout="wide")
+st.set_page_config(page_title="SF PANGEA VPLUS ULTRA", layout="wide")
 
 st.markdown(
     """
