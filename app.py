@@ -2148,7 +2148,7 @@ else:
                         "adscrito": adscrito, "nombre": nombre_emp, "num_emp": num_emp,
                         "tipo_fecha": tipo_fecha_j, "fecha_inicio": str(f_inicio), "fecha_fin": str(f_fin),
                         "clave_concepto": clave_concepto, "motivo": motivo, "revisa_n": revisa_n,
-                        "autoriza_n": autoriza_n, "recibe_n": receives_n, "fecha_doc": str(f_doc),
+                        "autoriza_n": autoriza_n, "recibe_n": recibe_n, "fecha_doc": str(f_doc),
                         "firma_solicita": firma_solicita, "autoriza_c": autoriza_c, "revisa_c": revisa_c, "recibe_c": recibe_c
                     }
                     
@@ -2171,7 +2171,24 @@ else:
                     
                     W_TOTAL = 185.9
                     
-                    # Encabezado Toluca Estandarizado
+                    # Filtro defensivo anti-crash para caracteres especiales (Nombres Mexicanos)
+                    solicita_enc = solicita.encode('latin-1', 'replace').decode('latin-1')
+                    nombre_emp_enc = nombre_emp.encode('latin-1', 'replace').decode('latin-1')
+                    just_line_enc = just_line.encode('latin-1', 'replace').decode('latin-1')
+                    sanc_line_enc = sanc_line.encode('latin-1', 'replace').decode('latin-1')
+                    adscrito_enc = adscrito.encode('latin-1', 'replace').decode('latin-1')
+                    motivo_enc = (motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO.").encode('latin-1', 'replace').decode('latin-1')
+                    
+                    firma_solicita_enc = firma_solicita.encode('latin-1', 'replace').decode('latin-1')
+                    autoriza_n_enc = autoriza_n.encode('latin-1', 'replace').decode('latin-1')
+                    revisa_n_enc = revisa_n.encode('latin-1', 'replace').decode('latin-1')
+                    recibe_n_enc = recibe_n.encode('latin-1', 'replace').decode('latin-1')
+                    
+                    autoriza_c_enc = autoriza_c.encode('latin-1', 'replace').decode('latin-1')
+                    revisa_c_enc = revisa_c.encode('latin-1', 'replace').decode('latin-1')
+                    recibe_c_enc = recibe_c.encode('latin-1', 'replace').decode('latin-1')
+                    
+                    # Encabezado Estandarizado
                     pdf_j.set_font("Arial", 'B', 18)
                     pdf_j.cell(45, 6, txt="Toluca", ln=False)
                     pdf_j.set_font("Arial", 'B', 9)
@@ -2194,54 +2211,54 @@ else:
                     pdf_j.cell(W_TOTAL, 5, txt="FORMATO ÚNICO DE JUSTIFICACIÓN", ln=True, align='C')
                     pdf_j.ln(4)
                     
-                    # Renglones del bloque superior con celdas de subrayado automático (Bordes 'B')
+                    # Renglones Esponjados (Altura 7mm) y alineados al ras lateral (Borde 'B')
                     pdf_j.set_font("Arial", 'B', 10)
-                    pdf_j.cell(22, 6, txt="SOLICITA: ", border=0, ln=False)
+                    pdf_j.cell(22, 7, txt="SOLICITA: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(110, 6, txt=solicita, border='B', ln=False)
+                    pdf_j.cell(110, 7, txt=solicita_enc, border='B', ln=False)
                     pdf_j.set_font("Arial", 'B', 10)
-                    pdf_j.cell(18, 6, txt=" FECHA: ", border=0, ln=False)
+                    pdf_j.cell(18, 7, txt=" FECHA: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(35.9, 6, txt=f_doc_str, border='B', ln=True, align='C')
+                    pdf_j.cell(35.9, 7, txt=f_doc_str, border='B', ln=True, align='C')
                     
                     pdf_j.set_font("Arial", 'B', 10)
-                    pdf_j.cell(26, 6, txt="JUSTIFICAR: ", border=0, ln=False)
+                    pdf_j.cell(26, 7, txt="JUSTIFICAR: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(159.9, 6, txt=just_line, border='B', ln=True)
+                    pdf_j.cell(159.9, 7, txt=just_line_enc, border='B', ln=True)
                     
                     pdf_j.set_font("Arial", 'B', 10)
-                    pdf_j.cell(26, 6, txt="SANCIONAR: ", border=0, ln=False)
+                    pdf_j.cell(26, 7, txt="SANCIONAR: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(98, 6, txt=sanc_line, border='B', ln=False)
+                    pdf_j.cell(98, 7, txt=sanc_line_enc, border='B', ln=False)
                     pdf_j.set_font("Arial", 'B', 10)
-                    pdf_j.cell(26, 6, txt=" No. DE EMP.: ", border=0, ln=False)
+                    pdf_j.cell(26, 7, txt=" No. DE EMP.: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(35.9, 6, txt=num_emp, border='B', ln=True, align='C')
+                    pdf_j.cell(35.9, 7, txt=num_emp, border='B', ln=True, align='C')
                     
                     pdf_j.set_font("Arial", 'B', 10)
-                    pdf_j.cell(26, 6, txt="ADSCRITO A: ", border=0, ln=False)
+                    pdf_j.cell(26, 7, txt="ADSCRITO A: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(98, 6, txt=adscrito, border='B', ln=False)
+                    pdf_j.cell(98, 7, txt=adscrito_enc, border='B', ln=False)
                     pdf_j.set_font("Arial", 'B', 8.5)
-                    pdf_j.cell(26, 6, txt=" F. REGISTRO: ", border=0, ln=False)
+                    pdf_j.cell(26, 7, txt=" F. REGISTRO: ", border=0, ln=False)
                     
-                    # Casillas de verificación integradas horizontalmente
+                    # Checkboxes horizontales integradas
                     fill_lista = (f_registro == "LISTA")
                     pdf_j.set_fill_color(188, 188, 188)
-                    pdf_j.cell(14, 5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
-                    pdf_j.cell(2, 5, txt="", border=0, ln=False)
+                    pdf_j.cell(14, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
+                    pdf_j.cell(2, 5.5, txt="", border=0, ln=False)
                     fill_hp = (f_registro == "HAND PUNCH")
-                    pdf_j.cell(19.9, 5, txt="HAND PUNCH", border=1, ln=True, align='C', fill=fill_hp)
+                    pdf_j.cell(19.9, 5.5, txt="HAND PUNCH", border=1, ln=True, align='C', fill=fill_hp)
                     
                     pdf_j.ln(4)
                     
-                    # --- TABLA DE CONCEPTOS REDISEÑADA PARA EXTENSIÓN COMPLETA ---
+                    # --- TABLA DE CONCEPTOS ESPONJADA (Altura 6.2mm) ---
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.set_fill_color(225, 225, 225)
-                    pdf_j.cell(12, 5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                    pdf_j.cell(80.95, 5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
-                    pdf_j.cell(12, 5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                    pdf_j.cell(80.95, 5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
+                    pdf_j.cell(12, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
+                    pdf_j.cell(80.95, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
+                    pdf_j.cell(12, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
+                    pdf_j.cell(80.95, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
                     
                     pdf_j.set_font("Arial", '', 8)
                     for c1, n1, c2, n2 in conceptos_grid:
@@ -2249,87 +2266,93 @@ else:
                         fill_r = (cod_sel == c2)
                         pdf_j.set_fill_color(188, 188, 188)
                         
-                        pdf_j.cell(12, 4.8, txt=c1, border=1, ln=False, align='C', fill=fill_l)
-                        pdf_j.cell(80.95, 4.8, txt=f" {n1}", border=1, ln=False, fill=fill_l)
-                        pdf_j.cell(12, 4.8, txt=c2, border=1, ln=False, align='C', fill=fill_r)
-                        pdf_j.cell(80.95, 4.8, txt=f" {n2}", border=1, ln=True, fill=fill_r)
+                        t_n1 = f" {n1}".encode('latin-1', 'replace').decode('latin-1')
+                        t_n2 = f" {n2}".encode('latin-1', 'replace').decode('latin-1')
+                        
+                        pdf_j.cell(12, 6.2, txt=c1, border=1, ln=False, align='C', fill=fill_l)
+                        pdf_j.cell(80.95, 6.2, txt=t_n1, border=1, ln=False, fill=fill_l)
+                        pdf_j.cell(12, 6.2, txt=c2, border=1, ln=False, align='C', fill=fill_r)
+                        pdf_j.cell(80.95, 6.2, txt=t_n2, border=1, ln=True, fill=fill_r)
                         
                     pdf_j.ln(3)
                     
-                    # Recuadro de Fechas en Ancho Completo
+                    # Recuadro Periodo / Fechas
                     pdf_j.set_font("Arial", 'B', 9.5)
                     pdf_j.set_fill_color(245, 245, 245)
-                    pdf_j.cell(W_TOTAL, 5, txt=" FECHA:", border=1, ln=True, fill=True)
+                    pdf_j.cell(W_TOTAL, 5.5, txt=" FECHA:", border=1, ln=True, fill=True)
                     pdf_j.set_font("Arial", 'B', 10.5)
                     pdf_j.set_text_color(220, 0, 0)
-                    pdf_j.cell(92.95, 8, txt=f_ini_str, border=1, ln=False, align='C')
-                    pdf_j.cell(92.95, 8, txt=f_fin_str, border=1, ln=True, align='C')
+                    pdf_j.cell(92.95, 9, txt=f_ini_str, border=1, ln=False, align='C')
+                    pdf_j.cell(92.95, 9, txt=f_fin_str, border=1, ln=True, align='C')
                     pdf_j.set_text_color(0, 0, 0)
                     
                     pdf_j.ln(3)
                     
-                    # Contenedor Autónomo de Motivo
+                    # Recuadro Ampliado de Motivo
                     pdf_j.set_font("Arial", 'B', 9.5)
                     pdf_j.set_fill_color(225, 225, 225)
-                    pdf_j.cell(W_TOTAL, 5, txt="MOTIVO", border=1, ln=True, align='C', fill=True)
+                    pdf_j.cell(W_TOTAL, 5.5, txt="MOTIVO", border=1, ln=True, align='C', fill=True)
                     pdf_j.set_font("Arial", 'B', 9.5)
                     
                     y_antes_motivo = pdf_j.get_y()
-                    pdf_j.multi_cell(W_TOTAL, 5, txt=motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO.", border=1, align='C')
-                    pdf_j.set_y(y_antes_motivo + 18)
+                    pdf_j.rect(15, y_antes_motivo, W_TOTAL, 22)
+                    pdf_j.set_y(y_antes_motivo + 2)
+                    pdf_j.multi_cell(W_TOTAL, 5, txt=motivo_enc, align='C')
+                    pdf_j.set_y(y_antes_motivo + 22)
                     
-                    # --- BLOQUE METRICO DE 4 FIRMAS PERFECTAMENTE ALINEADAS ---
-                    y_firmas = 232
-                    w_col = 46.475
+                    # --- GRID DE FIRMAS INTEGRADO ESTILO IMAGEN OFICIAL ---
+                    # Acoplamos el bloque justo abajo del motivo llenando la hoja al 100%
+                    y_g = pdf_j.get_y() + 4
+                    h_grid = 54
+                    w_col = W_TOTAL / 4
                     
-                    # Columna 1: Solicitante
-                    pdf_j.set_xy(15, y_firmas)
-                    pdf_j.cell(w_col, 4, txt="", border='B', ln=True)
-                    pdf_j.set_xy(15, y_firmas + 5)
+                    # Marco contenedor y divisiones de columnas
+                    pdf_j.rect(15, y_g, W_TOTAL, h_grid)
+                    pdf_j.line(15 + w_col, y_g, 15 + w_col, y_g + h_grid)
+                    pdf_j.line(15 + 2*w_col, y_g, 15 + 2*w_col, y_g + h_grid)
+                    pdf_j.line(15 + 3*w_col, y_g, 15 + 3*w_col, y_g + h_grid)
+                    
+                    # Divisiones internas del formato de firmas
+                    pdf_j.line(15, y_g + 36, 15 + W_TOTAL, y_g + 36) # Renglón superior de firmas
+                    pdf_j.line(15, y_g + 45, 15 + W_TOTAL, y_g + 45) # Renglón inferior de roles
+                    
+                    # Títulos superiores internos de validación
                     pdf_j.set_font("Arial", 'B', 8.5)
-                    pdf_j.multi_cell(w_col, 3.5, txt=firma_solicita, align='C')
-                    pdf_j.set_xy(15, y_firmas + 16)
+                    pdf_j.set_xy(15 + w_col, y_g + 2)
+                    pdf_j.cell(w_col, 4, txt="AUTORIZACIÓN", align='C')
+                    pdf_j.set_xy(15 + 2*w_col, y_g + 2)
+                    pdf_j.cell(w_col, 4, txt="Vo. Bo.", align='C')
+                    
+                    # Inyección de Nombres del Personal
+                    pdf_j.set_font("Arial", 'B', 8)
+                    pdf_j.set_xy(15, y_g + 37.5)
+                    pdf_j.multi_cell(w_col, 3.2, txt=firma_solicita_enc, align='C')
+                    pdf_j.set_xy(15 + w_col, y_g + 37.5)
+                    pdf_j.multi_cell(w_col, 3.2, txt=autoriza_n_enc, align='C')
+                    pdf_j.set_xy(15 + 2*w_col, y_g + 37.5)
+                    pdf_j.multi_cell(w_col, 3.2, txt=revisa_n_enc, align='C')
+                    pdf_j.set_xy(15 + 3*w_col, y_g + 37.5)
+                    pdf_j.multi_cell(w_col, 3.2, txt=recibe_n_enc, align='C')
+                    
+                    # Inyección de Cargos Oficiales
                     pdf_j.set_font("Arial", 'B', 7.5)
+                    pdf_j.set_xy(15, y_g + 46.5)
                     pdf_j.multi_cell(w_col, 3, txt="SOLICITANTE", align='C')
+                    pdf_j.set_xy(15 + w_col, y_g + 46.5)
+                    pdf_j.multi_cell(w_col, 3, txt=autoriza_c_enc, align='C')
+                    pdf_j.set_xy(15 + 2*w_col, y_g + 46.5)
+                    pdf_j.multi_cell(w_col, 3, txt=revisa_c_enc, align='C')
+                    pdf_j.set_xy(15 + 3*w_col, y_g + 46.5)
+                    pdf_j.multi_cell(w_col, 3, txt=recibe_c_enc, align='C')
                     
-                    # Columna 2: Autoriza
-                    pdf_j.set_xy(15 + w_col, y_firmas)
-                    pdf_j.cell(w_col, 4, txt="", border='B', ln=True)
-                    pdf_j.set_xy(15 + w_col, y_firmas + 5)
-                    pdf_j.set_font("Arial", 'B', 8.5)
-                    pdf_j.multi_cell(w_col, 3.5, txt=autoriza_n, align='C')
-                    pdf_j.set_xy(15 + w_col, y_firmas + 16)
-                    pdf_j.set_font("Arial", 'B', 7.5)
-                    pdf_j.multi_cell(w_col, 3, txt=autoriza_c, align='C')
-                    
-                    # Columna 3: Revisa
-                    pdf_j.set_xy(15 + 2*w_col, y_firmas)
-                    pdf_j.cell(w_col, 4, txt="", border='B', ln=True)
-                    pdf_j.set_xy(15 + 2*w_col, y_firmas + 5)
-                    pdf_j.set_font("Arial", 'B', 8.5)
-                    pdf_j.multi_cell(w_col, 3.5, txt=revisa_n, align='C')
-                    pdf_j.set_xy(15 + 2*w_col, y_firmas + 16)
-                    pdf_j.set_font("Arial", 'B', 7.5)
-                    pdf_j.multi_cell(w_col, 3, txt=revisa_c, align='C')
-                    
-                    # Columna 4: Recibe
-                    pdf_j.set_xy(15 + 3*w_col, y_firmas)
-                    pdf_j.cell(w_col, 4, txt="", border='B', ln=True)
-                    pdf_j.set_xy(15 + 3*w_col, y_firmas + 5)
-                    pdf_j.set_font("Arial", 'B', 8.5)
-                    pdf_j.multi_cell(w_col, 3.5, txt=recibe_n, align='C')
-                    pdf_j.set_xy(15 + 3*w_col, y_firmas + 16)
-                    pdf_j.set_font("Arial", 'B', 7.5)
-                    pdf_j.multi_cell(w_col, 3, txt=recibe_c, align='C')
-                    
-                    # Cierre y Pie de Página Institucional
-                    pdf_j.set_xy(15, 261)
+                    # Pie de página y cinturón negro inferior institucional
+                    pdf_j.set_xy(15, y_g + 58)
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.cell(W_TOTAL, 4, txt="H. Ayuntamiento de Toluca", ln=True, align='C')
                     pdf_j.set_font("Arial", '', 7.5)
                     pdf_j.cell(W_TOTAL, 3, txt="Rafael Alducin s/n esquina Primero de Mayo, Col. Reforma y Ferrocarriles | Tel: 7223171747", ln=True, align='C')
                     pdf_j.set_fill_color(0, 0, 0)
-                    pdf_j.rect(15, 269, W_TOTAL, 2.5, 'F')
+                    pdf_j.rect(15, pdf_j.get_y() + 2, W_TOTAL, 2.5, 'F')
                     
                     pdf_data_j = pdf_j.output(dest='S').encode('latin-1', 'replace')
                     st.download_button(label="🚀 DESCARGAR JUSTIFICACIÓN PDF", data=pdf_data_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True)
