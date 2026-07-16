@@ -2164,12 +2164,12 @@ else:
 
                 # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA) ---
                 if motor_pdf_listo:
-                    # Definición de coordenadas elásticas para alineación física en papel
-                    X_START = 19.0  # Incrementado para centrar más a la derecha
-                    W_TOTAL = 185.9
+                    # Calibración asimétrica para forzar desplazamiento físico en papel
+                    X_START = 24.0  # Incrementado para empujar todo a la derecha
+                    W_TOTAL = 178.0  # Compactado para abrir el margen derecho y evitar auto-centrados
                     
                     pdf_j = FPDF(orientation='P', unit='mm', format='Letter')
-                    pdf_j.set_margins(X_START, 22, 11)  # Bajado a 22mm para dar aire al encabezado
+                    pdf_j.set_margins(X_START, 26, 12)  # Bajado a 26mm para forzar el desplazamiento hacia abajo
                     pdf_j.set_auto_page_break(auto=False)
                     pdf_j.add_page()
                     
@@ -2190,19 +2190,19 @@ else:
                     revisa_c_enc = revisa_c.encode('latin-1', 'replace').decode('latin-1')
                     recibe_c_enc = recibe_c.encode('latin-1', 'replace').decode('latin-1')
                     
-                    # Encabezado Estandarizado (Alineado a la nueva coordenada X)
+                    # Encabezado Estandarizado
                     pdf_j.set_font("Arial", 'B', 18)
                     pdf_j.cell(45, 6, txt="Toluca", ln=False)
                     pdf_j.set_font("Arial", 'B', 9)
-                    pdf_j.cell(100, 4, txt="DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS", ln=False, align='C')
+                    pdf_j.cell(95, 4, txt="DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS", ln=False, align='C')
                     pdf_j.set_font("Arial", '', 8)
-                    pdf_j.cell(40.9, 4, txt="[ TIMBRE ]", ln=True, align='R')
+                    pdf_j.cell(38, 4, txt="[ TIMBRE ]", ln=True, align='R')
                     
                     pdf_j.set_font("Arial", 'B', 8)
-                    pdf_j.set_xy(X_START, 28) # Ajustado proporcionalmente hacia abajo
+                    pdf_j.set_xy(X_START, 32) # Bajado el bloque de subtítulos
                     pdf_j.cell(45, 4, txt="CAPITAL DE OPORTUNIDADES", ln=False)
                     pdf_j.set_font("Arial", 'B', 9)
-                    pdf_j.cell(100, 4, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
+                    pdf_j.cell(95, 4, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
                     
                     pdf_j.ln(2)
                     pdf_j.set_font("Arial", 'I', 8.5)
@@ -2213,54 +2213,53 @@ else:
                     pdf_j.cell(W_TOTAL, 5, txt="FORMATO ÚNICO DE JUSTIFICACIÓN", ln=True, align='C')
                     pdf_j.ln(4)
                     
-                    # Renglones Esponjados (Altura 7mm) y alineados al ras lateral (Borde 'B')
+                    # Renglones principales
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(22, 7, txt="SOLICITA: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(110, 7, txt=solicita_enc, border='B', ln=False)
+                    pdf_j.cell(105, 7, txt=solicita_enc, border='B', ln=False)
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(18, 7, txt=" FECHA: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(35.9, 7, txt=f_doc_str, border='B', ln=True, align='C')
+                    pdf_j.cell(33, 7, txt=f_doc_str, border='B', ln=True, align='C')
                     
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(26, 7, txt="JUSTIFICAR: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(159.9, 7, txt=just_line_enc, border='B', ln=True)
+                    pdf_j.cell(152, 7, txt=just_line_enc, border='B', ln=True)
                     
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(26, 7, txt="SANCIONAR: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(98, 7, txt=sanc_line_enc, border='B', ln=False)
+                    pdf_j.cell(93, 7, txt=sanc_line_enc, border='B', ln=False)
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(26, 7, txt=" No. DE EMP.: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(35.9, 7, txt=num_emp, border='B', ln=True, align='C')
+                    pdf_j.cell(33, 7, txt=num_emp, border='B', ln=True, align='C')
                     
                     pdf_j.set_font("Arial", 'B', 10)
                     pdf_j.cell(26, 7, txt="ADSCRITO A: ", border=0, ln=False)
                     pdf_j.set_font("Arial", '', 10)
-                    pdf_j.cell(98, 7, txt=adscrito_enc, border='B', ln=False)
+                    pdf_j.cell(93, 7, txt=adscrito_enc, border='B', ln=False)
                     pdf_j.set_font("Arial", 'B', 8.5)
                     pdf_j.cell(26, 7, txt=" F. REGISTRO: ", border=0, ln=False)
                     
-                    # Checkboxes horizontales integradas
                     fill_lista = (f_registro == "LISTA")
                     pdf_j.set_fill_color(188, 188, 188)
                     pdf_j.cell(14, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
                     pdf_j.cell(2, 5.5, txt="", border=0, ln=False)
                     fill_hp = (f_registro == "HAND PUNCH")
-                    pdf_j.cell(19.9, 5.5, txt="HAND PUNCH", border=1, ln=True, align='C', fill=fill_hp)
+                    pdf_j.cell(17 Vintage if fill_hp else 17, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
                     
                     pdf_j.ln(4)
                     
-                    # --- TABLA DE CONCEPTOS ESPONJADA (Altura 6.2mm) ---
+                    # --- TABLA DE CONCEPTOS ESPONJADA ---
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.set_fill_color(225, 225, 225)
                     pdf_j.cell(12, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                    pdf_j.cell(80.95, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
+                    pdf_j.cell(77, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
                     pdf_j.cell(12, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                    pdf_j.cell(80.95, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
+                    pdf_j.cell(77, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
                     
                     pdf_j.set_font("Arial", '', 8)
                     for c1, n1, c2, n2 in conceptos_grid:
@@ -2272,9 +2271,9 @@ else:
                         t_n2 = f" {n2}".encode('latin-1', 'replace').decode('latin-1')
                         
                         pdf_j.cell(12, 6.2, txt=c1, border=1, ln=False, align='C', fill=fill_l)
-                        pdf_j.cell(80.95, 6.2, txt=t_n1, border=1, ln=False, fill=fill_l)
+                        pdf_j.cell(77, 6.2, txt=t_n1, border=1, ln=False, fill=fill_l)
                         pdf_j.cell(12, 6.2, txt=c2, border=1, ln=False, align='C', fill=fill_r)
-                        pdf_j.cell(80.95, 6.2, txt=t_n2, border=1, ln=True, fill=fill_r)
+                        pdf_j.cell(77, 6.2, txt=t_n2, border=1, ln=True, fill=fill_r)
                         
                     pdf_j.ln(3)
                     
@@ -2284,8 +2283,8 @@ else:
                     pdf_j.cell(W_TOTAL, 5.5, txt=" FECHA:", border=1, ln=True, fill=True)
                     pdf_j.set_font("Arial", 'B', 10.5)
                     pdf_j.set_text_color(220, 0, 0)
-                    pdf_j.cell(92.95, 9, txt=f_ini_str, border=1, ln=False, align='C')
-                    pdf_j.cell(92.95, 9, txt=f_fin_str, border=1, ln=True, align='C')
+                    pdf_j.cell(89, 9, txt=f_ini_str, border=1, ln=False, align='C')
+                    pdf_j.cell(89, 9, txt=f_fin_str, border=1, ln=True, align='C')
                     pdf_j.set_text_color(0, 0, 0)
                     
                     pdf_j.ln(3)
@@ -2302,29 +2301,25 @@ else:
                     pdf_j.multi_cell(W_TOTAL, 5, txt=motivo_enc, align='C')
                     pdf_j.set_y(y_antes_motivo + 22)
                     
-                    # --- GRID DE FIRMAS INTEGRADO ESTILO IMAGEN OFICIAL ---
-                    y_g = pdf_j.get_y() + 6  # Bajado ligeramente para una distribución uniforme
+                    # --- GRID DE FIRMAS INTEGRADO ---
+                    y_g = pdf_j.get_y() + 8  # Más espacio vertical antes del cuadro
                     h_grid = 54
                     w_col = W_TOTAL / 4
                     
-                    # Marco contenedor y divisiones utilizando la variable elástica X_START
                     pdf_j.rect(X_START, y_g, W_TOTAL, h_grid)
                     pdf_j.line(X_START + w_col, y_g, X_START + w_col, y_g + h_grid)
                     pdf_j.line(X_START + 2*w_col, y_g, X_START + 2*w_col, y_g + h_grid)
                     pdf_j.line(X_START + 3*w_col, y_g, X_START + 3*w_col, y_g + h_grid)
                     
-                    # Divisiones de los renglones internos
                     pdf_j.line(X_START, y_g + 36, X_START + W_TOTAL, y_g + 36)
                     pdf_j.line(X_START, y_g + 45, X_START + W_TOTAL, y_g + 45)
                     
-                    # Títulos de validación
                     pdf_j.set_font("Arial", 'B', 8.5)
                     pdf_j.set_xy(X_START + w_col, y_g + 2)
                     pdf_j.cell(w_col, 4, txt="AUTORIZACIÓN", align='C')
                     pdf_j.set_xy(X_START + 2*w_col, y_g + 2)
                     pdf_j.cell(w_col, 4, txt="Vo. Bo.", align='C')
                     
-                    # Nombres del Personal
                     pdf_j.set_font("Arial", 'B', 8)
                     pdf_j.set_xy(X_START, y_g + 37.5)
                     pdf_j.multi_cell(w_col, 3.2, txt=firma_solicita_enc, align='C')
@@ -2335,7 +2330,6 @@ else:
                     pdf_j.set_xy(X_START + 3*w_col, y_g + 37.5)
                     pdf_j.multi_cell(w_col, 3.2, txt=recibe_n_enc, align='C')
                     
-                    # Cargos Oficiales
                     pdf_j.set_font("Arial", 'B', 7.5)
                     pdf_j.set_xy(X_START, y_g + 46.5)
                     pdf_j.multi_cell(w_col, 3, txt="SOLICITANTE", align='C')
@@ -2346,7 +2340,7 @@ else:
                     pdf_j.set_xy(X_START + 3*w_col, y_g + 46.5)
                     pdf_j.multi_cell(w_col, 3, txt=recibe_c_enc, align='C')
                     
-                    # Pie de página y cinturón negro inferior institucional
+                    # Pie de página institucional
                     pdf_j.set_xy(X_START, y_g + 58)
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.cell(W_TOTAL, 4, txt="H. Ayuntamiento de Toluca", ln=True, align='C')
