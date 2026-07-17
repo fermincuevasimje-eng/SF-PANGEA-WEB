@@ -1714,11 +1714,12 @@ else:
                     else:
                         st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
 
-            with c_preview:
+with c_preview:
                 st.markdown("### 👁️ Vista Previa")
-                c_final = cuerpo_txt.replace("[FOLIO]", f"**{f_ref}**" if f_ref else "**_______**")
+                # Cambiado a etiquetas <b> para compatibilidad nativa con el componente HTML
+                c_final = cuerpo_txt.replace("[FOLIO]", f"<b>{f_ref}</b>" if f_ref else "<b>_______</b>")
                 
-                # --- SINCRO ESPEJO EN VISTA PREVIA HTML (CAPA OFICIOS) ---
+                # --- SINCRO ESPEJO EN VISTA PREVIA HTML (CAPA OFICIOS SANITIZADA) ---
                 if tipo_membrete_of == "Sistema (Texto Directo)":
                     html_header_of = ""
                     e_sup = "20px"
@@ -1733,17 +1734,20 @@ else:
                     html_header_of = """<div style="height: 80px;"></div>"""
                     e_sup = "20px"
 
-                st.markdown(f"""
-                <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.6; min-height: 550px;">
+                html_oficio_render = f"""
+                <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.6; min-height: 550px; box-sizing: border-box;">
                     {html_header_of}
                     <div style="height: {e_sup};"></div>
                     <div style="text-align: right; font-weight: bold;">Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}<br>Oficio: {n_oficio}</div><br>
                     <div style="text-align: left; font-weight: bold; white-space: pre-line;">{dest.upper()}<br>{cargo.upper()}</div><br>
-                    <div style="text-align: justify;"> {c_final} </div><br><br>
+                    <div style="text-align: justify; white-space: pre-line;">{c_final}</div><br><br>
                     <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br>{cargo_firm.upper()}</div>
                     <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px; white-space: pre-line;">C.c.p. {ccp}</div>
                 </div>
-                """, unsafe_allow_html=True)
+                """
+                
+                # Inyección limpia encapsulada para evitar el escape de strings en Streamlit
+                st.components.v1.html(html_oficio_render, height=650, scrolling=True)
 
                 st.divider()
                 
@@ -1790,7 +1794,6 @@ else:
                     pdf.set_auto_page_break(auto=True, margin=25) 
                     pdf.add_page()
                     
-                    # --- CAPA 1 PDF DINÁMICA: DETECTA CONFIGURACIÓN DE MEMBRETE OFICIOS ---
                     if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
                         pdf.ln(15)
                     elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
@@ -1801,14 +1804,12 @@ else:
                             tmp_of.write(img_of_bytes)
                             tmp_path_of = tmp_of.name
                         try:
-                            # Inyección gráfica milimétrica: ancho exacto útil 165.9mm
                             pdf.image(tmp_path_of, x=30, y=15, w=165.9)
-                            pdf.set_y(42)  # Anclaje rígido del cuerpo para prevenir encimados
+                            pdf.set_y(42)
                         finally:
                             try: os.unlink(tmp_path_of)
                             except: pass
                     
-                    # --- CAPA 2 PDF DINÁMICA: CUERPO RE-ANCLADO ---
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
