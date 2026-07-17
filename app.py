@@ -1695,15 +1695,47 @@ else:
                     cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"), key=f"cargo_f_{pk}")
                     ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."), height=65, key=f"ccp_{pk}", kwargs={"spellcheck": "true"})
 
-                h_membrete = st.toggle("🛰️ Modo Hoja Membretada", value=False, key=f"memb_{pk}")
+                # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (TRIPLE MODO MASTER) ---
+                opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
+                tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
+                
+                img_of_b64 = None
+                img_of_bytes = None
+                img_of_mime = "image/png"
+                file_of_ext = "png"
+                
+                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
+                    file_of_memb = st.file_uploader("Subir Logotipo o Banner Horizontal para Oficios:", type=["png", "jpg", "jpeg"], key=f"file_memb_of_{pk}")
+                    if file_of_memb is not None:
+                        img_of_bytes = file_of_memb.getvalue()
+                        img_of_b64 = base64.b64encode(img_of_bytes).decode('utf-8')
+                        file_of_ext = file_of_memb.name.split(".")[-1].lower()
+                        img_of_mime = f"image/{file_of_ext}"
+                    else:
+                        st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
 
             with c_preview:
                 st.markdown("### 👁️ Vista Previa")
                 c_final = cuerpo_txt.replace("[FOLIO]", f"**{f_ref}**" if f_ref else "**_______**")
-                e_sup = "100px" if h_membrete else "20px"
+                
+                # --- SINCRO ESPEJO EN VISTA PREVIA HTML (CAPA OFICIOS) ---
+                if tipo_membrete_of == "Sistema (Texto Directo)":
+                    html_header_of = ""
+                    e_sup = "20px"
+                elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_b64 is not None:
+                    html_header_of = f"""
+                    <div style="width: 100%; text-align: center; margin-bottom: 15px;">
+                        <img src="data:{img_of_mime};base64,{img_of_b64}" style="width: 100%; max-height: 80px; object-fit: contain;">
+                    </div>
+                    """
+                    e_sup = "0px"
+                else:
+                    html_header_of = """<div style="height: 80px;"></div>"""
+                    e_sup = "20px"
 
                 st.markdown(f"""
                 <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.6; min-height: 550px;">
+                    {html_header_of}
                     <div style="height: {e_sup};"></div>
                     <div style="text-align: right; font-weight: bold;">Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}<br>Oficio: {n_oficio}</div><br>
                     <div style="text-align: left; font-weight: bold; white-space: pre-line;">{dest.upper()}<br>{cargo.upper()}</div><br>
@@ -1717,7 +1749,6 @@ else:
                 
                 ejecutar_guardado = False
                 
-                # Separación e identificación de flujos de guardado independientes
                 if modo_of == "📂 Consultar Bóveda":
                     seguro_actualizar = st.checkbox("🔐 Confirmar cambios y actualización del oficio histórico", key="chk_seguro_actualizar_ofc")
                     if st.button("🔄 ACTUALIZAR REGISTRO EXISTENTE", use_container_width=True, disabled=not seguro_actualizar, type="primary"):
@@ -1729,7 +1760,6 @@ else:
                 if ejecutar_guardado:
                     id_r = n_oficio.replace("/", "-")
                     
-                    # --- CONTROL DE DUPLICADOS EN OFICIOS (SOLO AL CREAR NUEVOS) ---
                     if modo_of == "✨ Crear Nuevo" and id_r in st.session_state.db_oficios:
                         st.error(f"⚠️ Error: El oficio '{n_oficio}' ya existe en el registro histórico de la Dirección. Por favor verifique el número.")
                     else:
@@ -1753,14 +1783,32 @@ else:
                         
                         ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
                         st.success("✅ Bóveda Nube de Oficios Actualizada Exitosamente."); time.sleep(1); st.rerun()
+
                 if motor_pdf_listo:
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
                     pdf.set_margins(30, 25, 20)
                     pdf.set_auto_page_break(auto=True, margin=25) 
                     pdf.add_page()
                     
-                    if h_membrete: 
+                    # --- CAPA 1 PDF DINÁMICA: DETECTA CONFIGURACIÓN DE MEMBRETE OFICIOS ---
+                    if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
                         pdf.ln(15)
+                    elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
+                        import tempfile
+                        import os
+                        suffix_file_of = f".{file_of_ext}"
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix_file_of) as tmp_of:
+                            tmp_of.write(img_of_bytes)
+                            tmp_path_of = tmp_of.name
+                        try:
+                            # Inyección gráfica milimétrica: ancho exacto útil 165.9mm
+                            pdf.image(tmp_path_of, x=30, y=15, w=165.9)
+                            pdf.set_y(42)  # Anclaje rígido del cuerpo para prevenir encimados
+                        finally:
+                            try: os.unlink(tmp_path_of)
+                            except: pass
+                    
+                    # --- CAPA 2 PDF DINÁMICA: CUERPO RE-ANCLADO ---
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
