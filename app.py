@@ -1948,8 +1948,24 @@ else:
                     idx_rec = rec_opts.index(prev_rec) if prev_rec in rec_opts else 1
                     recibe_c_raw = c_rh2.selectbox("Cargo RRHH:", rec_opts, index=idx_rec, key=f"sel_rec_c_{pk_j}")
 
-            # --- CONTROL DE DOBLE CAPA INTERCAMBIABLE EN INTERFAZ ---
-            h_membrete_j = st.toggle("🛰️ Modo Hoja Membretada (Ocultar Encabezado Impreso)", value=False, key=f"memb_j_{pk_j}")
+# --- CONTROL DE ENCABEZADO Y MEMBRETE (ARQUITECTURA TRIPLE MODO) ---
+            opciones_memb = ["Sistema (Texto Genérico)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Ocultar Encabezado)"]
+            tipo_membrete = st.selectbox("Configuración de Encabezado / Membrete:", opciones_memb, index=0, key=f"tipo_memb_{pk_j}")
+            
+            img_membrete_b64 = None
+            img_membrete_bytes = None
+            img_mime = "image/png"
+            file_ext = "png"
+            
+            if tipo_membrete == "Imagen Personalizada (Subir Banner)":
+                file_memb = st.file_uploader("Subir Logotipo o Banner Horizontal:", type=["png", "jpg", "jpeg"], key=f"file_memb_{pk_j}")
+                if file_memb is not None:
+                    img_membrete_bytes = file_memb.getvalue()
+                    img_membrete_b64 = base64.b64encode(img_membrete_bytes).decode('utf-8')
+                    file_ext = file_memb.name.split(".")[-1].lower()
+                    img_mime = f"image/{file_ext}"
+                else:
+                    st.info("💡 Sube un banner horizontal (proporción óptima: 178mm x 25mm).")
 
             # --- FILTRO DE FUERZA BRUTA: PROCESAMIENTO ESTRICTO EN MAYÚSCULAS ---
             solicita = solicita_raw.upper().strip()
@@ -1995,7 +2011,7 @@ else:
                 ("11", "VACACIONES", "23", "OMISIÓN DE CHECADA"),
                 ("12", "INCAPACIDAD", "24", "DÍA ECONÓMICO (SINDICALIZADO)"),
                 ("14", "COMISIÓN", "34", "CUMPLEAÑOS (SINDICALIZADO)"),
-                ("16", "LICENCIA POR MATRIMONIO(SINDICALIZADO)", "CM", "CUIDADOS MÉDICOS")
+                ("16", "LICENCIA POR MATRIMONIO(SINDICALIZADO)", "CM", "CUIDADOS MÉCIDOS")
             ]
 
             tabla_html_conceptos = ""
@@ -2012,10 +2028,10 @@ else:
                 </tr>
                 """
 
-            html_formato = f"""
-            <div style="background: white; color: black; padding: 25px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; width: 100%; box-sizing: border-box;">
-                <!-- CAPA HTML 1: MEMBRETE DINÁMICO -->
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; {'visibility: hidden; opacity: 0;' if h_membrete_j else ''}">
+            # --- SINCRO ESPEJO EN VISTA PREVIA HTML (CAPA 1 DINÁMICA) ---
+            if tipo_membrete == "Sistema (Texto Genérico)":
+                html_header_layer = f"""
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px;">
                     <tr>
                         <td style="width: 25%; font-size: 22px; font-family: 'Arial Black', Gadget, sans-serif; font-weight: 900; vertical-align: top; line-height: 0.9;">
                             Toluca<br><span style="font-size: 9px; font-family: Arial; letter-spacing: 3px; font-weight: bold;">CAPITAL</span>
@@ -2031,6 +2047,20 @@ else:
                         </td>
                     </tr>
                 </table>
+                """
+            elif tipo_membrete == "Imagen Personalizada (Subir Banner)" and img_membrete_b64 is not None:
+                html_header_layer = f"""
+                <div style="width: 100%; text-align: center; margin-bottom: 5px;">
+                    <img src="data:{img_mime};base64,{img_membrete_b64}" style="width: 100%; max-height: 85px; object-fit: contain;">
+                </div>
+                """
+            else:
+                html_header_layer = """<div style="height: 85px;"></div>"""
+
+            html_formato = f"""
+            <div style="background: white; color: black; padding: 25px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; width: 100%; box-sizing: border-box;">
+                <!-- CAPA HTML 1: MEMBRETE DINÁMICO REFACTORIZADO -->
+                {html_header_layer}
                 
                 <!-- CAPA HTML 2: CUERPO FIJO -->
                 <div style="text-align: center; font-weight: bold; font-size: 13px; margin-top: 10px; margin-bottom: 15px; letter-spacing: 0.5px;">FORMATO ÚNICO DE JUSTIFICACIÓN</div>
@@ -2195,9 +2225,9 @@ else:
                 recibe_c_enc = recibe_c.encode('latin-1', 'replace').decode('latin-1')
                 
                 # ==========================================
-                # 🛰️ CAPA 1: LAYER HEADER (MEMBRETE OPCIONAL)
+                # 🛰️ CAPA 1: LAYER HEADER (MEMBRETE DINÁMICO)
                 # ==========================================
-                if not h_membrete_j:
+                if tipo_membrete == "Sistema (Texto Genérico)":
                     pdf_j.set_font("Arial", 'B', 18)
                     pdf_j.set_xy(X_START, 20)
                     pdf_j.cell(45, 6, txt="Toluca", ln=False)
@@ -2221,6 +2251,21 @@ else:
                     pdf_j.set_font("Arial", 'I', 8.5)
                     pdf_j.set_xy(X_START, 35)
                     pdf_j.cell(W_TOTAL, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
+                
+                elif tipo_membrete == "Imagen Personalizada (Subir Banner)" and img_membrete_bytes is not None:
+                    import tempfile
+                    import os
+                    suffix_file = f".{file_ext}"
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix_file) as tmp:
+                        tmp.write(img_membrete_bytes)
+                        tmp_path = tmp.name
+                    try:
+                        # Inyección gráfica milimétrica en Capa 1 (Y: 15mm)
+                        # Fijamos el ancho exacto al W_TOTAL útil (178mm) para un ajuste perfecto
+                        pdf_j.image(tmp_path, x=X_START, y=15, w=W_TOTAL)
+                    finally:
+                        try: os.unlink(tmp_path)
+                        except: pass
                 
                 # ==========================================
                 # 🏗️ CAPA 2: LAYER BODY (CUERPO ANCLADO INMUTABLE)
