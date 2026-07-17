@@ -1714,7 +1714,7 @@ else:
                     else:
                         st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
 
-with c_preview:
+            with c_preview:
                 st.markdown("### 👁️ Vista Previa")
                 # Cambiado a etiquetas <b> para compatibilidad nativa con el componente HTML
                 c_final = cuerpo_txt.replace("[FOLIO]", f"<b>{f_ref}</b>" if f_ref else "<b>_______</b>")
