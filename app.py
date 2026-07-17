@@ -1779,174 +1779,174 @@ else:
                     st.download_button(label="🚀 DESCARGAR OFICIO PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
                     st.error("❌ Función PDF no disponible.")
-        # ==================================================================================
+# ==================================================================================
 # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
 # ==================================================================================
-    with tab_j:
-        st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
-        
-        # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
-        if "db_justificaciones" not in st.session_state:
-            st.session_state.db_justificaciones = {}
-            try:
-                filas_raw = ws.get_all_values()
-                if len(filas_raw) > 1:
-                    for row in filas_raw[1:]:
-                        if len(row) >= 5:
-                            reg_id = str(row[0]).strip()
-                            datos_raw = str(row[4]).strip() if row[4] else "{}"
-                            if reg_id.startswith("SF4-JST-"):
-                                try: st.session_state.db_justificaciones[reg_id] = json.loads(datos_raw)
-                                except: pass
-            except: pass
-
-        c_config, c_preview = st.columns([1, 1.1])
-
-        with c_config:
-            modo_j = st.radio("Operación Justificaciones:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True, key="radio_modo_justificaciones")
+        with tab_j:
+            st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
             
-            data_previa_j = {}
-            id_sel_j = "nuevo"
-            
-            if modo_j == "📂 Consultar Bóveda":
-                if st.session_state.db_justificaciones:
-                    id_sel_j = st.selectbox("Seleccionar Registro:", list(st.session_state.db_justificaciones.keys())[::-1], key="select_boveda_justificaciones")
-                    data_previa_j = st.session_state.db_justificaciones[id_sel_j]
-                    
-                    # Tabla resumen de control histórico
-                    lista_j_tabla = [{"ID Registro": k, "Empleado": v.get("nombre", "N/A"), "No. Emp": v.get("num_emp", "N/A"), "Concepto": v.get("clave_concepto", "N/A")} for k, v in st.session_state.db_justificaciones.items()]
-                    df_j_vista = pd.DataFrame(lista_j_tabla)
-                    
-                    def resaltar_j_seleccionada(row):
-                        color = '#d1e7dd' if row['ID Registro'] == id_sel_j else ''
-                        return [f'background-color: {color}'] * len(row)
+            # --- SINCRO-BÓVEDA LOCAL (EXCLUSIVA PARA JUSTIFICACIONES) ---
+            if "db_justificaciones" not in st.session_state:
+                st.session_state.db_justificaciones = {}
+                try:
+                    filas_raw = ws.get_all_values()
+                    if len(filas_raw) > 1:
+                        for row in filas_raw[1:]:
+                            if len(row) >= 5:
+                                reg_id = str(row[0]).strip()
+                                datos_raw = str(row[4]).strip() if row[4] else "{}"
+                                if reg_id.startswith("SF4-JST-"):
+                                    try: st.session_state.db_justificaciones[reg_id] = json.loads(datos_raw)
+                                    except: pass
+                except: pass
+    
+            c_config, c_preview = st.columns([1, 1.1])
+
+            with c_config:
+                modo_j = st.radio("Operación Justificaciones:", ["✨ Crear Nuevo", "📂 Consultar Bóveda"], horizontal=True, key="radio_modo_justificaciones")
+                
+                data_previa_j = {}
+                id_sel_j = "nuevo"
+                
+                if modo_j == "📂 Consultar Bóveda":
+                    if st.session_state.db_justificaciones:
+                        id_sel_j = st.selectbox("Seleccionar Registro:", list(st.session_state.db_justificaciones.keys())[::-1], key="select_boveda_justificaciones")
+                        data_previa_j = st.session_state.db_justificaciones[id_sel_j]
                         
-                    st.dataframe(df_j_vista.style.apply(resaltar_j_seleccionada, axis=1), use_container_width=True, hide_index=True)
+                        # Tabla resumen de control histórico
+                        lista_j_tabla = [{"ID Registro": k, "Empleado": v.get("nombre", "N/A"), "No. Emp": v.get("num_emp", "N/A"), "Concepto": v.get("clave_concepto", "N/A")} for k, v in st.session_state.db_justificaciones.items()]
+                        df_j_vista = pd.DataFrame(lista_j_tabla)
+                        
+                        def resaltar_j_seleccionada(row):
+                            color = '#d1e7dd' if row['ID Registro'] == id_sel_j else ''
+                            return [f'background-color: {color}'] * len(row)
+                            
+                        st.dataframe(df_j_vista.style.apply(resaltar_j_seleccionada, axis=1), use_container_width=True, hide_index=True)
+                        
+                        col_chk_j, col_btn_j = st.columns([1.8, 1.2])
+                        with col_chk_j:
+                            seguro_borrado_j = st.checkbox("🔐 Confirmar eliminación permanente del registro", key=f"chk_del_just_{id_sel_j}")
+                        with col_btn_j:
+                            if st.button("🗑️ BORRAR FORMATO", use_container_width=True, disabled=not seguro_borrado_j, type="primary", key=f"btn_del_just_{id_sel_j}"):
+                                try:
+                                    cell = ws.find(id_sel_j, in_column=1)
+                                    if cell: ws.delete_rows(cell.row)
+                                    del st.session_state.db_justificaciones[id_sel_j]
+                                    st.warning(f"Registro {id_sel_j} eliminado de la nube.")
+                                    time.sleep(1); st.rerun()
+                                except Exception as e: st.error(f"Error al eliminar: {e}")
+                    else:
+                        st.info("La bóveda de justificaciones está vacía.")
+
+                pk_j = f"{modo_j}_{id_sel_j}"
+
+                with st.container(border=True):
+                    st.markdown("**📌 Secuencia Oficial de Llenado**")
                     
-                    col_chk_j, col_btn_j = st.columns([1.8, 1.2])
-                    with col_chk_j:
-                        seguro_borrado_j = st.checkbox("🔐 Confirmar eliminación permanente del registro", key=f"chk_del_just_{id_sel_j}")
-                    with col_btn_j:
-                        if st.button("🗑️ BORRAR FORMATO", use_container_width=True, disabled=not seguro_borrado_j, type="primary", key=f"btn_del_just_{id_sel_j}"):
-                            try:
-                                cell = ws.find(id_sel_j, in_column=1)
-                                if cell: ws.delete_rows(cell.row)
-                                del st.session_state.db_justificaciones[id_sel_j]
-                                st.warning(f"Registro {id_sel_j} eliminado de la nube.")
-                                time.sleep(1); st.rerun()
-                            except Exception as e: st.error(f"Error al eliminar: {e}")
-                else:
-                    st.info("La bóveda de justificaciones está vacía.")
-
-            pk_j = f"{modo_j}_{id_sel_j}"
-
-            with st.container(border=True):
-                st.markdown("**📌 Secuencia Oficial de Llenado**")
-                
-                # 1. Fecha del Documento
-                try:
-                    f_doc_raw = data_previa_j.get("fecha_doc")
-                    if f_doc_raw and str(f_doc_raw) != "NaT" and str(f_doc_raw).strip() != "":
-                        t_doc = pd.to_datetime(f_doc_raw)
-                        def_f_doc = t_doc.date() if not pd.isna(t_doc) else pd.Timestamp.now().date()
-                    else: def_f_doc = pd.Timestamp.now().date()
-                except: def_f_doc = pd.Timestamp.now().date()
+                    # 1. Fecha del Documento
+                    try:
+                        f_doc_raw = data_previa_j.get("fecha_doc")
+                        if f_doc_raw and str(f_doc_raw) != "NaT" and str(f_doc_raw).strip() != "":
+                            t_doc = pd.to_datetime(f_doc_raw)
+                            def_f_doc = t_doc.date() if not pd.isna(t_doc) else pd.Timestamp.now().date()
+                        else: def_f_doc = pd.Timestamp.now().date()
+                    except: def_f_doc = pd.Timestamp.now().date()
+                        
+                    f_doc = st.date_input("1. Fecha de Emisión del Documento:", value=def_f_doc, key=f"f_doc_{pk_j}")
                     
-                f_doc = st.date_input("1. Fecha de Emisión del Documento:", value=def_f_doc, key=f"f_doc_{pk_j}")
-                
-                # 2. Solicita
-                solicita_raw = st.text_input("2. Solicita (Área o Persona):", value=data_previa_j.get("solicita", ""), key=f"txt_sol_{pk_j}")
-                
-                # 3. Acción Administrativa
-                accion_idx = ["JUSTIFICAR", "SANCIONAR"].index(data_previa_j.get("accion", "JUSTIFICAR")) if data_previa_j.get("accion") in ["JUSTIFICAR", "SANCIONAR"] else 0
-                accion = st.selectbox("3. Acción Administrativa:", ["JUSTIFICAR", "SANCIONAR"], index=accion_idx, key=f"sel_accion_{pk_j}")
-                
-                # 4. No. de Empleado y Nombre
-                c_emp1, c_emp2 = st.columns([1, 2])
-                num_emp_raw = c_emp1.text_input("4. No. de Empleado:", value=data_previa_j.get("num_emp", ""), key=f"txt_num_emp_{pk_j}")
-                nombre_emp_raw = c_emp2.text_input("Nombre Completo del Empleado:", value=data_previa_j.get("nombre", ""), key=f"txt_nom_emp_{pk_j}")
-                
-                # 5. Adscrito a
-                adscrito_raw = st.text_input("5. Adscrito a (Departamento/Área):", value=data_previa_j.get("adscrito", ""), key=f"txt_ads_{pk_j}")
-                
-                # 6. F. Registro
-                f_reg_idx = ["LISTA", "HAND PUNCH"].index(data_previa_j.get("f_registro", "LISTA")) if data_previa_j.get("f_registro") in ["LISTA", "HAND PUNCH"] else 0
-                f_registro = st.selectbox("6. F. Registro:", ["LISTA", "HAND PUNCH"], index=f_reg_idx, key=f"sel_f_reg_{pk_j}")
-                
-                # 7. Clave y Concepto
-                cat_hand_punch = [
-                    "3 | FALTA INJUSTIFICADA", "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
-                    "9 | LICENCIA CON GOCE DE SUELDO", "10 | LICENCIA SIN GOCE DE SUELDO", 
-                    "11 | VACACIONES", "12 | INCAPACIDAD", "14 | COMISIÓN", 
-                    "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", "17 | LICENCIA POR GRAVIDEZ", 
-                    "18 | HORA DE LACTANCIA", "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
-                    "20 | LICENCIA POR NACIMIENTO", "23 | OMISIÓN DE CHECADA", 
-                    "24 | DÍA ECONÓMICO (SINDICALIZADO)", "34 | CUMPLEAÑOS (SINDICALIZADO)", 
-                    "CM | CUIDADOS MÉDICOS"
-                ]
-                concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
-                concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
-                clave_concepto = st.selectbox("7. Clave y Concepto (Escribe clave o texto para buscar):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
+                    # 2. Solicita
+                    solicita_raw = st.text_input("2. Solicita (Área o Persona):", value=data_previa_j.get("solicita", ""), key=f"txt_sol_{pk_j}")
+                    
+                    # 3. Acción Administrativa
+                    accion_idx = ["JUSTIFICAR", "SANCIONAR"].index(data_previa_j.get("accion", "JUSTIFICAR")) if data_previa_j.get("accion") in ["JUSTIFICAR", "SANCIONAR"] else 0
+                    accion = st.selectbox("3. Acción Administrativa:", ["JUSTIFICAR", "SANCIONAR"], index=accion_idx, key=f"sel_accion_{pk_j}")
+                    
+                    # 4. No. de Empleado y Nombre
+                    c_emp1, c_emp2 = st.columns([1, 2])
+                    num_emp_raw = c_emp1.text_input("4. No. de Empleado:", value=data_previa_j.get("num_emp", ""), key=f"txt_num_emp_{pk_j}")
+                    nombre_emp_raw = c_emp2.text_input("Nombre Completo del Empleado:", value=data_previa_j.get("nombre", ""), key=f"txt_nom_emp_{pk_j}")
+                    
+                    # 5. Adscrito a
+                    adscrito_raw = st.text_input("5. Adscrito a (Departamento/Área):", value=data_previa_j.get("adscrito", ""), key=f"txt_ads_{pk_j}")
+                    
+                    # 6. F. Registro
+                    f_reg_idx = ["LISTA", "HAND PUNCH"].index(data_previa_j.get("f_registro", "LISTA")) if data_previa_j.get("f_registro") in ["LISTA", "HAND PUNCH"] else 0
+                    f_registro = st.selectbox("6. F. Registro:", ["LISTA", "HAND PUNCH"], index=f_reg_idx, key=f"sel_f_reg_{pk_j}")
+                    
+                    # 7. Clave y Concepto
+                    cat_hand_punch = [
+                        "3 | FALTA INJUSTIFICADA", "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
+                        "9 | LICENCIA CON GOCE DE SUELDO", "10 | LICENCIA SIN GOCE DE SUELDO", 
+                        "11 | VACACIONES", "12 | INCAPACIDAD", "14 | COMISIÓN", 
+                        "16 | LICENCIA POR MATRIMONIO(SINDICALIZADO)", "17 | LICENCIA POR GRAVIDEZ", 
+                        "18 | HORA DE LACTANCIA", "19 | LICENCIA POR FALLECIMIENTO DE FAMILIAR", 
+                        "20 | LICENCIA POR NACIMIENTO", "23 | OMISIÓN DE CHECADA", 
+                        "24 | DÍA ECONÓMICO (SINDICALIZADO)", "34 | CUMPLEAÑOS (SINDICALIZADO)", 
+                        "CM | CUIDADOS MÉDICOS"
+                    ]
+                    concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
+                    concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
+                    clave_concepto = st.selectbox("7. Clave y Concepto (Escribe clave o texto para buscar):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
 
-                # 8. Modalidad de Fechas
-                tipo_fecha_j = st.radio("8. Modalidad de Fecha de la Incidencia:", ["Día Único", "Rango de Fechas"], index=0 if data_previa_j.get("tipo_fecha", "Día Único") == "Día Único" else 1, horizontal=True, key=f"radio_tipo_f_{pk_j}")
-                
-                try:
-                    f1_raw = data_previa_j.get("fecha_inicio")
-                    if f1_raw and str(f1_raw) != "NaT" and str(f1_raw).strip() != "":
-                        t1 = pd.to_datetime(f1_raw)
-                        def_f1 = t1.date() if not pd.isna(t1) else pd.Timestamp.now().date()
-                    else: def_f1 = pd.Timestamp.now().date()
-                except: def_f1 = pd.Timestamp.now().date()
+                    # 8. Modalidad de Fechas
+                    tipo_fecha_j = st.radio("8. Modalidad de Fecha de la Incidencia:", ["Día Único", "Rango de Fechas"], index=0 if data_previa_j.get("tipo_fecha", "Día Único") == "Día Único" else 1, horizontal=True, key=f"radio_tipo_f_{pk_j}")
+                    
+                    try:
+                        f1_raw = data_previa_j.get("fecha_inicio")
+                        if f1_raw and str(f1_raw) != "NaT" and str(f1_raw).strip() != "":
+                            t1 = pd.to_datetime(f1_raw)
+                            def_f1 = t1.date() if not pd.isna(t1) else pd.Timestamp.now().date()
+                        else: def_f1 = pd.Timestamp.now().date()
+                    except: def_f1 = pd.Timestamp.now().date()
 
-                try:
-                    f2_raw = data_previa_j.get("fecha_fin")
-                    if f2_raw and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
-                        t2 = pd.to_datetime(f2_raw)
-                        def_f2 = t2.date() if not pd.isna(t2) else pd.Timestamp.now().date()
-                    else: def_f2 = pd.Timestamp.now().date()
-                except: def_f2 = pd.Timestamp.now().date()
+                    try:
+                        f2_raw = data_previa_j.get("fecha_fin")
+                        if f2_raw and str(f2_raw) != "NaT" and str(f2_raw).strip() != "":
+                            t2 = pd.to_datetime(f2_raw)
+                            def_f2 = t2.date() if not pd.isna(t2) else pd.Timestamp.now().date()
+                        else: def_f2 = pd.Timestamp.now().date()
+                    except: def_f2 = pd.Timestamp.now().date()
 
-                if tipo_fecha_j == "Día Único":
-                    f_inicio = st.date_input("Fecha de Incidencia:", value=def_f1, key=f"date_ini_{pk_j}")
-                    f_fin = f_inicio
-                else:
-                    c_f1, c_f2 = st.columns(2)
-                    f_inicio = c_f1.date_input("Fecha Inicio:", value=def_f1, key=f"date_ini_r_{pk_j}")
-                    f_fin = c_f2.date_input("Fecha Fin:", value=def_f2, key=f"date_fin_r_{pk_j}")
+                    if tipo_fecha_j == "Día Único":
+                        f_inicio = st.date_input("Fecha de Incidencia:", value=def_f1, key=f"date_ini_{pk_j}")
+                        f_fin = f_inicio
+                    else:
+                        c_f1, c_f2 = st.columns(2)
+                        f_inicio = c_f1.date_input("Fecha Inicio:", value=def_f1, key=f"date_ini_r_{pk_j}")
+                        f_fin = c_f2.date_input("Fecha Fin:", value=def_f2, key=f"date_fin_r_{pk_j}")
 
-            with st.container(border=True):
-                st.markdown("**📝 Sección de Cierre Técnico**")
-                # 9. Motivo
-                motivo_raw = st.text_area("9. Motivo de la Incidencia / Justificación:", value=data_previa_j.get("motivo", ""), height=100, key=f"area_mot_{pk_j}")
-                
-                st.markdown("**✏️ Bloques de Validación y Firmas (Selección de Cargo)**")
-                # 10. Solicitante
-                firma_solicita_raw = st.text_input("10. Solicitante (Nombre):", value=data_previa_j.get("firma_solicita", ""), key=f"txt_firm_sol_{pk_j}")
-                
-                # 11. Autoriza (Nombre y Selección de Cargo)
-                c_aut1, c_aut2 = st.columns(2)
-                autoriza_n_raw = c_aut1.text_input("11. Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", ""), key=f"txt_aut_{pk_j}")
-                aut_opts = ["Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO", "Vo. Bo. DIRECTORA DE ALUMBRADO PÚBLICO"]
-                prev_aut = data_previa_j.get("autoriza_c", aut_opts[0])
-                idx_aut = aut_opts.index(prev_aut) if prev_aut in aut_opts else 0
-                autoriza_c_raw = c_aut2.selectbox("Cargo Autoriza:", aut_opts, index=idx_aut, key=f"sel_aut_c_{pk_j}")
-                
-                # 12. Vo. Bo. / Revisa (Nombre y Selección de Cargo)
-                c_vob1, c_vob2 = st.columns(2)
-                revisa_n_raw = c_vob1.text_input("12. Vo. Bo. / Revisa (Nombre):", value=data_previa_j.get("revisa_n", ""), key=f"txt_rev_{pk_j}")
-                rev_opts = ["DELEGADO ADMINISTRATIVO", "DELEGADA ADMINISTRATIVA"]
-                prev_rev = data_previa_j.get("revisa_c", rev_opts[1])
-                idx_rev = rev_opts.index(prev_rev) if prev_rev in rev_opts else 1
-                revisa_c_raw = c_vob2.selectbox("Cargo Revisa:", rev_opts, index=idx_rev, key=f"sel_rev_c_{pk_j}")
-                
-                # 13. Recursos Humanos (Nombre y Selección de Cargo)
-                c_rh1, c_rh2 = st.columns(2)
-                recibe_n_raw = c_rh1.text_input("13. Recursos Humanos (Nombre):", value=data_previa_j.get("recibe_n", ""), key=f"txt_rec_{pk_j}")
-                rec_opts = ["DIRECTOR DE RECURSOS HUMANOS", "DIRECTORA DE RECURSOS HUMANOS"]
-                prev_rec = data_previa_j.get("recibe_c", rec_opts[1])
-                idx_rec = rec_opts.index(prev_rec) if prev_rec in rec_opts else 1
-                recibe_c_raw = c_rh2.selectbox("Cargo RRHH:", rec_opts, index=idx_rec, key=f"sel_rec_c_{pk_j}")
+                with st.container(border=True):
+                    st.markdown("**📝 Sección de Cierre Técnico**")
+                    # 9. Motivo
+                    motivo_raw = st.text_area("9. Motivo de la Incidencia / Justificación:", value=data_previa_j.get("motivo", ""), height=100, key=f"area_mot_{pk_j}")
+                    
+                    st.markdown("**✏️ Bloques de Validación y Firmas (Selección de Cargo)**")
+                    # 10. Solicitante
+                    firma_solicita_raw = st.text_input("10. Solicitante (Nombre):", value=data_previa_j.get("firma_solicita", ""), key=f"txt_firm_sol_{pk_j}")
+                    
+                    # 11. Autoriza (Nombre y Selección de Cargo)
+                    c_aut1, c_aut2 = st.columns(2)
+                    autoriza_n_raw = c_aut1.text_input("11. Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", ""), key=f"txt_aut_{pk_j}")
+                    aut_opts = ["Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO", "Vo. Bo. DIRECTORA DE ALUMBRADO PÚBLICO"]
+                    prev_aut = data_previa_j.get("autoriza_c", aut_opts[0])
+                    idx_aut = aut_opts.index(prev_aut) if prev_aut in aut_opts else 0
+                    autoriza_c_raw = c_aut2.selectbox("Cargo Autoriza:", aut_opts, index=idx_aut, key=f"sel_aut_c_{pk_j}")
+                    
+                    # 12. Vo. Bo. / Revisa (Nombre y Selección de Cargo)
+                    c_vob1, c_vob2 = st.columns(2)
+                    revisa_n_raw = c_vob1.text_input("12. Vo. Bo. / Revisa (Nombre):", value=data_previa_j.get("revisa_n", ""), key=f"txt_rev_{pk_j}")
+                    rev_opts = ["DELEGADO ADMINISTRATIVO", "DELEGADA ADMINISTRATIVA"]
+                    prev_rev = data_previa_j.get("revisa_c", rev_opts[1])
+                    idx_rev = rev_opts.index(prev_rev) if prev_rev in rev_opts else 1
+                    revisa_c_raw = c_vob2.selectbox("Cargo Revisa:", rev_opts, index=idx_rev, key=f"sel_rev_c_{pk_j}")
+                    
+                    # 13. Recursos Humanos (Nombre y Selección de Cargo)
+                    c_rh1, c_rh2 = st.columns(2)
+                    recibe_n_raw = c_rh1.text_input("13. Recursos Humanos (Nombre):", value=data_previa_j.get("recibe_n", ""), key=f"txt_rec_{pk_j}")
+                    rec_opts = ["DIRECTOR DE RECURSOS HUMANOS", "DIRECTORA DE RECURSOS HUMANOS"]
+                    prev_rec = data_previa_j.get("recibe_c", rec_opts[1])
+                    idx_rec = rec_opts.index(prev_rec) if prev_rec in rec_opts else 1
+                    recibe_c_raw = c_rh2.selectbox("Cargo RRHH:", rec_opts, index=idx_rec, key=f"sel_rec_c_{pk_j}")
 
             # --- CONTROL DE DOBLE CAPA INTERCAMBIABLE EN INTERFAZ ---
             h_membrete_j = st.toggle("🛰️ Modo Hoja Membretada (Ocultar Encabezado Impreso)", value=False, key=f"memb_j_{pk_j}")
