@@ -17,7 +17,8 @@ def obtener_datos_tiempo():
     hora_disp = ahora.strftime("%I:%M %p")
     return fecha_iso, fecha_disp, hora_disp
 
-CLAVE_ADMIN = "1234"
+# --- CLAVE MAESTRA DE ADMINISTRADOR ---
+CLAVE_ADMIN = "1827"
 
 # --- 1. LISTA BASE DE USUARIOS Y CANALES ---
 LISTA_USUARIOS_INICIAL = [
@@ -35,7 +36,7 @@ LISTA_USUARIOS_INICIAL = [
     "Cuadrilla Alumbrado"
 ] + [f"Brigada Campo {i}" for i in range(1, 18)]
 
-# SINCRONIZACIÓN FORZADA DE USUARIOS (Soluciona el bloqueo de Brigada 14)
+# Sincronización automática de usuarios (Asegura Brigada 1 a 17)
 if "lista_usuarios" not in st.session_state:
     st.session_state.lista_usuarios = LISTA_USUARIOS_INICIAL
 else:
@@ -126,7 +127,7 @@ with st.sidebar:
         )
         st.session_state.canal_activo = canal_sel
 
-    # --- 📅 NAVEGADOR DE FILTRO POR FECHA ---
+    # --- 📅 FILTRO POR FECHA ---
     st.divider()
     st.subheader("📅 Filtro por Fecha")
     activar_filtro_fecha = st.checkbox("Filtrar por fecha específica", value=False)
@@ -192,6 +193,7 @@ with st.sidebar:
                     st.success(f"Usuario '{usr_a_borrar}' eliminado.")
                     st.rerun()
 
+            # --- VACIAR HISTORIAL (CON SANITIZACIÓN DE CLAVE) ---
             with tab_vaciar:
                 st.markdown("**🔥 Vaciar todo el historial de mensajes:**")
                 st.warning("Esta acción borrará TODOS los mensajes de todos los canales y chats directos.")
@@ -200,7 +202,8 @@ with st.sidebar:
                 confirm_vaciar = st.checkbox("⚠️ Entiendo las consecuencias y deseo borrar todo el historial", key="chk_del_all")
                 
                 if st.button("🔥 Vaciar Historial Completo", disabled=not confirm_vaciar, type="primary"):
-                    if clave_input == CLAVE_ADMIN:
+                    # Comparación limpia sin espacios ocultos
+                    if str(clave_input).strip() == str(CLAVE_ADMIN).strip():
                         st.session_state.bd_chat = []
                         st.session_state.menciones_leidas = set()
                         st.success("🧹 Historial de chat vaciado correctamente.")
@@ -219,7 +222,6 @@ if st.session_state.seccion_activa == "📢 Canales":
         if m["CANAL_DESTINO"] == st.session_state.canal_activo and not m["ID_PADRE"]
     ]
     
-    # Aplicar Filtro de Fecha si está activo
     if activar_filtro_fecha and fecha_filtro_iso:
         mensajes_canal = [m for m in mensajes_canal if m.get("FECHA_ISO") == fecha_filtro_iso]
         st.info(f"📅 Mostrando mensajes del día: `{fecha_sel.strftime('%d/%m/%Y')}`")
