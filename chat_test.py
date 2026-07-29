@@ -88,7 +88,7 @@ if "bd_chat" not in st.session_state:
         }
     ]
 
-# FUNCION INTELIGENTE DE DETECCIÓN DE MENCIONES (Tolerante a mayúsculas/minúsculas)
+# FUNCION INTELIGENTE DE DETECCIÓN DE MENCIONES
 def detectar_menciones_inteligente(texto, lista_usuarios):
     etiquetas_encontradas = re.findall(r'@(\w+)', texto)
     mencionados = set()
@@ -255,9 +255,21 @@ if st.session_state.seccion_activa == "📢 Canales":
                 
                 with st.expander(f"💬 {cant_hilos} respuestas en hilo" if cant_hilos > 0 else "💬 Responder en hilo"):
                     for h in hilos:
-                        st.markdown(f"↳ **{h['EMISOR']}**: {h['MENSAJE']} `<small style='color:gray;'>({h['FECHA_HORA']})</small>`", unsafe_allow_html=True)
+                        # RENDERIZADO HTML LIMPIO (Sin backticks)
+                        st.markdown(f"↳ **{h['EMISOR']}**: {h['MENSAJE']} <small style='color:gray;'>({h['FECHA_HORA']})</small>", unsafe_allow_html=True)
                     
-                    texto_hilo = st.text_input(f"Responder a {msg['EMISOR']}...", key=f"input_{msg['ID_MENSAJE']}")
+                    # CÁLCULO DINÁMICO DEL DESTINATARIO
+                    if hilos:
+                        ultimo_emisor = hilos[-1]["EMISOR"]
+                    else:
+                        ultimo_emisor = msg["EMISOR"]
+                        
+                    if ultimo_emisor == usuario_actual:
+                        placeholder_hilo = "Escribir respuesta en el hilo..."
+                    else:
+                        placeholder_hilo = f"Responder a {ultimo_emisor}..."
+
+                    texto_hilo = st.text_input(placeholder_hilo, key=f"input_{msg['ID_MENSAJE']}")
                     if st.button("Enviar respuesta", key=f"btn_{msg['ID_MENSAJE']}"):
                         if texto_hilo:
                             f_iso, f_disp, h_disp = obtener_datos_tiempo()
@@ -346,11 +358,10 @@ elif st.session_state.seccion_activa == "🔔 Mi Actividad (@Menciones)":
     
     for m in st.session_state.bd_chat:
         if m["EMISOR"] == usuario_actual:
-            continue  # Ignorar mensajes propios
+            continue
             
         es_mencionado = usuario_actual in m.get("MENCIONADOS", "")
         
-        # Verificar si es respuesta a un mensaje del usuario actual
         es_respuesta_a_mi = False
         if m.get("ID_PADRE"):
             padre = dict_mensajes.get(m["ID_PADRE"])
@@ -358,7 +369,6 @@ elif st.session_state.seccion_activa == "🔔 Mi Actividad (@Menciones)":
                 es_respuesta_a_mi = True
                 
         if es_mencionado or es_respuesta_a_mi:
-            # Marcamos el tipo de notificación
             tipo_notif = "mencion" if es_mencionado else "respuesta"
             m_copy = dict(m)
             m_copy["TIPO_NOTIF"] = tipo_notif
