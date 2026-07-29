@@ -32,7 +32,7 @@ with chat_container:
         avatar_icon = "👨‍💻" if "Admin" in msg["emisor"] else ("🤖" if msg["emisor"] == "Sistema" else "👷‍♂️")
         
         with st.chat_message("user" if es_propio else "assistant", avatar=avatar_icon):
-            st.markdown(f"**{msg['emisor']}** `<small style='color:gray;'>({msg['hora']})</small>`", unsafe_allow_html=True)
+            st.markdown(f"**{msg['emisor']}** <small style='color:gray;'>({msg['hora']})</small>", unsafe_allow_html=True)
             st.write(msg["mensaje"])
 
 # --- 4. ENTRADA DE NUEVO MENSAJE ---
