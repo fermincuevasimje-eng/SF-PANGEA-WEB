@@ -8,15 +8,20 @@ st.set_page_config(page_title="💬 SF Pangea Chat - Sandbox", layout="wide")
 
 st.title("💬 SF Pangea Chat")
 
-def obtener_hora_mexico():
-    return datetime.datetime.now(ZoneInfo("America/Mexico_City")).strftime("%I:%M %p")
+TZ_MEX = ZoneInfo("America/Mexico_City")
 
-# --- CLAVE MAESTRA PARA OPERACIONES CRÍTICAS ---
-CLAVE_ADMIN = "1827" #Puedes cambiar esta clave por la que gustes
+def obtener_datos_tiempo():
+    ahora = datetime.datetime.now(TZ_MEX)
+    fecha_iso = ahora.strftime("%Y-%m-%d")
+    fecha_disp = ahora.strftime("%d/%m/%Y")
+    hora_disp = ahora.strftime("%I:%M %p")
+    return fecha_iso, fecha_disp, hora_disp
+
+CLAVE_ADMIN = "1234"
 
 # --- 1. LISTA BASE DE USUARIOS Y CANALES ---
 LISTA_USUARIOS_INICIAL = [
-    "FERMIN",  # Administrador único
+    "FERMIN",
     "Director",
     "Jefe 1",
     "Jefe 2",
@@ -30,8 +35,13 @@ LISTA_USUARIOS_INICIAL = [
     "Cuadrilla Alumbrado"
 ] + [f"Brigada Campo {i}" for i in range(1, 18)]
 
+# SINCRONIZACIÓN FORZADA DE USUARIOS (Soluciona el bloqueo de Brigada 14)
 if "lista_usuarios" not in st.session_state:
     st.session_state.lista_usuarios = LISTA_USUARIOS_INICIAL
+else:
+    for u in LISTA_USUARIOS_INICIAL:
+        if u not in st.session_state.lista_usuarios:
+            st.session_state.lista_usuarios.append(u)
 
 if "lista_canales" not in st.session_state:
     st.session_state.lista_canales = ["#general", "#mantenimiento", "#urgencias", "#bodega_reportes"]
@@ -62,11 +72,14 @@ if "menciones_leidas" not in st.session_state:
 if "mensaje_destacado" not in st.session_state:
     st.session_state.mensaje_destacado = None
 
+hoy_iso, hoy_disp, hoy_hora = obtener_datos_tiempo()
+
 if "bd_chat" not in st.session_state:
     st.session_state.bd_chat = [
         {
             "ID_MENSAJE": "msg-init-1",
-            "FECHA_HORA": "10:00 AM",
+            "FECHA_ISO": hoy_iso,
+            "FECHA_HORA": f"{hoy_disp} 10:00 AM",
             "EMISOR": "Brigada DAP",
             "MENSAJE": "Reporte inicial listo. Atención @FERMIN favor de validar.",
             "CANAL_DESTINO": "#general",
@@ -113,6 +126,15 @@ with st.sidebar:
         )
         st.session_state.canal_activo = canal_sel
 
+    # --- 📅 NAVEGADOR DE FILTRO POR FECHA ---
+    st.divider()
+    st.subheader("📅 Filtro por Fecha")
+    activar_filtro_fecha = st.checkbox("Filtrar por fecha específica", value=False)
+    fecha_filtro_iso = None
+    if activar_filtro_fecha:
+        fecha_sel = st.date_input("Selecciona día:", datetime.date.today())
+        fecha_filtro_iso = fecha_sel.strftime("%Y-%m-%d")
+
     # --- PANEL EXCLUSIVO DE ADMINISTRADOR (ÚNICAMENTE PARA 'FERMIN') ---
     if usuario_actual == "FERMIN":
         st.divider()
@@ -121,7 +143,6 @@ with st.sidebar:
             
             tab_crear, tab_eliminar, tab_vaciar = st.tabs(["➕ Crear", "🗑️ Eliminar", "🔥 Vaciar Chat"])
             
-            # --- PESTAÑA CREAR ---
             with tab_crear:
                 st.markdown("**Crear nuevo canal:**")
                 nuevo_canal_nombre = st.text_input("Nombre del canal:", placeholder="ej. #obra_especial", key="in_crear_canal")
@@ -144,7 +165,6 @@ with st.sidebar:
                         st.success(f"Usuario {nuevo_usuario_nombre} creado.")
                         st.rerun()
 
-            # --- PESTAÑA ELIMINAR ---
             with tab_eliminar:
                 st.markdown("**Eliminar Canal:**")
                 canales_borrables = [c for c in st.session_state.lista_canales if c != "#general"]
@@ -172,7 +192,6 @@ with st.sidebar:
                     st.success(f"Usuario '{usr_a_borrar}' eliminado.")
                     st.rerun()
 
-            # --- PESTAÑA VACIAR HISTORIAL (NUEVA) ---
             with tab_vaciar:
                 st.markdown("**🔥 Vaciar todo el historial de mensajes:**")
                 st.warning("Esta acción borrará TODOS los mensajes de todos los canales y chats directos.")
@@ -200,8 +219,13 @@ if st.session_state.seccion_activa == "📢 Canales":
         if m["CANAL_DESTINO"] == st.session_state.canal_activo and not m["ID_PADRE"]
     ]
     
+    # Aplicar Filtro de Fecha si está activo
+    if activar_filtro_fecha and fecha_filtro_iso:
+        mensajes_canal = [m for m in mensajes_canal if m.get("FECHA_ISO") == fecha_filtro_iso]
+        st.info(f"📅 Mostrando mensajes del día: `{fecha_sel.strftime('%d/%m/%Y')}`")
+
     if not mensajes_canal:
-        st.info(f"El canal `{st.session_state.canal_activo}` no tiene mensajes.")
+        st.info(f"No hay mensajes para mostrar en `{st.session_state.canal_activo}` con los filtros actuales.")
     else:
         for msg in mensajes_canal[-50:]:
             es_propio = (msg["EMISOR"] == usuario_actual)
@@ -226,9 +250,11 @@ if st.session_state.seccion_activa == "📢 Canales":
                     texto_hilo = st.text_input(f"Responder a {msg['EMISOR']}...", key=f"input_{msg['ID_MENSAJE']}")
                     if st.button("Enviar respuesta", key=f"btn_{msg['ID_MENSAJE']}"):
                         if texto_hilo:
+                            f_iso, f_disp, h_disp = obtener_datos_tiempo()
                             st.session_state.bd_chat.append({
                                 "ID_MENSAJE": str(uuid.uuid4())[:8],
-                                "FECHA_HORA": obtener_hora_mexico(),
+                                "FECHA_ISO": f_iso,
+                                "FECHA_HORA": f"{f_disp} {h_disp}",
                                 "EMISOR": usuario_actual,
                                 "MENSAJE": texto_hilo,
                                 "CANAL_DESTINO": st.session_state.canal_activo,
@@ -239,9 +265,11 @@ if st.session_state.seccion_activa == "📢 Canales":
 
     nuevo_txt = st.chat_input(f"Enviar mensaje a {st.session_state.canal_activo}...")
     if nuevo_txt:
+        f_iso, f_disp, h_disp = obtener_datos_tiempo()
         st.session_state.bd_chat.append({
             "ID_MENSAJE": str(uuid.uuid4())[:8],
-            "FECHA_HORA": obtener_hora_mexico(),
+            "FECHA_ISO": f_iso,
+            "FECHA_HORA": f"{f_disp} {h_disp}",
             "EMISOR": usuario_actual,
             "MENSAJE": nuevo_txt,
             "CANAL_DESTINO": st.session_state.canal_activo,
@@ -271,8 +299,12 @@ elif st.session_state.seccion_activa == "✉️ Mensajes Directos":
     id_dm = "_".join(sorted([usuario_actual, st.session_state.dm_activo]))
     mensajes_dm = [m for m in st.session_state.bd_chat if m["CANAL_DESTINO"] == id_dm]
     
+    if activar_filtro_fecha and fecha_filtro_iso:
+        mensajes_dm = [m for m in mensajes_dm if m.get("FECHA_ISO") == fecha_filtro_iso]
+        st.info(f"📅 Mostrando chats del día: `{fecha_sel.strftime('%d/%m/%Y')}`")
+    
     if not mensajes_dm:
-        st.info(f"No hay mensajes anteriores con {st.session_state.dm_activo}. ¡Escribe el primero!")
+        st.info(f"No hay mensajes registrados con {st.session_state.dm_activo} para esta fecha.")
     else:
         for msg in mensajes_dm[-50:]:
             es_propio = (msg["EMISOR"] == usuario_actual)
@@ -282,9 +314,11 @@ elif st.session_state.seccion_activa == "✉️ Mensajes Directos":
             
     txt_dm = st.chat_input(f"Escribir mensaje privado a {st.session_state.dm_activo}...")
     if txt_dm:
+        f_iso, f_disp, h_disp = obtener_datos_tiempo()
         st.session_state.bd_chat.append({
             "ID_MENSAJE": str(uuid.uuid4())[:8],
-            "FECHA_HORA": obtener_hora_mexico(),
+            "FECHA_ISO": f_iso,
+            "FECHA_HORA": f"{f_disp} {h_disp}",
             "EMISOR": usuario_actual,
             "MENSAJE": txt_dm,
             "CANAL_DESTINO": id_dm,
@@ -303,6 +337,9 @@ elif st.session_state.seccion_activa == "🔔 Mi Actividad (@Menciones)":
         m for m in st.session_state.bd_chat 
         if f"@{nombre_clave}".lower() in m["MENSAJE"].lower()
     ]
+    
+    if activar_filtro_fecha and fecha_filtro_iso:
+        menciones = [m for m in menciones if m.get("FECHA_ISO") == fecha_filtro_iso]
     
     pendientes = [m for m in menciones if m["ID_MENSAJE"] not in st.session_state.menciones_leidas]
     leidas = [m for m in menciones if m["ID_MENSAJE"] in st.session_state.menciones_leidas]
