@@ -1,5 +1,6 @@
 import streamlit as st
 import datetime
+from zoneinfo import ZoneInfo
 
 st.set_page_config(page_title="🧪 Sandbox - Chat Interno SF Pangea", layout="centered")
 
@@ -15,11 +16,13 @@ usuario_actual = st.sidebar.selectbox(
 
 # --- 2. HISTORIAL TEMPORAL EN MEMORIA ---
 if "historial_chat" not in st.session_state:
+    # Capturamos la hora exacta de México (UTC-6)
+    hora_inicio = datetime.datetime.now(ZoneInfo("America/Mexico_City")).strftime("%I:%M %p")
     st.session_state.historial_chat = [
         {
             "emisor": "Sistema",
             "mensaje": "Bienvenido al canal general de la Dirección de Alumbrado Público.",
-            "hora": "10:00 AM"
+            "hora": hora_inicio
         }
     ]
 
@@ -39,7 +42,8 @@ with chat_container:
 nuevo_mensaje = st.chat_input("Escribe un mensaje para el equipo...")
 
 if nuevo_mensaje:
-    hora_actual = datetime.datetime.now().strftime("%I:%M %p")
+    # Hora exacta de México al enviar el mensaje
+    hora_actual = datetime.datetime.now(ZoneInfo("America/Mexico_City")).strftime("%I:%M %p")
     
     st.session_state.historial_chat.append({
         "emisor": usuario_actual,
