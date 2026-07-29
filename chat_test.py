@@ -36,7 +36,6 @@ LISTA_USUARIOS_INICIAL = [
     "Cuadrilla Alumbrado"
 ] + [f"Brigada Campo {i}" for i in range(1, 18)]
 
-# Sincronización automática de usuarios (Asegura Brigada 1 a 17)
 if "lista_usuarios" not in st.session_state:
     st.session_state.lista_usuarios = LISTA_USUARIOS_INICIAL
 else:
@@ -84,14 +83,25 @@ if "bd_chat" not in st.session_state:
             "EMISOR": "Brigada DAP",
             "MENSAJE": "Reporte inicial listo. Atención @FERMIN favor de validar.",
             "CANAL_DESTINO": "#general",
-            "MENCIONADOS": "@FERMIN",
+            "MENCIONADOS": "FERMIN",
             "ID_PADRE": ""
         }
     ]
 
-def detectar_menciones(texto):
-    menciones = re.findall(r'@\w+', texto)
-    return ", ".join(menciones) if menciones else ""
+# FUNCION INTELIGENTE DE DETECCIÓN DE MENCIONES (Tolerante a mayúsculas/minúsculas)
+def detectar_menciones_inteligente(texto, lista_usuarios):
+    etiquetas_encontradas = re.findall(r'@(\w+)', texto)
+    mencionados = set()
+    
+    for etq in etiquetas_encontradas:
+        etq_low = etq.lower()
+        for u in lista_usuarios:
+            primer_nombre = u.split()[0].lower()
+            nombre_completo = u.lower().replace(" ", "")
+            if etq_low == primer_nombre or etq_low == nombre_completo:
+                mencionados.add(u)
+                
+    return ", ".join(list(mencionados))
 
 # --- 4. BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
@@ -193,7 +203,6 @@ with st.sidebar:
                     st.success(f"Usuario '{usr_a_borrar}' eliminado.")
                     st.rerun()
 
-            # --- VACIAR HISTORIAL (CON SANITIZACIÓN DE CLAVE) ---
             with tab_vaciar:
                 st.markdown("**🔥 Vaciar todo el historial de mensajes:**")
                 st.warning("Esta acción borrará TODOS los mensajes de todos los canales y chats directos.")
@@ -202,7 +211,6 @@ with st.sidebar:
                 confirm_vaciar = st.checkbox("⚠️ Entiendo las consecuencias y deseo borrar todo el historial", key="chk_del_all")
                 
                 if st.button("🔥 Vaciar Historial Completo", disabled=not confirm_vaciar, type="primary"):
-                    # Comparación limpia sin espacios ocultos
                     if str(clave_input).strip() == str(CLAVE_ADMIN).strip():
                         st.session_state.bd_chat = []
                         st.session_state.menciones_leidas = set()
@@ -260,7 +268,7 @@ if st.session_state.seccion_activa == "📢 Canales":
                                 "EMISOR": usuario_actual,
                                 "MENSAJE": texto_hilo,
                                 "CANAL_DESTINO": st.session_state.canal_activo,
-                                "MENCIONADOS": detectar_menciones(texto_hilo),
+                                "MENCIONADOS": detectar_menciones_inteligente(texto_hilo, st.session_state.lista_usuarios),
                                 "ID_PADRE": msg["ID_MENSAJE"]
                             })
                             st.rerun()
@@ -275,7 +283,7 @@ if st.session_state.seccion_activa == "📢 Canales":
             "EMISOR": usuario_actual,
             "MENSAJE": nuevo_txt,
             "CANAL_DESTINO": st.session_state.canal_activo,
-            "MENCIONADOS": detectar_menciones(nuevo_txt),
+            "MENCIONADOS": detectar_menciones_inteligente(nuevo_txt, st.session_state.lista_usuarios),
             "ID_PADRE": ""
         })
         st.rerun()
@@ -333,26 +341,46 @@ elif st.session_state.seccion_activa == "✉️ Mensajes Directos":
 elif st.session_state.seccion_activa == "🔔 Mi Actividad (@Menciones)":
     st.subheader(f"🔔 Notificaciones para `{usuario_actual}`")
     
-    nombre_clave = usuario_actual.split()[0]
+    dict_mensajes = {m["ID_MENSAJE"]: m for m in st.session_state.bd_chat}
+    menciones_y_respuestas = []
     
-    menciones = [
-        m for m in st.session_state.bd_chat 
-        if f"@{nombre_clave}".lower() in m["MENSAJE"].lower()
-    ]
-    
+    for m in st.session_state.bd_chat:
+        if m["EMISOR"] == usuario_actual:
+            continue  # Ignorar mensajes propios
+            
+        es_mencionado = usuario_actual in m.get("MENCIONADOS", "")
+        
+        # Verificar si es respuesta a un mensaje del usuario actual
+        es_respuesta_a_mi = False
+        if m.get("ID_PADRE"):
+            padre = dict_mensajes.get(m["ID_PADRE"])
+            if padre and padre["EMISOR"] == usuario_actual:
+                es_respuesta_a_mi = True
+                
+        if es_mencionado or es_respuesta_a_mi:
+            # Marcamos el tipo de notificación
+            tipo_notif = "mencion" if es_mencionado else "respuesta"
+            m_copy = dict(m)
+            m_copy["TIPO_NOTIF"] = tipo_notif
+            menciones_y_respuestas.append(m_copy)
+
     if activar_filtro_fecha and fecha_filtro_iso:
-        menciones = [m for m in menciones if m.get("FECHA_ISO") == fecha_filtro_iso]
-    
-    pendientes = [m for m in menciones if m["ID_MENSAJE"] not in st.session_state.menciones_leidas]
-    leidas = [m for m in menciones if m["ID_MENSAJE"] in st.session_state.menciones_leidas]
+        menciones_y_respuestas = [m for m in menciones_y_respuestas if m.get("FECHA_ISO") == fecha_filtro_iso]
+
+    pendientes = [m for m in menciones_y_respuestas if m["ID_MENSAJE"] not in st.session_state.menciones_leidas]
+    leidas = [m for m in menciones_y_respuestas if m["ID_MENSAJE"] in st.session_state.menciones_leidas]
     
     st.markdown("### 🔴 Pendientes (Prioridad)")
     if not pendientes:
-        st.success("🎉 ¡Estás al día! No tienes menciones pendientes.")
+        st.success("🎉 ¡Estás al día! No tienes menciones ni respuestas pendientes.")
     else:
         for msg in pendientes:
             with st.container(border=True):
-                st.markdown(f"🚨 **{msg['EMISOR']}** te etiquetó en `{msg['CANAL_DESTINO']}` <small>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
+                if msg.get("TIPO_NOTIF") == "respuesta":
+                    st.markdown(f"💬 **{msg['EMISOR']}** respondió a tu mensaje en `{msg['CANAL_DESTINO']}` <small>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"🚨 **{msg['EMISOR']}** te etiquetó en `{msg['CANAL_DESTINO']}` <small>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
+                    
                 st.write(f"_{msg['MENSAJE']}_")
                 
                 if st.button("📍 Ir al mensaje", key=f"btn_ir_{msg['ID_MENSAJE']}"):
