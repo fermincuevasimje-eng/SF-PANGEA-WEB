@@ -187,20 +187,42 @@ if st.session_state.seccion_activa == "📢 Canales":
         })
         st.rerun()
 
-# B) MENSAJES DIRECTOS
+# B) MENSAJES DIRECTOS (MEJORADO)
 elif st.session_state.seccion_activa == "✉️ Mensajes Directos":
-    st.subheader(f"💬 Chat Privado con `{st.session_state.dm_activo}`")
+    destinatarios = [u for u in st.session_state.lista_usuarios if u != usuario_actual]
     
+    # Encabezado con selector directo de usuario
+    col_titulo, col_selector = st.columns([1, 1])
+    
+    with col_titulo:
+        st.subheader("✉️ Mensajes Directos")
+        
+    with col_selector:
+        # Selector de destinatario visible en el panel principal
+        dm_elegido = st.selectbox(
+            "💬 Selecciona destinatario:",
+            destinatarios,
+            index=destinatarios.index(st.session_state.dm_activo) if st.session_state.dm_activo in destinatarios else 0
+        )
+        st.session_state.dm_activo = dm_elegido
+
+    st.caption(f"🔒 Canal privado entre **{usuario_actual}** y **{st.session_state.dm_activo}**")
+    st.divider()
+    
+    # Filtrado del historial privado
     id_dm = "_".join(sorted([usuario_actual, st.session_state.dm_activo]))
     mensajes_dm = [m for m in st.session_state.bd_chat if m["CANAL_DESTINO"] == id_dm]
     
-    for msg in mensajes_dm[-50:]:
-        es_propio = (msg["EMISOR"] == usuario_actual)
-        with st.chat_message("user" if es_propio else "assistant"):
-            st.markdown(f"**{msg['EMISOR']}** <small style='color:gray;'>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
-            st.write(msg["MENSAJE"])
+    if not mensajes_dm:
+        st.info(f"No hay mensajes anteriores con {st.session_state.dm_activo}. ¡Escribe el primero!")
+    else:
+        for msg in mensajes_dm[-50:]:
+            es_propio = (msg["EMISOR"] == usuario_actual)
+            with st.chat_message("user" if es_propio else "assistant"):
+                st.markdown(f"**{msg['EMISOR']}** <small style='color:gray;'>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
+                st.write(msg["MENSAJE"])
             
-    txt_dm = st.chat_input(f"Escribir a {st.session_state.dm_activo}...")
+    txt_dm = st.chat_input(f"Escribir mensaje privado a {st.session_state.dm_activo}...")
     if txt_dm:
         st.session_state.bd_chat.append({
             "ID_MENSAJE": str(uuid.uuid4())[:8],
