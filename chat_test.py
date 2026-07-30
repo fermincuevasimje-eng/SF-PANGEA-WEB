@@ -1,446 +1,50 @@
 import streamlit as st
-import datetime
-import uuid
-import re
 import pandas as pd
-from zoneinfo import ZoneInfo
 from streamlit_gsheets import GSheetsConnection
 
-st.set_page_config(page_title="💬 SF Pangea Chat", layout="wide")
+# 1. Configuración de la página
+st.set_page_config(
+    page_title="SF Pangea Chat",
+    page_icon="💬",
+    layout="centered"
+)
 
 st.title("💬 SF Pangea Chat")
 
-TZ_MEX = ZoneInfo("America/Mexico_City")
-
-def obtener_datos_tiempo():
-    ahora = datetime.datetime.now(TZ_MEX)
-    fecha_iso = ahora.strftime("%Y-%m-%d")
-    fecha_disp = ahora.strftime("%d/%m/%Y")
-    hora_disp = ahora.strftime("%I:%M %p")
-    return fecha_iso, fecha_disp, hora_disp
-
-CLAVE_ADMIN = "1827"
-
-# --- URL DIRECTA DE TU GOOGLE SHEET 'BD_PANGEA' ---
-URL_BD = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wwiiWR08Lw3PKHzEjSbMwxUm8/edit"
-
-# --- CONEXIÓN A GOOGLE SHEETS ---
+# 2. Conexión nativa con Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- CARGA OPTIMIZADA CON CACHÉ (Evita la saturación de CPU) ---
-@st.cache_data(ttl=600)
-def cargar_mensajes_bd():
-    """Carga los mensajes desde la pestaña Boveda_Chat guardando caché por 10 min"""
-    try:
-        df = conn.read(spreadsheet=URL_BD, worksheet="Boveda_Chat", ttl="10m")
-        df = df.fillna("")
-        return df.to_dict(orient="records")
-    except Exception as e:
-        st.error(f"Error al conectar con Boveda_Chat: {e}")
-        return []
+# Carga de datos optimizada con caché de 60 segundos
+@st.cache_data(ttl=60)
+def cargar_historial():
+    return conn.read()
 
-def guardar_mensaje_bd(nuevo_msg):
-    """Guarda un nuevo mensaje en la hoja Boveda_Chat y refresca la caché"""
-    try:
-        df_actual = conn.read(spreadsheet=URL_BD, worksheet="Boveda_Chat", ttl=0).fillna("")
-        df_nuevo = pd.DataFrame([nuevo_msg])
-        df_final = pd.concat([df_actual, df_nuevo], ignore_index=True)
-        conn.update(spreadsheet=URL_BD, worksheet="Boveda_Chat", data=df_final)
-        # Invalidar la caché para que el usuario que envía el mensaje lo vea de inmediato
-        cargar_mensajes_bd.clear()
-    except Exception as e:
-        st.error(f"Error al guardar mensaje: {e}")
+# 3. Inicializar Estado de la Sesión para el Chat
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-def vaciar_historial_bd():
-    """Limpia el historial en Google Sheets y refresca la caché"""
-    try:
-        df_vacio = pd.DataFrame(columns=[
-            "ID_MENSAJE", "FECHA_HORA", "EMISOR", "MENSAJE", 
-            "CANAL_DESTINO", "MENCIONADOS", "ID_PADRE", "FECHA_ISO"
-        ])
-        conn.update(spreadsheet=URL_BD, worksheet="Boveda_Chat", data=df_vacio)
-        # Invalidar la caché tras limpiar todo
-        cargar_mensajes_bd.clear()
-    except Exception as e:
-        st.error(f"Error al vaciar historial: {e}")
+# 4. Prueba de Conexión Inicial
+try:
+    df_bd = cargar_historial()
+    st.success("🟢 Sistema inicializado y conectado a BD_PANGEA")
+except Exception as e:
+    st.error(f"🔴 Error de conexión con Google Cloud: {e}")
+    st.stop()
 
-# --- 1. LISTA BASE DE USUARIOS Y CANALES ---
-LISTA_USUARIOS_INICIAL = [
-    "FERMIN",
-    "Director",
-    "Jefe 1",
-    "Jefe 2",
-    "Especial 1",
-    "Especial 2",
-    "Bodega 1",
-    "Bodega 2",
-    "Brigada DAP",
-    "Brigada Especial",
-    "Brigada Mantenimiento Interno",
-    "Cuadrilla Alumbrado"
-] + [f"Brigada Campo {i}" for i in range(1, 18)]
+# 5. Renderizado de Mensajes en Pantalla
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-if "lista_usuarios" not in st.session_state:
-    st.session_state.lista_usuarios = LISTA_USUARIOS_INICIAL
-else:
-    for u in LISTA_USUARIOS_INICIAL:
-        if u not in st.session_state.lista_usuarios:
-            st.session_state.lista_usuarios.append(u)
+# 6. Captura de Entrada del Usuario
+if prompt := st.chat_input("Escribe tu mensaje aquí..."):
+    # Agregar mensaje del usuario a la pantalla
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-if "lista_canales" not in st.session_state:
-    st.session_state.lista_canales = ["#general", "#mantenimiento", "#urgencias", "#bodega_reportes"]
-
-# --- 2. ENLACES RÁPIDOS POR URL ---
-params = st.query_params
-usuario_url = params.get("user") or params.get("usuario")
-
-if "usuario_actual" not in st.session_state:
-    if usuario_url and usuario_url in st.session_state.lista_usuarios:
-        st.session_state.usuario_actual = usuario_url
-    else:
-        st.session_state.usuario_actual = "FERMIN"
-
-# --- 3. NAVEGACIÓN Y CARGA DE BD ---
-if "seccion_activa" not in st.session_state:
-    st.session_state.seccion_activa = "📢 Canales"
-
-if "canal_activo" not in st.session_state:
-    st.session_state.canal_activo = "#general"
-
-if "dm_activo" not in st.session_state:
-    st.session_state.dm_activo = "Director"
-
-if "menciones_leidas" not in st.session_state:
-    st.session_state.menciones_leidas = set()
-
-if "mensaje_destacado" not in st.session_state:
-    st.session_state.mensaje_destacado = None
-
-# Carga utilizando caché de Streamlit
-bd_chat = cargar_mensajes_bd()
-
-def detectar_menciones_inteligente(texto, lista_usuarios):
-    etiquetas_encontradas = re.findall(r'@(\w+)', texto)
-    mencionados = set()
-    for etq in etiquetas_encontradas:
-        etq_low = etq.lower()
-        for u in lista_usuarios:
-            primer_nombre = u.split()[0].lower()
-            nombre_completo = u.lower().replace(" ", "")
-            if etq_low == primer_nombre or etq_low == nombre_completo:
-                mencionados.add(u)
-    return ", ".join(list(mencionados))
-
-# --- 4. BARRA LATERAL (SIDEBAR) ---
-with st.sidebar:
-    st.header("⚙️ Sesión")
-    
-    index_usr = st.session_state.lista_usuarios.index(st.session_state.usuario_actual) if st.session_state.usuario_actual in st.session_state.lista_usuarios else 0
-    usuario_actual = st.selectbox("👤 Tu Usuario:", st.session_state.lista_usuarios, index=index_usr)
-    st.session_state.usuario_actual = usuario_actual
-    
-    usr_encoded = usuario_actual.replace(" ", "%20")
-    link_rapido = f"https://sf-pangea-chat-test.streamlit.app/?user={usr_encoded}"
-    
-    with st.expander("📱 Enlace rápido para Celular"):
-        st.caption("Envía este link por WhatsApp al usuario para que entre sin escribir datos:")
-        st.code(link_rapido, language="text")
-
-    # --- BOTÓN PARA REFROSCAR CHAT DE FORMA MANUAL ---
-    if st.button("🔄 Refrescar Chat", use_container_width=True):
-        cargar_mensajes_bd.clear()
-        st.rerun()
-
-    st.divider()
-    
-    seccion = st.radio(
-        "📌 Navegación:",
-        ["📢 Canales", "✉️ Mensajes Directos", "🔔 Mi Actividad (@Menciones)"],
-        index=["📢 Canales", "✉️ Mensajes Directos", "🔔 Mi Actividad (@Menciones)"].index(st.session_state.seccion_activa)
-    )
-    st.session_state.seccion_activa = seccion
-    
-    st.divider()
-    
-    if st.session_state.seccion_activa == "📢 Canales":
-        canal_sel = st.selectbox(
-            "Canal activo:", 
-            st.session_state.lista_canales,
-            index=st.session_state.lista_canales.index(st.session_state.canal_activo) if st.session_state.canal_activo in st.session_state.lista_canales else 0
-        )
-        st.session_state.canal_activo = canal_sel
-
-    # --- 📅 FILTRO POR FECHA ---
-    st.divider()
-    st.subheader("📅 Filtro por Fecha")
-    activar_filtro_fecha = st.checkbox("Filtrar por fecha específica", value=False)
-    fecha_filtro_iso = None
-    if activar_filtro_fecha:
-        fecha_sel = st.date_input("Selecciona día:", datetime.date.today())
-        fecha_filtro_iso = fecha_sel.strftime("%Y-%m-%d")
-
-    # --- PANEL EXCLUSIVO DE ADMINISTRADOR ('FERMIN') ---
-    if usuario_actual == "FERMIN":
-        st.divider()
-        with st.expander("🛠️ Panel Admin (FERMIN)"):
-            st.caption("🔒 Control exclusivo del Administrador")
-            
-            tab_crear, tab_eliminar, tab_vaciar = st.tabs(["➕ Crear", "🗑️ Eliminar", "🔥 Vaciar Chat"])
-            
-            with tab_crear:
-                st.markdown("**Crear nuevo canal:**")
-                nuevo_canal_nombre = st.text_input("Nombre del canal:", placeholder="ej. #obra_especial", key="in_crear_canal")
-                if st.button("➕ Crear Canal"):
-                    if nuevo_canal_nombre:
-                        fmt = nuevo_canal_nombre.lower().strip()
-                        if not fmt.startswith("#"):
-                            fmt = f"#{fmt}"
-                        if fmt not in st.session_state.lista_canales:
-                            st.session_state.lista_canales.append(fmt)
-                            st.success(f"Canal {fmt} creado.")
-                            st.rerun()
-                
-                st.divider()
-                st.markdown("**Crear nuevo usuario:**")
-                nuevo_usuario_nombre = st.text_input("Nombre usuario/brigada:", placeholder="ej. Brigada Campo 18", key="in_crear_usr")
-                if st.button("➕ Agregar Usuario"):
-                    if nuevo_usuario_nombre and nuevo_usuario_nombre not in st.session_state.lista_usuarios:
-                        st.session_state.lista_usuarios.append(nuevo_usuario_nombre)
-                        st.success(f"Usuario {nuevo_usuario_nombre} creado.")
-                        st.rerun()
-
-            with tab_eliminar:
-                st.markdown("**Eliminar Canal:**")
-                canales_borrables = [c for c in st.session_state.lista_canales if c != "#general"]
-                if canales_borrables:
-                    canal_a_borrar = st.selectbox("Selecciona canal a borrar:", canales_borrables)
-                    confirm_canal = st.checkbox(f"⚠️ Confirmar borrar {canal_a_borrar}", key="chk_del_canal")
-                    if st.button("🗑️ Eliminar Canal", disabled=not confirm_canal, type="primary"):
-                        st.session_state.lista_canales.remove(canal_a_borrar)
-                        if st.session_state.canal_activo == canal_a_borrar:
-                            st.session_state.canal_activo = "#general"
-                        st.success(f"Canal {canal_a_borrar} eliminado.")
-                        st.rerun()
-                else:
-                    st.caption("No hay canales secundarios para borrar.")
-
-                st.divider()
-                st.markdown("**Eliminar Usuario:**")
-                usuarios_borrables = [u for u in st.session_state.lista_usuarios if u != "FERMIN"]
-                usr_a_borrar = st.selectbox("Selecciona usuario a borrar:", usuarios_borrables)
-                confirm_usr = st.checkbox(f"⚠️ Confirmar borrar '{usr_a_borrar}'", key="chk_del_usr")
-                
-                if st.button("🗑️ Eliminar Usuario", disabled=not confirm_usr, type="primary"):
-                    st.session_state.lista_usuarios.remove(usr_a_borrar)
-                    st.success(f"Usuario '{usr_a_borrar}' eliminado.")
-                    st.rerun()
-
-            with tab_vaciar:
-                st.markdown("**🔥 Vaciar todo el historial en Google Sheets:**")
-                st.warning("Esta acción borrará TODOS los mensajes en la pestaña Boveda_Chat.")
-                
-                clave_input = st.text_input("🔑 Clave de seguridad admin:", type="password", key="in_clave_del_all")
-                confirm_vaciar = st.checkbox("⚠️ Entiendo las consecuencias y deseo borrar todo el historial", key="chk_del_all")
-                
-                if st.button("🔥 Vaciar Historial Completo", disabled=not confirm_vaciar, type="primary"):
-                    if str(clave_input).strip() == str(CLAVE_ADMIN).strip():
-                        vaciar_historial_bd()
-                        st.session_state.menciones_leidas = set()
-                        st.success("🧹 Historial vaciado en Google Sheets.")
-                        st.rerun()
-                    else:
-                        st.error("❌ Clave de seguridad incorrecta. Acceso denegado.")
-
-# --- 5. RENDERIZADO DE CONTENIDO PRINCIPAL ---
-
-# A) CANALES
-if st.session_state.seccion_activa == "📢 Canales":
-    st.subheader(f"Canal: `{st.session_state.canal_activo}`")
-    
-    mensajes_canal = [
-        m for m in bd_chat 
-        if m["CANAL_DESTINO"] == st.session_state.canal_activo and not str(m["ID_PADRE"]).strip()
-    ]
-    
-    if activar_filtro_fecha and fecha_filtro_iso:
-        mensajes_canal = [m for m in mensajes_canal if str(m.get("FECHA_ISO")).strip() == fecha_filtro_iso]
-        st.info(f"📅 Mostrando mensajes del día: `{fecha_sel.strftime('%d/%m/%Y')}`")
-
-    if not mensajes_canal:
-        st.info(f"No hay mensajes guardados en `{st.session_state.canal_activo}`.")
-    else:
-        for msg in mensajes_canal[-50:]:
-            es_propio = (msg["EMISOR"] == usuario_actual)
-            avatar = "👨‍💻" if msg["EMISOR"] == "FERMIN" else ("👔" if "Director" in msg["EMISOR"] or "Jefe" in msg["EMISOR"] else "👷‍♂️")
-            
-            es_destacado = (st.session_state.mensaje_destacado == msg["ID_MENSAJE"])
-            if es_destacado:
-                st.info("👇 **Mensaje seleccionado desde tus menciones:**")
-                
-            with st.chat_message("user" if es_propio else "assistant", avatar=avatar):
-                st.markdown(f"**{msg['EMISOR']}** <small style='color:gray;'>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
-                st.write(msg["MENSAJE"])
-                
-                # Hilos
-                hilos = [h for h in bd_chat if str(h["ID_PADRE"]).strip() == str(msg["ID_MENSAJE"]).strip()]
-                cant_hilos = len(hilos)
-                
-                with st.expander(f"💬 {cant_hilos} respuestas en hilo" if cant_hilos > 0 else "💬 Responder en hilo"):
-                    for h in hilos:
-                        st.markdown(f"↳ **{h['EMISOR']}**: {h['MENSAJE']} <small style='color:gray;'>({h['FECHA_HORA']})</small>", unsafe_allow_html=True)
-                    
-                    if hilos:
-                        ultimo_emisor = hilos[-1]["EMISOR"]
-                    else:
-                        ultimo_emisor = msg["EMISOR"]
-                        
-                    placeholder_hilo = "Escribir respuesta en el hilo..." if ultimo_emisor == usuario_actual else f"Responder a {ultimo_emisor}..."
-
-                    texto_hilo = st.text_input(placeholder_hilo, key=f"input_{msg['ID_MENSAJE']}")
-                    if st.button("Enviar respuesta", key=f"btn_{msg['ID_MENSAJE']}"):
-                        if texto_hilo:
-                            f_iso, f_disp, h_disp = obtener_datos_tiempo()
-                            nuevo_hilo = {
-                                "ID_MENSAJE": str(uuid.uuid4())[:8],
-                                "FECHA_HORA": f"{f_disp} {h_disp}",
-                                "EMISOR": usuario_actual,
-                                "MENSAJE": texto_hilo,
-                                "CANAL_DESTINO": st.session_state.canal_activo,
-                                "MENCIONADOS": detectar_menciones_inteligente(texto_hilo, st.session_state.lista_usuarios),
-                                "ID_PADRE": msg["ID_MENSAJE"],
-                                "FECHA_ISO": f_iso
-                            }
-                            guardar_mensaje_bd(nuevo_hilo)
-                            st.rerun()
-
-    nuevo_txt = st.chat_input(f"Enviar mensaje a {st.session_state.canal_activo}...")
-    if nuevo_txt:
-        f_iso, f_disp, h_disp = obtener_datos_tiempo()
-        nuevo_msg = {
-            "ID_MENSAJE": str(uuid.uuid4())[:8],
-            "FECHA_HORA": f"{f_disp} {h_disp}",
-            "EMISOR": usuario_actual,
-            "MENSAJE": nuevo_txt,
-            "CANAL_DESTINO": st.session_state.canal_activo,
-            "MENCIONADOS": detectar_menciones_inteligente(nuevo_txt, st.session_state.lista_usuarios),
-            "ID_PADRE": "",
-            "FECHA_ISO": f_iso
-        }
-        guardar_mensaje_bd(nuevo_msg)
-        st.rerun()
-
-# B) MENSAJES DIRECTOS
-elif st.session_state.seccion_activa == "✉️ Mensajes Directos":
-    destinatarios = [u for u in st.session_state.lista_usuarios if u != usuario_actual]
-    
-    col_t, col_s = st.columns([1, 1])
-    with col_t:
-        st.subheader("✉️ Mensajes Directos")
-    with col_s:
-        dm_elegido = st.selectbox(
-            "💬 Selecciona destinatario:",
-            destinatarios,
-            index=destinatarios.index(st.session_state.dm_activo) if st.session_state.dm_activo in destinatarios else 0
-        )
-        st.session_state.dm_activo = dm_elegido
-
-    st.caption(f"🔒 Canal privado entre **{usuario_actual}** y **{st.session_state.dm_activo}**")
-    st.divider()
-    
-    id_dm = "_".join(sorted([usuario_actual, st.session_state.dm_activo]))
-    mensajes_dm = [m for m in bd_chat if m["CANAL_DESTINO"] == id_dm]
-    
-    if activar_filtro_fecha and fecha_filtro_iso:
-        mensajes_dm = [m for m in mensajes_dm if str(m.get("FECHA_ISO")).strip() == fecha_filtro_iso]
-        st.info(f"📅 Mostrando chats del día: `{fecha_sel.strftime('%d/%m/%Y')}`")
-    
-    if not mensajes_dm:
-        st.info(f"No hay mensajes registrados con {st.session_state.dm_activo}.")
-    else:
-        for msg in mensajes_dm[-50:]:
-            es_propio = (msg["EMISOR"] == usuario_actual)
-            with st.chat_message("user" if es_propio else "assistant"):
-                st.markdown(f"**{msg['EMISOR']}** <small style='color:gray;'>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
-                st.write(msg["MENSAJE"])
-            
-    txt_dm = st.chat_input(f"Escribir mensaje privado a {st.session_state.dm_activo}...")
-    if txt_dm:
-        f_iso, f_disp, h_disp = obtener_datos_tiempo()
-        nuevo_dm = {
-            "ID_MENSAJE": str(uuid.uuid4())[:8],
-            "FECHA_HORA": f"{f_disp} {h_disp}",
-            "EMISOR": usuario_actual,
-            "MENSAJE": txt_dm,
-            "CANAL_DESTINO": id_dm,
-            "MENCIONADOS": "",
-            "ID_PADRE": "",
-            "FECHA_ISO": f_iso
-        }
-        guardar_mensaje_bd(nuevo_dm)
-        st.rerun()
-
-# C) ACTIVIDAD
-elif st.session_state.seccion_activa == "🔔 Mi Actividad (@Menciones)":
-    st.subheader(f"🔔 Notificaciones para `{usuario_actual}`")
-    
-    dict_mensajes = {m["ID_MENSAJE"]: m for m in bd_chat}
-    menciones_y_respuestas = []
-    
-    for m in bd_chat:
-        if m["EMISOR"] == usuario_actual:
-            continue
-            
-        es_mencionado = usuario_actual in str(m.get("MENCIONADOS", ""))
-        
-        es_respuesta_a_mi = False
-        if str(m.get("ID_PADRE")).strip():
-            padre = dict_mensajes.get(m["ID_PADRE"])
-            if padre and padre["EMISOR"] == usuario_actual:
-                es_respuesta_a_mi = True
-                
-        if es_mencionado or es_respuesta_a_mi:
-            tipo_notif = "mencion" if es_mencionado else "respuesta"
-            m_copy = dict(m)
-            m_copy["TIPO_NOTIF"] = tipo_notif
-            menciones_y_respuestas.append(m_copy)
-
-    if activar_filtro_fecha and fecha_filtro_iso:
-        menciones_y_respuestas = [m for m in menciones_y_respuestas if str(m.get("FECHA_ISO")).strip() == fecha_filtro_iso]
-
-    pendientes = [m for m in menciones_y_respuestas if m["ID_MENSAJE"] not in st.session_state.menciones_leidas]
-    leidas = [m for m in menciones_y_respuestas if m["ID_MENSAJE"] in st.session_state.menciones_leidas]
-    
-    st.markdown("### 🔴 Pendientes (Prioridad)")
-    if not pendientes:
-        st.success("🎉 ¡Estás al día! No tienes menciones ni respuestas pendientes.")
-    else:
-        for msg in pendientes:
-            with st.container(border=True):
-                if msg.get("TIPO_NOTIF") == "respuesta":
-                    st.markdown(f"💬 **{msg['EMISOR']}** respondió a tu mensaje en `{msg['CANAL_DESTINO']}` <small>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"🚨 **{msg['EMISOR']}** te etiquetó en `{msg['CANAL_DESTINO']}` <small>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
-                    
-                st.write(f"_{msg['MENSAJE']}_")
-                
-                if st.button("📍 Ir al mensaje", key=f"btn_ir_{msg['ID_MENSAJE']}"):
-                    st.session_state.menciones_leidas.add(msg["ID_MENSAJE"])
-                    if str(msg["CANAL_DESTINO"]).startswith("#"):
-                        st.session_state.seccion_activa = "📢 Canales"
-                        st.session_state.canal_activo = msg["CANAL_DESTINO"]
-                    st.session_state.mensaje_destacado = msg["ID_MENSAJE"]
-                    st.rerun()
-
-    if leidas:
-        st.divider()
-        st.markdown("### ⚪ Historial (Atendidas)")
-        for msg in leidas:
-            with st.container(border=True):
-                st.markdown(f"✅ **{msg['EMISOR']}** en `{msg['CANAL_DESTINO']}` <small>({msg['FECHA_HORA']})</small>", unsafe_allow_html=True)
-                st.write(f"_{msg['MENSAJE']}_")
-                if st.button("👁️ Volver a ver", key=f"btn_ver_{msg['ID_MENSAJE']}"):
-                    if str(msg["CANAL_DESTINO"]).startswith("#"):
-                        st.session_state.seccion_activa = "📢 Canales"
-                        st.session_state.canal_activo = msg["CANAL_DESTINO"]
-                    st.session_state.mensaje_destacado = msg["ID_MENSAJE"]
-                    st.rerun()
+    # Respuesta provisional del sistema (Estructura base)
+    respuesta = f"Recibido: {prompt}"
+    st.session_state.messages.append({"role": "assistant", "content": respuesta})
+    with st.chat_message("assistant"):
+        st.markdown(respuesta)
