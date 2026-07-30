@@ -21,13 +21,16 @@ def obtener_datos_tiempo():
 
 CLAVE_ADMIN = "1827"
 
+# --- URL DIRECTA DE TU GOOGLE SHEET 'BD_PANGEA' ---
+URL_BD = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wwiiWR08Lw3PKHzEjSbMwxUm8/edit"
+
 # --- CONEXIÓN A GOOGLE SHEETS ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def cargar_mensajes_bd():
-    """Carga los mensajes desde la pestaña Boveda_Chat en Google Sheets"""
+    """Carga los mensajes desde la pestaña Boveda_Chat"""
     try:
-        df = conn.read(worksheet="Boveda_Chat", ttl=0)
+        df = conn.read(spreadsheet=URL_BD, worksheet="Boveda_Chat", ttl=0)
         df = df.fillna("")
         return df.to_dict(orient="records")
     except Exception as e:
@@ -37,21 +40,21 @@ def cargar_mensajes_bd():
 def guardar_mensaje_bd(nuevo_msg):
     """Guarda un nuevo mensaje en la hoja Boveda_Chat"""
     try:
-        df_actual = conn.read(worksheet="Boveda_Chat", ttl=0).fillna("")
+        df_actual = conn.read(spreadsheet=URL_BD, worksheet="Boveda_Chat", ttl=0).fillna("")
         df_nuevo = pd.DataFrame([nuevo_msg])
         df_final = pd.concat([df_actual, df_nuevo], ignore_index=True)
-        conn.update(worksheet="Boveda_Chat", data=df_final)
+        conn.update(spreadsheet=URL_BD, worksheet="Boveda_Chat", data=df_final)
     except Exception as e:
         st.error(f"Error al guardar mensaje: {e}")
 
 def vaciar_historial_bd():
-    """Limpia el historial en Google Sheets manteniendo solo la fila de encabezados"""
+    """Limpia el historial en Google Sheets"""
     try:
         df_vacio = pd.DataFrame(columns=[
             "ID_MENSAJE", "FECHA_HORA", "EMISOR", "MENSAJE", 
             "CANAL_DESTINO", "MENCIONADOS", "ID_PADRE", "FECHA_ISO"
         ])
-        conn.update(worksheet="Boveda_Chat", data=df_vacio)
+        conn.update(spreadsheet=URL_BD, worksheet="Boveda_Chat", data=df_vacio)
     except Exception as e:
         st.error(f"Error al vaciar historial: {e}")
 
@@ -107,7 +110,7 @@ if "menciones_leidas" not in st.session_state:
 if "mensaje_destacado" not in st.session_state:
     st.session_state.mensaje_destacado = None
 
-# Carga de mensajes directo desde Google Sheets
+# Carga directa utilizando la URL vinculada
 bd_chat = cargar_mensajes_bd()
 
 def detectar_menciones_inteligente(texto, lista_usuarios):
