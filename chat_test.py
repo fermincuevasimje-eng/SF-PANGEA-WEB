@@ -27,10 +27,12 @@ URL_BD = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wwiiWR08Lw3P
 # --- CONEXIÓN A GOOGLE SHEETS ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# --- CARGA OPTIMIZADA CON CACHÉ (Evita la saturación de CPU) ---
+@st.cache_data(ttl=600)
 def cargar_mensajes_bd():
-    """Carga los mensajes desde la pestaña Boveda_Chat"""
+    """Carga los mensajes desde la pestaña Boveda_Chat guardando caché por 10 min"""
     try:
-        df = conn.read(spreadsheet=URL_BD, worksheet="Boveda_Chat", ttl=0)
+        df = conn.read(spreadsheet=URL_BD, worksheet="Boveda_Chat", ttl="10m")
         df = df.fillna("")
         return df.to_dict(orient="records")
     except Exception as e:
@@ -38,23 +40,27 @@ def cargar_mensajes_bd():
         return []
 
 def guardar_mensaje_bd(nuevo_msg):
-    """Guarda un nuevo mensaje en la hoja Boveda_Chat"""
+    """Guarda un nuevo mensaje en la hoja Boveda_Chat y refresca la caché"""
     try:
         df_actual = conn.read(spreadsheet=URL_BD, worksheet="Boveda_Chat", ttl=0).fillna("")
         df_nuevo = pd.DataFrame([nuevo_msg])
         df_final = pd.concat([df_actual, df_nuevo], ignore_index=True)
         conn.update(spreadsheet=URL_BD, worksheet="Boveda_Chat", data=df_final)
+        # Invalidar la caché para que el usuario que envía el mensaje lo vea de inmediato
+        cargar_mensajes_bd.clear()
     except Exception as e:
         st.error(f"Error al guardar mensaje: {e}")
 
 def vaciar_historial_bd():
-    """Limpia el historial en Google Sheets"""
+    """Limpia el historial en Google Sheets y refresca la caché"""
     try:
         df_vacio = pd.DataFrame(columns=[
             "ID_MENSAJE", "FECHA_HORA", "EMISOR", "MENSAJE", 
             "CANAL_DESTINO", "MENCIONADOS", "ID_PADRE", "FECHA_ISO"
         ])
         conn.update(spreadsheet=URL_BD, worksheet="Boveda_Chat", data=df_vacio)
+        # Invalidar la caché tras limpiar todo
+        cargar_mensajes_bd.clear()
     except Exception as e:
         st.error(f"Error al vaciar historial: {e}")
 
@@ -110,7 +116,7 @@ if "menciones_leidas" not in st.session_state:
 if "mensaje_destacado" not in st.session_state:
     st.session_state.mensaje_destacado = None
 
-# Carga directa utilizando la URL vinculada
+# Carga utilizando caché de Streamlit
 bd_chat = cargar_mensajes_bd()
 
 def detectar_menciones_inteligente(texto, lista_usuarios):
@@ -139,6 +145,11 @@ with st.sidebar:
     with st.expander("📱 Enlace rápido para Celular"):
         st.caption("Envía este link por WhatsApp al usuario para que entre sin escribir datos:")
         st.code(link_rapido, language="text")
+
+    # --- BOTÓN PARA REFROSCAR CHAT DE FORMA MANUAL ---
+    if st.button("🔄 Refrescar Chat", use_container_width=True):
+        cargar_mensajes_bd.clear()
+        st.rerun()
 
     st.divider()
     
