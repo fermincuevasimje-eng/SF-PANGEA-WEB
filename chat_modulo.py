@@ -1,6 +1,7 @@
 import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # 1. Conexión Segura a Supabase
 @st.cache_resource
@@ -16,7 +17,7 @@ def get_supabase_client() -> Client:
 def render_chat():
     """
     Módulo de Chat aislado e independiente para SF Pangea.
-    Migrado a Supabase para evitar CPU Throttling, errores de escritura y latencia.
+    Migrado a Supabase con control de zona horaria (México) y seguridad RLS.
     """
     st.header("💬 SF Pangea Chat")
     st.caption("Módulo de comunicación interna seguro y optimizado con Supabase")
@@ -51,7 +52,7 @@ def render_chat():
 
     st.divider()
 
-    # 3. Consulta de Historial en Supabase (Corregido: desc=False)
+    # 3. Consulta de Historial en Supabase
     def cargar_historial(canal="general"):
         try:
             res = (
@@ -76,11 +77,13 @@ def render_chat():
                 usr = fila.get("emisor", "Anónimo")
                 msg = fila.get("mensaje", "")
                 
-                # Formatear fecha y hora
+                # Formatear fecha y hora convertida a Horario de México (UTC-6)
                 raw_time = fila.get("created_at", "")
                 if raw_time:
                     try:
-                        tstamp = datetime.fromisoformat(raw_time.replace("Z", "+00:00")).strftime("%Y-%m-%d %H:%M:%S")
+                        dt_utc = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                        dt_local = dt_utc.astimezone(ZoneInfo("America/Mexico_City"))
+                        tstamp = dt_local.strftime("%Y-%m-%d %H:%M:%S")
                     except Exception:
                         tstamp = str(raw_time)
                 else:
