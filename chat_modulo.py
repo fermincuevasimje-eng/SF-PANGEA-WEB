@@ -1,36 +1,29 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
-import pandas as pd
+from supabase import create_client, Client
 from datetime import datetime
+
+# 1. Conexión Segura a Supabase (Cache de recurso para no reconectar en cada re-run)
+@st.cache_resource
+def get_supabase_client() -> Client:
+    try:
+        url = st.secrets["supabase"]["SUPABASE_URL"]
+        key = st.secrets["supabase"]["SUPABASE_KEY"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error(f"🔴 Error al cargar las credenciales de Supabase en Secrets: {e}")
+        st.stop()
 
 def render_chat():
     """
     Módulo de Chat aislado e independiente para SF Pangea.
-    Previene consumo excesivo de CPU y colisiones de estado.
+    Migrado a Supabase para evitar CPU Throttling, errores de escritura y latencia.
     """
     st.header("💬 SF Pangea Chat")
-    st.caption("Módulo de comunicación interna seguro y optimizado")
+    st.caption("Módulo de comunicación interna seguro y optimizado con Supabase")
 
-    # 1. Conexión Segura mediante Secrets de Streamlit
-    try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-    except Exception as e:
-        st.error(f"🔴 Error al conectar con los Secrets de Google Sheets: {e}")
-        st.stop()
+    supabase = get_supabase_client()
 
-    # 2. Consulta Protegida con Cache (ttl=10s previene CPU Throttling y peticiones infinitas)
-    @st.cache_data(ttl=10, show_spinner=False)
-    def cargar_historial():
-        try:
-            df = conn.read(ttl="10s")
-            if df is None or df.empty:
-                return pd.DataFrame(columns=["timestamp", "usuario", "mensaje"])
-            return df.dropna(how="all")
-        except Exception as err:
-            st.error(f"🔴 Error de lectura en BD_CHAT_PANGEA (Verifica permisos de Service Account): {err}")
-            st.stop()
-
-    # 3. Control de Identificación de Usuario (Session State aislado)
+    # 2. Control de Identificación de Usuario (Session State aislado)
     if "sf_chat_user" not in st.session_state:
         st.session_state.sf_chat_user = ""
 
@@ -58,16 +51,40 @@ def render_chat():
 
     st.divider()
 
+    # 3. Consulta de Historial en Supabase
+    def cargar_historial(canal="general"):
+        try:
+            res = (
+                supabase.table("mensajes")
+                .select("*")
+                .eq("canal", canal)
+                .order("created_at", ascending=True)
+                .execute()
+            )
+            return res.data if res.data else []
+        except Exception as err:
+            st.error(f"🔴 Error al consultar mensajes en Supabase: {err}")
+            return []
+
     # 4. Carga y Renderizado del Historial
-    df_chat = cargar_historial()
+    mensajes = cargar_historial(canal="general")
 
     chat_container = st.container()
     with chat_container:
-        if not df_chat.empty:
-            for _, fila in df_chat.iterrows():
-                usr = str(fila.get("usuario", "Anónimo"))
-                msg = str(fila.get("mensaje", ""))
-                tstamp = str(fila.get("timestamp", ""))
+        if mensajes:
+            for fila in mensajes:
+                usr = fila.get("emisor", "Anónimo")
+                msg = fila.get("mensaje", "")
+                
+                # Formatear fecha y hora para lectura limpia
+                raw_time = fila.get("created_at", "")
+                if raw_time:
+                    try:
+                        tstamp = datetime.fromisoformat(raw_time.replace("Z", "+00:00")).strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        tstamp = str(raw_time)
+                else:
+                    tstamp = ""
 
                 es_propio = (usr == st.session_state.sf_chat_user)
                 avatar_icon = "👤" if es_propio else "💬"
@@ -80,19 +97,16 @@ def render_chat():
     # 5. Entrada y Envío de Nuevos Mensajes
     prompt = st.chat_input("Escribe un mensaje para SF Pangea...")
     if prompt:
-        nuevo_registro = pd.DataFrame([{
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "usuario": st.session_state.sf_chat_user,
-            "mensaje": prompt
-        }])
+        nuevo_registro = {
+            "canal": "general",
+            "emisor": st.session_state.sf_chat_user,
+            "mensaje": prompt,
+            "destinatario": None
+        }
 
         try:
-            # Concatenar nuevo mensaje al historial y guardar en Google Sheets
-            df_actualizado = pd.concat([df_chat, nuevo_registro], ignore_index=True)
-            conn.update(data=df_actualizado)
-            
-            # Limpiar caché local para mostrar el mensaje al instante
-            st.cache_data.clear()
+            # Inserción ultrarrápida directa en la tabla de Supabase
+            supabase.table("mensajes").insert(nuevo_registro).execute()
             st.rerun()
         except Exception as write_err:
             st.error(f"🔴 Error al enviar mensaje: {write_err}")
