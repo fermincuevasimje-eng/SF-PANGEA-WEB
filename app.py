@@ -378,6 +378,14 @@ if "boveda_mmd" not in st.session_state:
     else:
         st.session_state.boveda_mmd = {}
 
+# 🔄 REPETICIÓN / RECUPERACIÓN AUTOMÁTICA DE SESIÓN (PROTECCIÓN F5)
+if not st.session_state.autenticado and "session_user" in st.query_params:
+    user_url = st.query_params["session_user"]
+    if user_url == "SF_ADMIN":
+        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
+    elif user_url == "GuaDAP":
+        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
+
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
     col_u, col_p = st.columns(2)
@@ -386,9 +394,11 @@ if not st.session_state.autenticado:
     if st.button("🚀 Ingresar", use_container_width=True):
         if u == "SF" and p == "1827":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
+            st.query_params["session_user"] = "SF_ADMIN"  # 📌 Guarda sesión en URL
             st.rerun()
         elif u == "GuaDAP" and p == "1111":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
+            st.query_params["session_user"] = "GuaDAP"     # 📌 Guarda sesión en URL
             st.rerun()
         else:
             st.error("Acceso denegado")
@@ -412,13 +422,13 @@ else:
             st.subheader("📊 Ajustes GdR Multi-Ruta")
             t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
             v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
-            max_puntos_ruta = st.slider("Puntos Máximos por Ruta (Segmentación):", 5, 50, 15) # <--- NUEVO CONTROL DE LA V24
+            max_puntos_ruta = st.slider("Puntos Máximos por Ruta (Segmentación):", 5, 50, 15)
             st.write("---")
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
+            st.query_params.clear()  # 🧹 Limpia parámetro en URL al salir
             st.rerun()
         st.info("SF PANGEA VPLUS ULTRA")
-
 # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
