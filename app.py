@@ -18,6 +18,7 @@ from streamlit_gsheets import GSheetsConnection
 from openpyxl.styles import PatternFill
 import config
 import data_manager
+import chat_modulo
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
 st.set_page_config(page_title="SF PANGEA VPLUS ULTRA", layout="wide")
@@ -404,6 +405,8 @@ else:
         if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): st.session_state.menu = "SF4"
         if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): st.session_state.menu = "SF5"
         if st.button("📦 SF6-Almacén e Inventario", use_container_width=True): st.session_state.menu = "SF6"
+        st.write("---")
+        if st.button("💬 SF Pangea Chat", use_container_width=True): st.session_state.menu = "SF_CHAT"
         st.write("---")
         if st.session_state.menu == "SF1":
             st.subheader("📊 Ajustes GdR Multi-Ruta")
