@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime
 
-# 1. Conexión Segura a Supabase (Cache de recurso para no reconectar en cada re-run)
+# 1. Conexión Segura a Supabase
 @st.cache_resource
 def get_supabase_client() -> Client:
     try:
@@ -23,7 +23,7 @@ def render_chat():
 
     supabase = get_supabase_client()
 
-    # 2. Control de Identificación de Usuario (Session State aislado)
+    # 2. Control de Identificación de Usuario
     if "sf_chat_user" not in st.session_state:
         st.session_state.sf_chat_user = ""
 
@@ -51,14 +51,14 @@ def render_chat():
 
     st.divider()
 
-    # 3. Consulta de Historial en Supabase
+    # 3. Consulta de Historial en Supabase (Corregido: desc=False)
     def cargar_historial(canal="general"):
         try:
             res = (
                 supabase.table("mensajes")
                 .select("*")
                 .eq("canal", canal)
-                .order("created_at", ascending=True)
+                .order("created_at", desc=False)
                 .execute()
             )
             return res.data if res.data else []
@@ -76,7 +76,7 @@ def render_chat():
                 usr = fila.get("emisor", "Anónimo")
                 msg = fila.get("mensaje", "")
                 
-                # Formatear fecha y hora para lectura limpia
+                # Formatear fecha y hora
                 raw_time = fila.get("created_at", "")
                 if raw_time:
                     try:
@@ -105,7 +105,6 @@ def render_chat():
         }
 
         try:
-            # Inserción ultrarrápida directa en la tabla de Supabase
             supabase.table("mensajes").insert(nuevo_registro).execute()
             st.rerun()
         except Exception as write_err:
