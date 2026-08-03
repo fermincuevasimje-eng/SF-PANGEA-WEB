@@ -360,8 +360,21 @@ def load_massive_data(file, extension):
 # --- 3. AUTENTICACIÓN Y ESTADO ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
-if "menu" not in st.session_state:
+
+# 🔄 REPETICIÓN / RECUPERACIÓN AUTOMÁTICA DE SESIÓN (PROTECCIÓN F5)
+if not st.session_state.autenticado and "session_user" in st.query_params:
+    user_url = st.query_params["session_user"]
+    if user_url == "SF_ADMIN":
+        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
+    elif user_url == "GuaDAP":
+        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
+
+# 📌 RECUPERAR MÓDULO/MENÚ ACTIVO TRAS UN F5
+if "menu" in st.query_params:
+    st.session_state.menu = st.query_params["menu"]
+elif "menu" not in st.session_state:
     st.session_state.menu = "Inicio"
+
 if "lista_bajas" not in st.session_state:
     st.session_state.lista_bajas = {}
 if "input_key" not in st.session_state:
@@ -378,13 +391,10 @@ if "boveda_mmd" not in st.session_state:
     else:
         st.session_state.boveda_mmd = {}
 
-# 🔄 REPETICIÓN / RECUPERACIÓN AUTOMÁTICA DE SESIÓN (PROTECCIÓN F5)
-if not st.session_state.autenticado and "session_user" in st.query_params:
-    user_url = st.query_params["session_user"]
-    if user_url == "SF_ADMIN":
-        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
-    elif user_url == "GuaDAP":
-        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
+# Función auxiliar para cambiar de pantalla y actualizar la URL
+def navegar(destino):
+    st.session_state.menu = destino
+    st.query_params["menu"] = destino
 
 if not st.session_state.autenticado:
     st.title("🔐 Acceso SF PANGEA")
@@ -394,11 +404,13 @@ if not st.session_state.autenticado:
     if st.button("🚀 Ingresar", use_container_width=True):
         if u == "SF" and p == "1827":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
-            st.query_params["session_user"] = "SF_ADMIN"  # 📌 Guarda sesión en URL
+            st.query_params["session_user"] = "SF_ADMIN"
+            st.query_params["menu"] = st.session_state.menu
             st.rerun()
         elif u == "GuaDAP" and p == "1111":
             st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
-            st.query_params["session_user"] = "GuaDAP"     # 📌 Guarda sesión en URL
+            st.query_params["session_user"] = "GuaDAP"
+            st.query_params["menu"] = st.session_state.menu
             st.rerun()
         else:
             st.error("Acceso denegado")
@@ -408,15 +420,15 @@ else:
         st.title("⚙️ Panel Operativo")
         st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
         st.write("---")
-        if st.button("🏠 Inicio", use_container_width=True): st.session_state.menu = "Inicio"
-        if st.button("🚀 SF1-Generador de Rutas", use_container_width=True): st.session_state.menu = "SF1"
-        if st.button("📁 SF2-Bajas", use_container_width=True): st.session_state.menu = "SF2"
-        if st.button("📊 SF3-Captura y Métricas", use_container_width=True): st.session_state.menu = "SF3"
-        if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): st.session_state.menu = "SF4"
-        if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): st.session_state.menu = "SF5"
-        if st.button("📦 SF6-Almacén e Inventario", use_container_width=True): st.session_state.menu = "SF6"
+        if st.button("🏠 Inicio", use_container_width=True): navegar("Inicio")
+        if st.button("🚀 SF1-Generador de Rutas", use_container_width=True): navegar("SF1")
+        if st.button("📁 SF2-Bajas", use_container_width=True): navegar("SF2")
+        if st.button("📊 SF3-Captura y Métricas", use_container_width=True): navegar("SF3")
+        if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): navegar("SF4")
+        if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): navegar("SF5")
+        if st.button("📦 SF6-Almacén e Inventario", use_container_width=True): navegar("SF6")
         st.write("---")
-        if st.button("💬 SF Pangea Chat", use_container_width=True): st.session_state.menu = "SF_CHAT"
+        if st.button("💬 SF Pangea Chat", use_container_width=True): navegar("SF_CHAT")
         st.write("---")
         if st.session_state.menu == "SF1":
             st.subheader("📊 Ajustes GdR Multi-Ruta")
@@ -426,7 +438,7 @@ else:
             st.write("---")
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.autenticado = False
-            st.query_params.clear()  # 🧹 Limpia parámetro en URL al salir
+            st.query_params.clear()  # 🧹 Limpia la URL completa al salir
             st.rerun()
         st.info("SF PANGEA VPLUS ULTRA")
 # --- 5. CUERPO LÓGICO ---
