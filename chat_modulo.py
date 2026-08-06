@@ -56,10 +56,13 @@ def obtener_bytes_adjunto(url: str) -> bytes:
 
 
 # -----------------------------------------------------------------------------
-# FASE 3: Fragmento aislado para Auto-Refresco en tiempo real (cada 5 segundos)
+# FASE 3: Fragmento aislado para Auto-Refresco en tiempo real (Sincronización fluida)
 # -----------------------------------------------------------------------------
-@st.fragment(run_every="5s")
-def render_historial_fragment(supabase, usuario_actual, canal="general"):
+@st.fragment(run_every=5)
+def render_historial_fragment(usuario_actual: str, canal: str = "general"):
+  # Obtenemos la conexión aquí adentro para evitar bloqueos del fragmento
+  supabase = get_supabase_client()
+
   def cargar_historial():
     try:
       res = (
@@ -94,6 +97,14 @@ def render_historial_fragment(supabase, usuario_actual, canal="general"):
       ),
       "ppt": "application/vnd.ms-powerpoint",
   }
+
+  # Indicador visual del estado del auto-refresco
+  hora_actual = datetime.now(ZoneInfo("America/Mexico_City")).strftime(
+      "%H:%M:%S"
+  )
+  st.caption(
+      f"🟢 **Chat Sincronizado en Vivo** • Última actualización: `{hora_actual}`"
+  )
 
   mensajes = cargar_historial()
 
@@ -232,10 +243,8 @@ def render_chat():
 
   st.divider()
 
-  # Llama al fragmento de actualización automática cada 5s
-  render_historial_fragment(
-      supabase, st.session_state.sf_chat_user, canal="general"
-  )
+  # Llama al fragmento pasando solo tipos de datos simples (String)
+  render_historial_fragment(st.session_state.sf_chat_user, canal="general")
 
   # 5. Entrada para Adjuntar Archivos
   count = st.session_state.upload_counter
