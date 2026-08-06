@@ -55,7 +55,7 @@ def obtener_bytes_adjunto(url: str) -> bytes:
     return None
 
 
-# Helper para consultar lista de usuarios únicos registrados en el historial
+# Helper para consultar usuarios registrados
 def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
   try:
     res = supabase.table("mensajes").select("emisor").execute()
@@ -72,18 +72,39 @@ def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
 
 
 # -----------------------------------------------------------------------------
-# FASE 3 + CANALES + PRIVADOS + @MENCIONES: Fragmento aislado para Auto-Refresco (2s)
+# FASE 3: Fragmento aislado para Auto-Refresco en tiempo real (2s)
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
 def render_historial_fragment(
-    usuario_actual: str, canal: str = "general", destinatario: str = None
+    usuario_actual: str,
+    canal: str = "general",
+    destinatario: str = None,
+    solo_menciones: bool = False,
 ):
   supabase = get_supabase_client()
 
   def cargar_historial():
     try:
-      if canal == "privado" and destinatario:
-        # Carga mensajes del chat 1 a 1 entre usuario_actual y destinatario
+      if solo_menciones:
+        # Carga mensajes globales donde te etiquetaron con @tu_usuario
+        res = (
+            supabase.table("mensajes")
+            .select("*")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        if res.data:
+          tag = f"@{usuario_actual.lower()}"
+          return [
+              m
+              for m in res.data
+              if tag in m.get("mensaje", "").lower()
+              and m.get("emisor") != usuario_actual
+          ]
+        return []
+
+      elif canal == "privado" and destinatario:
+        # Carga conversación bidireccional 1 a 1
         res = (
             supabase.table("mensajes")
             .select("*")
@@ -92,7 +113,6 @@ def render_historial_fragment(
             .execute()
         )
         if res.data:
-          # Filtrar solo la conversación bidireccional entre ambos
           return [
               m
               for m in res.data
@@ -107,7 +127,7 @@ def render_historial_fragment(
           ]
         return []
       else:
-        # Carga mensajes del canal público correspondiente
+        # Carga canal público
         res = (
             supabase.table("mensajes")
             .select("*")
@@ -141,18 +161,22 @@ def render_historial_fragment(
       "ppt": "application/vnd.ms-powerpoint",
   }
 
-  # Indicador visual de sincronización en vivo
   hora_actual = datetime.now(ZoneInfo("America/Mexico_City")).strftime(
       "%H:%M:%S"
   )
-  etiqueta_canal = (
-      f"🔒 Chat Privado con **{destinatario}**"
-      if canal == "privado"
-      else f"📢 Canal **#{canal.upper()}**"
-  )
-  st.caption(
-      f"🟢 **{etiqueta_canal}** • Sincronizado en Vivo (`{hora_actual}`)"
-  )
+  if solo_menciones:
+    st.caption(
+        f"🔔 **Muro de Menciones para @{usuario_actual}** • En vivo"
+        f" (`{hora_actual}`)"
+    )
+  elif canal == "privado":
+    st.caption(
+        f"🔒 **Chat Privado con {destinatario}** • En vivo (`{hora_actual}`)"
+    )
+  else:
+    st.caption(
+        f"📢 **Canal #{canal.upper()}** • Sincronizado en Vivo (`{hora_actual}`)"
+    )
 
   mensajes = cargar_historial()
 
@@ -163,8 +187,8 @@ def render_historial_fragment(
         usr = fila.get("emisor", "Anónimo")
         msg = fila.get("mensaje", "")
         url_adjunto_raw = fila.get("url_adjunto", None)
+        canal_origen = fila.get("canal", "general")
 
-        # Horario de México (UTC-6)
         raw_time = fila.get("created_at", "")
         if raw_time:
           try:
@@ -179,14 +203,16 @@ def render_historial_fragment(
         es_propio = usr == usuario_actual
         avatar_icon = "👤" if es_propio else "💬"
 
-        # Detección de @Mención al usuario activo
+        # Detección de mención
         mencion_tag = f"@{usuario_actual.lower()}"
         contiene_mencion = mencion_tag in msg.lower() and not es_propio
 
         with st.chat_message(usr, avatar=avatar_icon):
-          # Alerta visual destacada si te etiquetaron en este mensaje
-          if contiene_mencion:
+          if contiene_mencion and not solo_menciones:
             st.warning(f"🔔 **¡{usr} te ha mencionado en este mensaje!**")
+
+          if solo_menciones:
+            st.info(f"📌 Mencionado en canal: **#{canal_origen.upper()}**")
 
           st.markdown(f"**{usr}** `<{tstamp}>`\n\n{msg}")
 
@@ -215,7 +241,7 @@ def render_historial_fragment(
                         file_name=nombre_archivo,
                         mime=mime_actual,
                         use_container_width=True,
-                        key=f"dl_btn_{msg_idx}_{file_idx}",
+                        key=f"dl_btn_{msg_idx}_{file_idx}_{canal}",
                     )
                   st.link_button(
                       "🌐 Abrir en pestaña",
@@ -247,7 +273,7 @@ def render_historial_fragment(
                         file_name=nombre_archivo,
                         mime=mime_actual,
                         use_container_width=True,
-                        key=f"dl_btn_file_{msg_idx}_{file_idx}",
+                        key=f"dl_btn_file_{msg_idx}_{file_idx}_{canal}",
                     )
                 with col_btn2:
                   st.link_button(
@@ -256,9 +282,7 @@ def render_historial_fragment(
                       use_container_width=True,
                   )
     else:
-      st.info(
-          "No hay mensajes en este espacio aún. ¡Sé el primero en escribir!"
-      )
+      st.info("No hay mensajes en este espacio aún.")
 
 
 # -----------------------------------------------------------------------------
@@ -290,7 +314,7 @@ def render_chat():
           st.warning("El nombre de usuario no puede estar vacío.")
     return
 
-  # Barra superior de estado de usuario
+  # Barra superior de sesión
   col_status, col_logout = st.columns([4, 1])
   with col_status:
     st.success(f"🟢 Usuario activo: **{st.session_state.sf_chat_user}**")
@@ -299,167 +323,194 @@ def render_chat():
       st.session_state.sf_chat_user = ""
       st.rerun()
 
-  st.divider()
-
   # ---------------------------------------------------------------------------
-  # Selector de Canales y Chat Privado (1 a 1)
+  # ORGANIZACIÓN POR PESTAÑAS (TABS) - RÁPIDO Y CÓMODO
   # ---------------------------------------------------------------------------
-  col_chan, col_dest = st.columns([2, 2])
+  tab_canales, tab_privados, tab_menciones = st.tabs([
+      "📢 Canales Públicos",
+      "🔒 Chat 1 a 1 (Privado)",
+      "🔔 Mis Menciones",
+  ])
 
-  with col_chan:
-    canal_seleccionado = st.selectbox(
-        "📍 Selecciona espacio de conversación:",
-        [
-            "📢 General",
-            "⚙️ Operativo",
-            "🆘 Soporte",
-            "🔒 Chat Privado (1 a 1)",
-        ],
-        key="sf_chat_canal_select",
+  # --- PESTAÑA 1: CANALES PÚBLICOS ---
+  with tab_canales:
+    canal_seleccionado = st.radio(
+        "Canal activo:",
+        ["General", "Operativo", "Soporte"],
+        horizontal=True,
+        key="sf_chat_radio_canal",
     )
+    canal_activo = canal_seleccionado.lower()
 
-  canal_map = {
-      "📢 General": "general",
-      "⚙️ Operativo": "operativo",
-      "🆘 Soporte": "soporte",
-      "🔒 Chat Privado (1 a 1)": "privado",
-  }
-  canal_activo = canal_map[canal_seleccionado]
-
-  destinatario_activo = None
-  if canal_activo == "privado":
-    with col_dest:
-      usuarios_disponibles = obtener_usuarios_chat(
-          supabase, st.session_state.sf_chat_user
-      )
-      if usuarios_disponibles:
-        destinatario_activo = st.selectbox(
-            "👤 Selecciona usuario para mensaje privado:",
-            usuarios_disponibles,
-            key="sf_chat_destinatario_select",
-        )
-      else:
-        st.info("💡 Aún no hay otros usuarios en el historial para conversar.")
-
-  st.markdown("---")
-
-  # Llama al fragmento de renderizado en tiempo real (2s)
-  if canal_activo == "privado" and not destinatario_activo:
-    st.warning("👈 Por favor selecciona un usuario arriba para iniciar la charla privada.")
-  else:
     render_historial_fragment(
-        st.session_state.sf_chat_user,
-        canal=canal_activo,
-        destinatario=destinatario_activo,
+        st.session_state.sf_chat_user, canal=canal_activo
     )
 
-  # ---------------------------------------------------------------------------
-  # Adjuntos de Evidencias (Múltiples y con Autolimpia)
-  # ---------------------------------------------------------------------------
-  count = st.session_state.upload_counter
-  with st.popover("📎 Adjuntar evidencias o documentos"):
-    archivos_adjuntos = st.file_uploader(
-        "Selecciona uno o varios archivos",
-        type=[
-            "png",
-            "jpg",
-            "jpeg",
-            "webp",
-            "gif",
-            "pdf",
-            "xlsx",
-            "xls",
-            "docx",
-            "doc",
-            "pptx",
-            "ppt",
-        ],
-        accept_multiple_files=True,
-        key=f"sf_chat_uploader_{count}",
-    )
-
-    if archivos_adjuntos:
-      st.caption(f"📁 **Archivos seleccionados:** {len(archivos_adjuntos)}")
-
-      folio_input = st.text_input(
-          "Número de Folio / Ticket / AIRIS *",
-          key=f"sf_chat_folio_{count}",
-          placeholder="Ej. AIRIS-12345 / Folio 987",
+    # Controles de envío para Pestaña 1
+    count = st.session_state.upload_counter
+    with st.popover("📎 Adjuntar evidencias a #" + canal_activo.upper()):
+      archivos_adjuntos = st.file_uploader(
+          "Selecciona archivos",
+          type=[
+              "png",
+              "jpg",
+              "jpeg",
+              "webp",
+              "gif",
+              "pdf",
+              "xlsx",
+              "xls",
+              "docx",
+              "doc",
+              "pptx",
+              "ppt",
+          ],
+          accept_multiple_files=True,
+          key=f"sf_chat_uploader_canales_{count}",
       )
-      comentario_adjunto = st.text_area(
-          "Comentario adicional (Opcional):",
-          key=f"sf_chat_comentario_{count}",
-          placeholder="Detalles sobre las evidencias...",
-      )
-
-      if st.button(
-          "Enviar Evidencias 🚀",
-          key=f"btn_enviar_{count}",
-          use_container_width=True,
-      ):
-        if not folio_input.strip():
-          st.error(
-              "⚠️ Debes ingresar obligatoriamente el número de Folio / Ticket /"
-              " AIRIS."
-          )
-        elif canal_activo == "privado" and not destinatario_activo:
-          st.error("⚠️ Debes seleccionar un destinatario para el chat privado.")
-        else:
-          urls_subidas = []
-          with st.spinner("Subiendo archivos a Supabase Storage..."):
-            for f in archivos_adjuntos:
-              url_f = subir_adjunto_supabase(f, supabase)
-              if url_f:
-                urls_subidas.append(url_f)
-
-          if urls_subidas:
-            url_adjunto_final = "|".join(urls_subidas)
-
-            mensaje_final = (
-                f"📌 **Folio / Ticket / AIRIS:** `{folio_input.strip()}`"
-            )
-            if comentario_adjunto.strip():
-              mensaje_final += f"\n\n{comentario_adjunto.strip()}"
-
-            nuevo_registro = {
-                "canal": canal_activo,
-                "emisor": st.session_state.sf_chat_user,
-                "mensaje": mensaje_final,
-                "destinatario": destinatario_activo,
-                "url_adjunto": url_adjunto_final,
-            }
-
-            try:
-              supabase.table("mensajes").insert(nuevo_registro).execute()
+      if archivos_adjuntos:
+        folio_input = st.text_input(
+            "Número de Folio / Ticket / AIRIS *",
+            key=f"sf_chat_folio_canales_{count}",
+            placeholder="Ej. AIRIS-12345",
+        )
+        comentario_adjunto = st.text_area(
+            "Comentario (Opcional):", key=f"sf_chat_comentario_canales_{count}"
+        )
+        if st.button(
+            "Enviar Evidencias 🚀",
+            key=f"btn_enviar_canales_{count}",
+            use_container_width=True,
+        ):
+          if not folio_input.strip():
+            st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
+          else:
+            urls = [
+                subir_adjunto_supabase(f, supabase)
+                for f in archivos_adjuntos
+                if f
+            ]
+            urls_validas = [u for u in urls if u]
+            if urls_validas:
+              msg_f = f"📌 **Folio / Ticket / AIRIS:** `{folio_input.strip()}`"
+              if comentario_adjunto.strip():
+                msg_f += f"\n\n{comentario_adjunto.strip()}"
+              supabase.table("mensajes").insert({
+                  "canal": canal_activo,
+                  "emisor": st.session_state.sf_chat_user,
+                  "mensaje": msg_f,
+                  "destinatario": None,
+                  "url_adjunto": "|".join(urls_validas),
+              }).execute()
               st.session_state.upload_counter += 1
               st.rerun()
-            except Exception as write_err:
-              st.error(f"🔴 Error al enviar evidencia: {write_err}")
 
-  # ---------------------------------------------------------------------------
-  # Entrada para Mensajes Tradicionales (Texto)
-  # ---------------------------------------------------------------------------
-  placeholder_prompt = (
-      f"Mensaje privado para {destinatario_activo}..."
-      if canal_activo == "privado" and destinatario_activo
-      else f"Escribe un mensaje en #{canal_activo.upper()} (puedes usar @usuario)..."
-  )
-  prompt = st.chat_input(placeholder_prompt)
-
-  if prompt:
-    if canal_activo == "privado" and not destinatario_activo:
-      st.error("⚠️ Selecciona un destinatario arriba antes de enviar un mensaje privado.")
-    else:
-      nuevo_registro = {
+    prompt_canal = st.chat_input(f"Escribe un mensaje en #{canal_activo.upper()}...")
+    if prompt_canal:
+      supabase.table("mensajes").insert({
           "canal": canal_activo,
           "emisor": st.session_state.sf_chat_user,
-          "mensaje": prompt,
-          "destinatario": destinatario_activo,
+          "mensaje": prompt_canal,
+          "destinatario": None,
           "url_adjunto": None,
-      }
+      }).execute()
+      st.rerun()
 
-      try:
-        supabase.table("mensajes").insert(nuevo_registro).execute()
+  # --- PESTAÑA 2: CHAT PRIVADO 1 A 1 ---
+  with tab_privados:
+    usuarios_disponibles = obtener_usuarios_chat(
+        supabase, st.session_state.sf_chat_user
+    )
+    if usuarios_disponibles:
+      destinatario_activo = st.selectbox(
+          "👤 Selecciona el colega para chatear en privado:",
+          usuarios_disponibles,
+          key="sf_chat_select_privado",
+      )
+
+      render_historial_fragment(
+          st.session_state.sf_chat_user,
+          canal="privado",
+          destinatario=destinatario_activo,
+      )
+
+      count = st.session_state.upload_counter
+      with st.popover(f"📎 Adjuntar archivo privado para {destinatario_activo}"):
+        archivos_privados = st.file_uploader(
+            "Selecciona archivos",
+            type=[
+                "png",
+                "jpg",
+                "jpeg",
+                "webp",
+                "gif",
+                "pdf",
+                "xlsx",
+                "xls",
+                "docx",
+                "doc",
+                "pptx",
+                "ppt",
+            ],
+            accept_multiple_files=True,
+            key=f"sf_chat_uploader_priv_{count}",
+        )
+        if archivos_privados:
+          folio_priv = st.text_input(
+              "Número de Folio / Ticket / AIRIS *",
+              key=f"sf_chat_folio_priv_{count}",
+          )
+          coment_priv = st.text_area(
+              "Comentario (Opcional):", key=f"sf_chat_coment_priv_{count}"
+          )
+          if st.button(
+              "Enviar Evidencia Privada 🚀",
+              key=f"btn_enviar_priv_{count}",
+              use_container_width=True,
+          ):
+            if not folio_priv.strip():
+              st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
+            else:
+              urls = [
+                  subir_adjunto_supabase(f, supabase)
+                  for f in archivos_privados
+                  if f
+              ]
+              urls_validas = [u for u in urls if u]
+              if urls_validas:
+                msg_f = f"📌 **Folio / Ticket / AIRIS:** `{folio_priv.strip()}`"
+                if coment_priv.strip():
+                  msg_f += f"\n\n{coment_priv.strip()}"
+                supabase.table("mensajes").insert({
+                    "canal": "privado",
+                    "emisor": st.session_state.sf_chat_user,
+                    "mensaje": msg_f,
+                    "destinatario": destinatario_activo,
+                    "url_adjunto": "|".join(urls_validas),
+                }).execute()
+                st.session_state.upload_counter += 1
+                st.rerun()
+
+      prompt_privado = st.chat_input(
+          f"Mensaje privado directo para {destinatario_activo}..."
+      )
+      if prompt_privado:
+        supabase.table("mensajes").insert({
+            "canal": "privado",
+            "emisor": st.session_state.sf_chat_user,
+            "mensaje": prompt_privado,
+            "destinatario": destinatario_activo,
+            "url_adjunto": None,
+        }).execute()
         st.rerun()
-      except Exception as write_err:
-        st.error(f"🔴 Error al enviar mensaje: {write_err}")
+    else:
+      st.info(
+          "💡 Aún no hay otros usuarios registrados en el historial para conversar"
+          " en privado."
+      )
+
+  # --- PESTAÑA 3: MIS MENCIONES Y ALERTAS ---
+  with tab_menciones:
+    render_historial_fragment(
+        st.session_state.sf_chat_user, solo_menciones=True
+    )
