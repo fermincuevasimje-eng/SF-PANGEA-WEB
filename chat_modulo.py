@@ -1,3 +1,4 @@
+import re
 import time
 import urllib.request
 from datetime import datetime
@@ -14,16 +15,31 @@ def get_supabase_client() -> Client:
         key = st.secrets["supabase"]["SUPABASE_KEY"]
         return create_client(url, key)
     except Exception as e:
-        st.error(f"🔴 Error al cargar las credenciales de Supabase en Secrets: {e}")
+        st.error(f"🔴 Error al cargar credenciales de Supabase: {e}")
         st.stop()
+
+
+# Helper para sanitizar estrictamente nombres de archivo para Supabase Storage
+def sanitizar_nombre_archivo(nombre_original: str) -> str:
+    partes = nombre_original.rsplit(".", 1)
+    nombre_base = partes[0]
+    ext = partes[1] if len(partes) > 1 else ""
+
+    # Reemplazar cualquier caracter que NO sea letra, número o guión por guión bajo
+    nombre_base_limpio = re.sub(r"[^a-zA-Z0-9_-]", "_", nombre_base)
+    ext_limpia = re.sub(r"[^a-zA-Z0-9]", "", ext)
+
+    if ext_limpia:
+        return f"{nombre_base_limpio}.{ext_limpia}"
+    return nombre_base_limpio
 
 
 # Helper para subir un archivo individual al Bucket de Supabase Storage
 def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
     try:
         timestamp = int(time.time() * 1000)
-        nombre_archivo_limpio = uploaded_file.name.replace(" ", "_")
-        path_destino = f"mensajes/{timestamp}_{nombre_archivo_limpio}"
+        nombre_limpio = sanitizar_nombre_archivo(uploaded_file.name)
+        path_destino = f"mensajes/{timestamp}_{nombre_limpio}"
 
         file_bytes = uploaded_file.getvalue()
 
@@ -42,7 +58,7 @@ def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
         return None
 
 
-# Helper en caché para descargar bytes y habilitar descarga nativa en celulares
+# Helper en caché para descargar bytes solo cuando el usuario los solicita
 @st.cache_data(ttl=3600, show_spinner=False)
 def obtener_bytes_adjunto(url: str) -> bytes:
     try:
@@ -72,7 +88,7 @@ def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
 
 
 # -----------------------------------------------------------------------------
-# FASE 3 + PANELES FIJOS + FILTROS DE FECHA Y HORA (2s)
+# FRAGMENTO DE HISTORIAL AUTO-SINCRONIZADO (2s)
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
 def render_historial_fragment(
@@ -120,22 +136,34 @@ def render_historial_fragment(
                     )
                 ]
             else:
-                res = query.eq("canal", canal).order("created_at", desc=False).execute()
+                res = (
+                    query.eq("canal", canal)
+                    .order("created_at", desc=False)
+                    .execute()
+                )
                 data = res.data if res.data else []
 
-            # Filtrado por Fecha y Hora (si se activó en la interfaz)
+            # Filtrado por Fecha y Hora
             if fecha_filtro and data:
                 data_filtrada = []
                 for m in data:
                     raw_time = m.get("created_at", "")
                     if raw_time:
                         try:
-                            dt_utc = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
-                            dt_local = dt_utc.astimezone(ZoneInfo("America/Mexico_City"))
+                            dt_utc = datetime.fromisoformat(
+                                raw_time.replace("Z", "+00:00")
+                            )
+                            dt_local = dt_utc.astimezone(
+                                ZoneInfo("America/Mexico_City")
+                            )
 
                             if dt_local.date() == fecha_filtro:
                                 if hora_inicio and hora_fin:
-                                    if hora_inicio <= dt_local.time() <= hora_fin:
+                                    if (
+                                        hora_inicio
+                                        <= dt_local.time()
+                                        <= hora_fin
+                                    ):
                                         data_filtrada.append(m)
                                 else:
                                     data_filtrada.append(m)
@@ -145,7 +173,7 @@ def render_historial_fragment(
 
             return data
         except Exception as err:
-            st.error(f"🔴 Error al consultar mensajes en Supabase: {err}")
+            st.error(f"🔴 Error al consultar mensajes: {err}")
             return []
 
     mime_types = {
@@ -155,17 +183,11 @@ def render_historial_fragment(
         "webp": "image/webp",
         "gif": "image/gif",
         "pdf": "application/pdf",
-        "xlsx": (
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "xls": "application/vnd.ms-excel",
-        "docx": (
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ),
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "doc": "application/msword",
-        "pptx": (
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        ),
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         "ppt": "application/vnd.ms-powerpoint",
     }
 
@@ -174,8 +196,7 @@ def render_historial_fragment(
     )
     if solo_menciones:
         st.caption(
-            f"🔔 **Muro de Menciones para @{usuario_actual}** • En vivo"
-            f" (`{hora_actual}`)"
+            f"🔔 **Muro de Menciones para @{usuario_actual}** • En vivo (`{hora_actual}`)"
         )
     elif canal == "privado":
         st.caption(
@@ -188,7 +209,6 @@ def render_historial_fragment(
 
     mensajes = cargar_historial()
 
-    # Contenedor con altura fija y scroll interno independiente para congelar el menú superior
     chat_container = st.container(height=500)
     with chat_container:
         if mensajes:
@@ -201,8 +221,12 @@ def render_historial_fragment(
                 raw_time = fila.get("created_at", "")
                 if raw_time:
                     try:
-                        dt_utc = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
-                        dt_local = dt_utc.astimezone(ZoneInfo("America/Mexico_City"))
+                        dt_utc = datetime.fromisoformat(
+                            raw_time.replace("Z", "+00:00")
+                        )
+                        dt_local = dt_utc.astimezone(
+                            ZoneInfo("America/Mexico_City")
+                        )
                         tstamp = dt_local.strftime("%Y-%m-%d %H:%M:%S")
                     except Exception:
                         tstamp = str(raw_time)
@@ -213,14 +237,20 @@ def render_historial_fragment(
                 avatar_icon = "👤" if es_propio else "💬"
 
                 mencion_tag = f"@{usuario_actual.lower()}"
-                contiene_mencion = mencion_tag in msg.lower() and not es_propio
+                contiene_mencion = (
+                    mencion_tag in msg.lower() and not es_propio
+                )
 
                 with st.chat_message(usr, avatar=avatar_icon):
                     if contiene_mencion and not solo_menciones:
-                        st.warning(f"🔔 **¡{usr} te ha mencionado en este mensaje!**")
+                        st.warning(
+                            f"🔔 **¡{usr} te ha mencionado en este mensaje!**"
+                        )
 
                     if solo_menciones:
-                        st.info(f"📌 Mencionado en canal: **#{canal_origen.upper()}**")
+                        st.info(
+                            f"📌 Mencionado en canal: **#{canal_origen.upper()}**"
+                        )
 
                     st.markdown(f"**{usr}** `<{tstamp}>`\n\n{msg}")
 
@@ -228,11 +258,17 @@ def render_historial_fragment(
                         lista_urls = url_adjunto_raw.split("|")
 
                         for file_idx, url_adjunto in enumerate(lista_urls):
-                            ext = url_adjunto.split("?")[0].split(".")[-1].lower()
-                            nombre_archivo = url_adjunto.split("?")[0].split("/")[-1]
-
-                            file_bytes = obtener_bytes_adjunto(url_adjunto)
-                            mime_actual = mime_types.get(ext, "application/octet-stream")
+                            ext = (
+                                url_adjunto.split("?")[0]
+                                .split(".")[-1]
+                                .lower()
+                            )
+                            nombre_archivo = (
+                                url_adjunto.split("?")[0].split("/")[-1]
+                            )
+                            mime_actual = mime_types.get(
+                                ext, "application/octet-stream"
+                            )
 
                             st.markdown("---")
                             if ext in ["png", "jpg", "jpeg", "webp", "gif"]:
@@ -242,22 +278,30 @@ def render_historial_fragment(
                                     st.image(url_adjunto, width=180)
 
                                 with col_actions:
-                                    if file_bytes:
-                                        st.download_button(
-                                            label="📥 Descargar al celular / PC",
-                                            data=file_bytes,
-                                            file_name=nombre_archivo,
-                                            mime=mime_actual,
-                                            use_container_width=True,
-                                            key=f"dl_btn_{msg_idx}_{file_idx}_{canal}",
-                                        )
                                     st.link_button(
                                         "🌐 Abrir en pestaña",
                                         url_adjunto,
                                         use_container_width=True,
                                     )
-                                    with st.expander("🔍 Vista previa en chat"):
-                                        st.image(url_adjunto, use_container_width=True)
+                                    with st.expander(
+                                        "🔍 Descargar / Vista previa"
+                                    ):
+                                        file_bytes = obtener_bytes_adjunto(
+                                            url_adjunto
+                                        )
+                                        if file_bytes:
+                                            st.download_button(
+                                                label="📥 Descargar al equipo",
+                                                data=file_bytes,
+                                                file_name=nombre_archivo,
+                                                mime=mime_actual,
+                                                use_container_width=True,
+                                                key=f"dl_btn_{msg_idx}_{file_idx}_{canal}",
+                                            )
+                                        st.image(
+                                            url_adjunto,
+                                            use_container_width=True,
+                                        )
                             else:
                                 icon_doc = "📄"
                                 if ext in ["xlsx", "xls"]:
@@ -274,6 +318,9 @@ def render_historial_fragment(
                                 )
                                 col_btn1, col_btn2 = st.columns(2)
                                 with col_btn1:
+                                    file_bytes = obtener_bytes_adjunto(
+                                        url_adjunto
+                                    )
                                     if file_bytes:
                                         st.download_button(
                                             label="📥 Descargar archivo",
@@ -294,7 +341,7 @@ def render_historial_fragment(
 
 
 # -----------------------------------------------------------------------------
-# Función Principal del Módulo
+# FUNCIÓN PRINCIPAL DEL MÓDULO (CON PERSISTENCIA DE SESIÓN)
 # -----------------------------------------------------------------------------
 def render_chat():
     st.header("💬 SF Pangea Chat")
@@ -302,7 +349,10 @@ def render_chat():
 
     supabase = get_supabase_client()
 
-    # Control de Usuario y Formulario
+    # Persistencia de usuario en URL (Evita cierres de sesión)
+    if "session_user" in st.query_params:
+        st.session_state.sf_chat_user = st.query_params["session_user"]
+
     if "sf_chat_user" not in st.session_state:
         st.session_state.sf_chat_user = ""
 
@@ -316,7 +366,9 @@ def render_chat():
             btn_entrar = st.form_submit_button("Ingresar al Chat 🚀")
             if btn_entrar:
                 if nombre_input.strip():
-                    st.session_state.sf_chat_user = nombre_input.strip()
+                    user_clean = nombre_input.strip()
+                    st.session_state.sf_chat_user = user_clean
+                    st.query_params["session_user"] = user_clean
                     st.rerun()
                 else:
                     st.warning("El nombre de usuario no puede estar vacío.")
@@ -325,15 +377,17 @@ def render_chat():
     # Barra superior de sesión
     col_status, col_logout = st.columns([4, 1])
     with col_status:
-        st.success(f"🟢 Usuario activo: **{st.session_state.sf_chat_user}**")
+        st.success(
+            f"🟢 Usuario activo: **{st.session_state.sf_chat_user}**"
+        )
     with col_logout:
         if st.button("Cambiar usuario", key="sf_chat_btn_logout"):
             st.session_state.sf_chat_user = ""
+            if "session_user" in st.query_params:
+                del st.query_params["session_user"]
             st.rerun()
 
-# ---------------------------------------------------------------------------
-    # SELECCIÓN DE MODO DE NAVEGACIÓN SUPERIOR (RÁPIDO Y LIGERO)
-    # ---------------------------------------------------------------------------
+    # Navegación por Modo
     modo_chat = st.radio(
         "Modo de navegación:",
         ["📢 Canales Públicos", "🔒 Chat 1 a 1 (Privado)", "🔔 Mis Menciones"],
@@ -351,13 +405,14 @@ def render_chat():
         )
         canal_activo = canal_seleccionado.lower()
 
-        # Filtro por Fecha y Hora opcional para Canales
         f_fecha_c, f_h_ini_c, f_h_fin_c = None, None, None
         with st.expander("📅 Filtrar canal por fecha / hora (Opcional)"):
             c1_c, c2_c = st.columns(2)
             with c1_c:
                 if st.checkbox("Activar filtro de fecha", key="chk_f_canales"):
-                    f_fecha_c = st.date_input("Selecciona día:", key="date_canales")
+                    f_fecha_c = st.date_input(
+                        "Selecciona día:", key="date_canales"
+                    )
             with c2_c:
                 if f_fecha_c and st.checkbox(
                     "Especificar rango de horas", key="chk_h_canales"
@@ -381,7 +436,6 @@ def render_chat():
             hora_fin=f_h_fin_c,
         )
 
-        # Controles de envío para Canales
         count = st.session_state.upload_counter
         with st.popover("📎 Adjuntar evidencias a #" + canal_activo.upper()):
             archivos_adjuntos = st.file_uploader(
@@ -410,7 +464,8 @@ def render_chat():
                     placeholder="Ej. AIRIS-12345",
                 )
                 comentario_adjunto = st.text_area(
-                    "Comentario (Opcional):", key=f"sf_chat_comentario_canales_{count}"
+                    "Comentario (Opcional):",
+                    key=f"sf_chat_comentario_canales_{count}",
                 )
                 if st.button(
                     "Enviar Evidencias 🚀",
@@ -418,7 +473,9 @@ def render_chat():
                     use_container_width=True,
                 ):
                     if not folio_input.strip():
-                        st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
+                        st.error(
+                            "⚠️ Debes ingresar el Folio / Ticket / AIRIS."
+                        )
                     else:
                         urls = [
                             subir_adjunto_supabase(f, supabase)
@@ -472,7 +529,9 @@ def render_chat():
             )
 
             count = st.session_state.upload_counter
-            with st.popover(f"📎 Adjuntar archivo privado para {destinatario_activo}"):
+            with st.popover(
+                f"📎 Adjuntar archivo privado para {destinatario_activo}"
+            ):
                 archivos_privados = st.file_uploader(
                     "Selecciona archivos",
                     type=[
@@ -498,7 +557,8 @@ def render_chat():
                         key=f"sf_chat_folio_priv_{count}",
                     )
                     coment_priv = st.text_area(
-                        "Comentario (Opcional):", key=f"sf_chat_coment_priv_{count}"
+                        "Comentario (Opcional):",
+                        key=f"sf_chat_coment_priv_{count}",
                     )
                     if st.button(
                         "Enviar Evidencia Privada 🚀",
@@ -506,7 +566,9 @@ def render_chat():
                         use_container_width=True,
                     ):
                         if not folio_priv.strip():
-                            st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
+                            st.error(
+                                "⚠️ Debes ingresar el Folio / Ticket / AIRIS."
+                            )
                         else:
                             urls = [
                                 subir_adjunto_supabase(f, supabase)
@@ -542,8 +604,8 @@ def render_chat():
                 st.rerun()
         else:
             st.info(
-                "💡 Aún no hay otros usuarios registrados en el historial para conversar"
-                " en privado."
+                "💡 Aún no hay otros usuarios registrados en el historial"
+                " para conversar en privado."
             )
 
     # --- MODO 3: MIS MENCIONES Y ALERTAS ---
@@ -552,8 +614,12 @@ def render_chat():
         with st.expander("📅 Filtrar menciones por fecha / hora (Opcional)"):
             c1_m, c2_m = st.columns(2)
             with c1_m:
-                if st.checkbox("Activar filtro de fecha", key="chk_f_menciones"):
-                    f_fecha_m = st.date_input("Selecciona día:", key="date_menciones")
+                if st.checkbox(
+                    "Activar filtro de fecha", key="chk_f_menciones"
+                ):
+                    f_fecha_m = st.date_input(
+                        "Selecciona día:", key="date_menciones"
+                    )
             with c2_m:
                 if f_fecha_m and st.checkbox(
                     "Especificar rango de horas", key="chk_h_menciones"
