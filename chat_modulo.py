@@ -119,16 +119,26 @@ def render_chat():
         with st.chat_message(usr, avatar=avatar_icon):
           st.markdown(f"**{usr}** `<{tstamp}>`\n\n{msg}")
 
-          # Renderizado del archivo adjunto
+          # Renderizado del archivo adjunto (Miniatura + Opción de vista previa y descarga)
           if url_adjunto:
             ext = url_adjunto.split("?")[0].split(".")[-1].lower()
+            nombre_archivo = url_adjunto.split("?")[0].split("/")[-1]
+
             if ext in ["png", "jpg", "jpeg", "webp", "gif"]:
-              st.image(url_adjunto, use_container_width=True)
+              col_thumb, col_actions = st.columns([1, 2])
+
+              with col_thumb:
+                # Miniatura compacta (180px)
+                st.image(url_adjunto, width=180)
+
+              with col_actions:
+                st.link_button("📥 Descargar / Abrir imagen", url_adjunto)
+                with st.expander("🔍 Vista previa completa"):
+                  st.image(url_adjunto, use_container_width=True)
             else:
-              st.markdown(
-                  f"📎 **Adjunto:**"
-                  f" [{url_adjunto.split('/')[-1]}]({url_adjunto})"
-              )
+              # Para otros tipos de archivos (PDF, Excel, Word, etc.)
+              st.markdown(f"📎 **Archivo adjunto:** `{nombre_archivo}`")
+              st.link_button("📥 Descargar / Abrir archivo", url_adjunto)
     else:
       st.info("No hay mensajes aún. ¡Sé el primero en escribir!")
 
