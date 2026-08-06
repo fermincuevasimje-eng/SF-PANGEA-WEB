@@ -344,7 +344,7 @@ def render_chat():
   with tab_canales:
     canal_seleccionado = st.radio(
         "Canal activo:",
-        ["General", "Mantenimiento", "Infraestructura", "DAP"],
+        ["General", "Operativo", "Soporte"],
         horizontal=True,
         key="sf_chat_radio_canal",
     )
