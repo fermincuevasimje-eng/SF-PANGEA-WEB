@@ -1,4 +1,5 @@
 import time
+import urllib.request
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import streamlit as st
@@ -38,6 +39,19 @@ def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
     return public_url
   except Exception as e:
     st.error(f"🔴 Error al subir el archivo adjunto: {e}")
+    return None
+
+
+# Helper en caché para obtener los bytes de la imagen/archivo y habilitar la descarga nativa en móviles
+@st.cache_data(ttl=3600, show_spinner=False)
+def obtener_bytes_adjunto(url: str) -> bytes:
+  try:
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "Mozilla/5.0"}
+    )
+    with urllib.request.urlopen(req) as response:
+      return response.read()
+  except Exception:
     return None
 
 
@@ -96,7 +110,7 @@ def render_chat():
   chat_container = st.container()
   with chat_container:
     if mensajes:
-      for fila in mensajes:
+      for idx, fila in enumerate(mensajes):
         usr = fila.get("emisor", "Anónimo")
         msg = fila.get("mensaje", "")
         url_adjunto = fila.get("url_adjunto", None)
@@ -119,10 +133,29 @@ def render_chat():
         with st.chat_message(usr, avatar=avatar_icon):
           st.markdown(f"**{usr}** `<{tstamp}>`\n\n{msg}")
 
-          # Renderizado del archivo adjunto (Miniatura + Opción de vista previa y descarga)
+          # Renderizado del archivo adjunto (Miniatura + Botón NATIVO de descarga para celular)
           if url_adjunto:
             ext = url_adjunto.split("?")[0].split(".")[-1].lower()
             nombre_archivo = url_adjunto.split("?")[0].split("/")[-1]
+
+            # Descargar bytes para permitir descarga directa en móviles
+            file_bytes = obtener_bytes_adjunto(url_adjunto)
+
+            mime_types = {
+                "png": "image/png",
+                "jpg": "image/jpeg",
+                "jpeg": "image/jpeg",
+                "webp": "image/webp",
+                "gif": "image/gif",
+                "pdf": "application/pdf",
+                "xlsx": (
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ),
+                "docx": (
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ),
+            }
+            mime_actual = mime_types.get(ext, "application/octet-stream")
 
             if ext in ["png", "jpg", "jpeg", "webp", "gif"]:
               col_thumb, col_actions = st.columns([1, 2])
@@ -132,13 +165,42 @@ def render_chat():
                 st.image(url_adjunto, width=180)
 
               with col_actions:
-                st.link_button("📥 Descargar / Abrir imagen", url_adjunto)
-                with st.expander("🔍 Vista previa completa"):
+                if file_bytes:
+                  st.download_button(
+                      label="📥 Descargar al celular / PC",
+                      data=file_bytes,
+                      file_name=nombre_archivo,
+                      mime=mime_actual,
+                      use_container_width=True,
+                      key=f"dl_btn_{idx}",
+                  )
+                st.link_button(
+                    "🌐 Abrir en pestaña",
+                    url_adjunto,
+                    use_container_width=True,
+                )
+                with st.expander("🔍 Vista previa en chat"):
                   st.image(url_adjunto, use_container_width=True)
             else:
               # Para otros tipos de archivos (PDF, Excel, Word, etc.)
               st.markdown(f"📎 **Archivo adjunto:** `{nombre_archivo}`")
-              st.link_button("📥 Descargar / Abrir archivo", url_adjunto)
+              col_btn1, col_btn2 = st.columns(2)
+              with col_btn1:
+                if file_bytes:
+                  st.download_button(
+                      label="📥 Descargar al celular / PC",
+                      data=file_bytes,
+                      file_name=nombre_archivo,
+                      mime=mime_actual,
+                      use_container_width=True,
+                      key=f"dl_btn_file_{idx}",
+                  )
+              with col_btn2:
+                st.link_button(
+                    "🌐 Abrir en pestaña",
+                    url_adjunto,
+                    use_container_width=True,
+                )
     else:
       st.info("No hay mensajes aún. ¡Sé el primero en escribir!")
 
