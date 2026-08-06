@@ -132,32 +132,66 @@ def render_chat():
         else:
             st.info("No hay mensajes aún. ¡Sé el primero en escribir!")
 
-    # 5. Entrada y Envío de Nuevos Mensajes con Adjuntos
+    # 5. Entrada para Adjuntar Archivos con Folio/Ticket/AIRIS Obligatorio
     with st.popover("📎 Adjuntar evidencia o documento"):
         archivo_adjunto = st.file_uploader(
             "Selecciona una imagen o archivo",
             type=["png", "jpg", "jpeg", "pdf", "xlsx", "docx"],
             key="sf_chat_file_uploader"
         )
+        
         if archivo_adjunto:
-            st.caption(f"📄 Archivo listo: **{archivo_adjunto.name}**")
+            st.caption(f"📄 Archivo seleccionado: **{archivo_adjunto.name}**")
+            
+            # Campo obligatorio
+            folio_input = st.text_input(
+                "Número de Folio / Ticket / AIRIS *", 
+                key="sf_chat_folio_input",
+                placeholder="Ej. AIRIS-12345 / Folio 987"
+            )
+            comentario_adjunto = st.text_area(
+                "Comentario adicional (Opcional):", 
+                key="sf_chat_comentario_adjunto",
+                placeholder="Detalles sobre la evidencia..."
+            )
+            
+            if st.button("Enviar Evidencia 🚀", key="btn_enviar_evidencia", use_container_width=True):
+                if not folio_input.strip():
+                    st.error("⚠️ Debes ingresar obligatoriamente el número de Folio / Ticket / AIRIS.")
+                else:
+                    with st.spinner("Subiendo archivo a Supabase Storage..."):
+                        url_adj = subir_adjunto_supabase(archivo_adjunto, supabase)
+                    
+                    if url_adj:
+                        # Construir mensaje con el Folio destacado
+                        mensaje_final = f"📌 **Folio / Ticket / AIRIS:** `{folio_input.strip()}`"
+                        if comentario_adjunto.strip():
+                            mensaje_final += f"\n\n{comentario_adjunto.strip()}"
 
-    prompt = st.chat_input("Escribe un mensaje para SF Pangea...")
+                        nuevo_registro = {
+                            "canal": "general",
+                            "emisor": st.session_state.sf_chat_user,
+                            "mensaje": mensaje_final,
+                            "destinatario": None,
+                            "url_adjunto": url_adj
+                        }
+
+                        try:
+                            supabase.table("mensajes").insert(nuevo_registro).execute()
+                            st.rerun()
+                        except Exception as write_err:
+                            st.error(f"🔴 Error al enviar evidencia: {write_err}")
+
+    # 6. Entrada para Mensajes Tradicionales (Solo Texto)
+    prompt = st.chat_input("Escribe un mensaje de texto para SF Pangea...")
 
     if prompt:
-        url_adj = None
-        
-        # Procesar subida a Supabase Storage si se adjuntó archivo
-        if archivo_adjunto is not None:
-            with st.spinner("Subiendo archivo a Supabase Storage..."):
-                url_adj = subir_adjunto_supabase(archivo_adjunto, supabase)
-
         nuevo_registro = {
             "canal": "general",
             "emisor": st.session_state.sf_chat_user,
             "mensaje": prompt,
             "destinatario": None,
-            "url_adjunto": url_adj
+            "url_adjunto": None
         }
 
         try:
