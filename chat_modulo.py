@@ -7,6 +7,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 from supabase import Client, create_client
 
+# Lista Oficial de Respaldo (27 Usuarios)
+USUARIOS_OFICIALES_DEFAULT = [
+    "SF_FERMIN", "Director", "Jefe Mant.", "Jefe Infra.", "Guadarrama",
+    "Almacén1", "Almacén 2", "DAP1", "DAP2", "DAP3",
+    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10",
+    "B11", "B12", "B13", "B14", "B15", "B16", "B17"
+]
 
 # 1. Conexión Segura a Supabase
 @st.cache_resource
@@ -104,11 +111,29 @@ def obtener_usuarios_registrados(supabase_client) -> list:
             .order("nombre")
             .execute()
         )
-        if res.data:
-            return [u["nombre"] for u in res.data if u.get("nombre")]
+        if res.data and len(res.data) > 0:
+            db_users = [u["nombre"] for u in res.data if u.get("nombre")]
+            return sorted(list(set(db_users + USUARIOS_OFICIALES_DEFAULT)))
     except Exception:
         pass
-    return ["SF_FERMIN"]
+    return USUARIOS_OFICIALES_DEFAULT
+
+
+# Motor de Menciones Inteligentes (Insensible a Mayúsculas/Minúsculas y Coincidencia por Prefijo)
+def evaluar_mencion_inteligente(mensaje: str, usuario_destinatario: str) -> bool:
+    if not mensaje or not usuario_destinatario:
+        return False
+    target_clean = usuario_destinatario.lower().replace(" ", "").replace(".", "")
+    palabras = mensaje.lower().split()
+
+    for palabra in palabras:
+        if palabra.startswith("@"):
+            tag = palabra[1:].strip(",.!?:;\"'")
+            if len(tag) >= 2:
+                tag_clean = tag.replace(" ", "").replace(".", "")
+                if target_clean.startswith(tag_clean) or tag_clean in target_clean:
+                    return True
+    return False
 
 
 # -----------------------------------------------------------------------------
@@ -137,11 +162,10 @@ def render_historial_fragment(
             if solo_menciones:
                 res = query.order("created_at", desc=True).execute()
                 data = res.data if res.data else []
-                tag = f"@{usuario_actual.lower()}"
                 data = [
                     m
                     for m in data
-                    if tag in m.get("mensaje", "").lower()
+                    if evaluar_mencion_inteligente(m.get("mensaje", ""), usuario_actual)
                     and m.get("emisor") != usuario_actual
                 ]
             elif canal == "privado" and destinatario:
@@ -270,9 +294,8 @@ def render_historial_fragment(
                 es_propio = usr == usuario_actual
                 avatar_icon = "👤" if es_propio else "💬"
 
-                mencion_tag = f"@{usuario_actual.lower()}"
                 contiene_mencion = (
-                    mencion_tag in msg.lower() and not es_propio
+                    evaluar_mencion_inteligente(msg, usuario_actual) and not es_propio
                 )
 
                 if (
