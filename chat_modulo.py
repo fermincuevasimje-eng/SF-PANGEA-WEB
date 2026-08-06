@@ -25,7 +25,6 @@ def sanitizar_nombre_archivo(nombre_original: str) -> str:
     nombre_base = partes[0]
     ext = partes[1] if len(partes) > 1 else ""
 
-    # Reemplazar cualquier caracter que NO sea letra, número o guión por guión bajo
     nombre_base_limpio = re.sub(r"[^a-zA-Z0-9_-]", "_", nombre_base)
     ext_limpia = re.sub(r"[^a-zA-Z0-9]", "", ext)
 
@@ -58,7 +57,7 @@ def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
         return None
 
 
-# Helper en caché para descargar bytes solo cuando el usuario los solicita
+# Helper en caché para descargar bytes a demanda
 @st.cache_data(ttl=3600, show_spinner=False)
 def obtener_bytes_adjunto(url: str) -> bytes:
     try:
@@ -99,6 +98,7 @@ def render_historial_fragment(
     fecha_filtro=None,
     hora_inicio=None,
     hora_fin=None,
+    texto_busqueda: str = "",
 ):
     supabase = get_supabase_client()
 
@@ -142,6 +142,11 @@ def render_historial_fragment(
                     .execute()
                 )
                 data = res.data if res.data else []
+
+            # Buscador por Palabra Clave
+            if texto_busqueda and data:
+                kw = texto_busqueda.strip().lower()
+                data = [m for m in data if kw in m.get("mensaje", "").lower()]
 
             # Filtrado por Fecha y Hora
             if fecha_filtro and data:
@@ -209,7 +214,7 @@ def render_historial_fragment(
 
     mensajes = cargar_historial()
 
-    chat_container = st.container(height=500)
+    chat_container = st.container(height=480)
     with chat_container:
         if mensajes:
             for msg_idx, fila in enumerate(mensajes):
@@ -337,19 +342,18 @@ def render_historial_fragment(
                                         use_container_width=True,
                                     )
         else:
-            st.info("No hay mensajes para el filtro o fecha seleccionados.")
+            st.info("No se encontraron mensajes.")
 
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN PRINCIPAL DEL MÓDULO (CON PERSISTENCIA DE SESIÓN)
+# FUNCIÓN PRINCIPAL DEL MÓDULO (INTERFAZ FLUIDA Y COMPACTA)
 # -----------------------------------------------------------------------------
 def render_chat():
     st.header("💬 SF Pangea Chat")
-    st.caption("Módulo de comunicación interna seguro y optimizado con Supabase")
 
     supabase = get_supabase_client()
 
-    # Persistencia de usuario en URL (Evita cierres de sesión)
+    # Persistencia de usuario en URL
     if "session_user" in st.query_params:
         st.session_state.sf_chat_user = st.query_params["session_user"]
 
@@ -374,59 +378,67 @@ def render_chat():
                     st.warning("El nombre de usuario no puede estar vacío.")
         return
 
-    # Barra superior de sesión
+    # Encabezado compacto de usuario
     col_status, col_logout = st.columns([4, 1])
     with col_status:
-        st.success(
-            f"🟢 Usuario activo: **{st.session_state.sf_chat_user}**"
-        )
+        st.caption(f"🟢 Usuario activo: **{st.session_state.sf_chat_user}**")
     with col_logout:
-        if st.button("Cambiar usuario", key="sf_chat_btn_logout"):
+        if st.button("Salir / Cambiar", key="sf_chat_btn_logout"):
             st.session_state.sf_chat_user = ""
             if "session_user" in st.query_params:
                 del st.query_params["session_user"]
             st.rerun()
 
-    # Navegación por Modo
+    # Navegación por Modo Superior
     modo_chat = st.radio(
         "Modo de navegación:",
         ["📢 Canales Públicos", "🔒 Chat 1 a 1 (Privado)", "🔔 Mis Menciones"],
         horizontal=True,
         key="sf_chat_modo_principal",
+        label_visibility="collapsed",
     )
 
     # --- MODO 1: CANALES PÚBLICOS ---
     if modo_chat == "📢 Canales Públicos":
         canal_seleccionado = st.radio(
             "Canal activo:",
-            ["General", "Mantenimiento", "Infraestructura", "DAP"],
+            ["General", "Mantenimiento", "Infraestructura", "DAP", "Mapas"],
             horizontal=True,
             key="sf_chat_radio_canal",
+            label_visibility="collapsed",
         )
         canal_activo = canal_seleccionado.lower()
 
+        # Barra de Herramientas Compacta (Buscador + Filtro en 1 sola línea)
+        col_search, col_filter = st.columns([3, 1])
         f_fecha_c, f_h_ini_c, f_h_fin_c = None, None, None
-        with st.expander("📅 Filtrar canal por fecha / hora (Opcional)"):
-            c1_c, c2_c = st.columns(2)
-            with c1_c:
+
+        with col_search:
+            kw_canal = st.text_input(
+                "Buscar",
+                key="kw_canal",
+                placeholder="🔍 Buscar palabra clave o folio...",
+                label_visibility="collapsed",
+            )
+        with col_filter:
+            with st.popover("📅 Filtros"):
                 if st.checkbox("Activar filtro de fecha", key="chk_f_canales"):
                     f_fecha_c = st.date_input(
                         "Selecciona día:", key="date_canales"
                     )
-            with c2_c:
-                if f_fecha_c and st.checkbox(
-                    "Especificar rango de horas", key="chk_h_canales"
-                ):
-                    f_h_ini_c = st.time_input(
-                        "Desde:",
-                        datetime.strptime("00:00", "%H:%M").time(),
-                        key="h_ini_c",
-                    )
-                    f_h_fin_c = st.time_input(
-                        "Hasta:",
-                        datetime.strptime("23:59", "%H:%M").time(),
-                        key="h_fin_c",
-                    )
+                    if st.checkbox(
+                        "Especificar rango de horas", key="chk_h_canales"
+                    ):
+                        f_h_ini_c = st.time_input(
+                            "Desde:",
+                            datetime.strptime("00:00", "%H:%M").time(),
+                            key="h_ini_c",
+                        )
+                        f_h_fin_c = st.time_input(
+                            "Hasta:",
+                            datetime.strptime("23:59", "%H:%M").time(),
+                            key="h_fin_c",
+                        )
 
         render_historial_fragment(
             st.session_state.sf_chat_user,
@@ -434,6 +446,7 @@ def render_chat():
             fecha_filtro=f_fecha_c,
             hora_inicio=f_h_ini_c,
             hora_fin=f_h_fin_c,
+            texto_busqueda=kw_canal,
         )
 
         count = st.session_state.upload_counter
@@ -517,15 +530,50 @@ def render_chat():
         )
         if usuarios_disponibles:
             destinatario_activo = st.selectbox(
-                "👤 Selecciona el colega para chatear en privado:",
+                "Colega:",
                 usuarios_disponibles,
                 key="sf_chat_select_privado",
             )
+
+            # Barra de Herramientas Compacta para Privados
+            col_search_p, col_filter_p = st.columns([3, 1])
+            f_fecha_p, f_h_ini_p, f_h_fin_p = None, None, None
+
+            with col_search_p:
+                kw_priv = st.text_input(
+                    "Buscar",
+                    key="kw_priv",
+                    placeholder="🔍 Buscar palabra clave...",
+                    label_visibility="collapsed",
+                )
+            with col_filter_p:
+                with st.popover("📅 Filtros"):
+                    if st.checkbox("Activar filtro de fecha", key="chk_f_privado"):
+                        f_fecha_p = st.date_input(
+                            "Selecciona día:", key="date_privado"
+                        )
+                        if st.checkbox(
+                            "Especificar rango de horas", key="chk_h_privado"
+                        ):
+                            f_h_ini_p = st.time_input(
+                                "Desde:",
+                                datetime.strptime("00:00", "%H:%M").time(),
+                                key="h_ini_p",
+                            )
+                            f_h_fin_p = st.time_input(
+                                "Hasta:",
+                                datetime.strptime("23:59", "%H:%M").time(),
+                                key="h_fin_p",
+                            )
 
             render_historial_fragment(
                 st.session_state.sf_chat_user,
                 canal="privado",
                 destinatario=destinatario_activo,
+                fecha_filtro=f_fecha_p,
+                hora_inicio=f_h_ini_p,
+                hora_fin=f_h_fin_p,
+                texto_busqueda=kw_priv,
             )
 
             count = st.session_state.upload_counter
@@ -604,36 +652,41 @@ def render_chat():
                 st.rerun()
         else:
             st.info(
-                "💡 Aún no hay otros usuarios registrados en el historial"
-                " para conversar en privado."
+                "💡 Aún no hay otros usuarios registrados para chatear en privado."
             )
 
     # --- MODO 3: MIS MENCIONES Y ALERTAS ---
     elif modo_chat == "🔔 Mis Menciones":
+        # Barra de Herramientas Compacta para Menciones
+        col_search_m, col_filter_m = st.columns([3, 1])
         f_fecha_m, f_h_ini_m, f_h_fin_m = None, None, None
-        with st.expander("📅 Filtrar menciones por fecha / hora (Opcional)"):
-            c1_m, c2_m = st.columns(2)
-            with c1_m:
-                if st.checkbox(
-                    "Activar filtro de fecha", key="chk_f_menciones"
-                ):
+
+        with col_search_m:
+            kw_menc = st.text_input(
+                "Buscar",
+                key="kw_menc",
+                placeholder="🔍 Buscar en mis menciones...",
+                label_visibility="collapsed",
+            )
+        with col_filter_m:
+            with st.popover("📅 Filtros"):
+                if st.checkbox("Activar filtro de fecha", key="chk_f_menciones"):
                     f_fecha_m = st.date_input(
                         "Selecciona día:", key="date_menciones"
                     )
-            with c2_m:
-                if f_fecha_m and st.checkbox(
-                    "Especificar rango de horas", key="chk_h_menciones"
-                ):
-                    f_h_ini_m = st.time_input(
-                        "Desde:",
-                        datetime.strptime("00:00", "%H:%M").time(),
-                        key="h_ini_m",
-                    )
-                    f_h_fin_m = st.time_input(
-                        "Hasta:",
-                        datetime.strptime("23:59", "%H:%M").time(),
-                        key="h_fin_m",
-                    )
+                    if st.checkbox(
+                        "Especificar rango de horas", key="chk_h_menciones"
+                    ):
+                        f_h_ini_m = st.time_input(
+                            "Desde:",
+                            datetime.strptime("00:00", "%H:%M").time(),
+                            key="h_ini_m",
+                        )
+                        f_h_fin_m = st.time_input(
+                            "Hasta:",
+                            datetime.strptime("23:59", "%H:%M").time(),
+                            key="h_fin_m",
+                        )
 
         render_historial_fragment(
             st.session_state.sf_chat_user,
@@ -641,4 +694,5 @@ def render_chat():
             fecha_filtro=f_fecha_m,
             hora_inicio=f_h_ini_m,
             hora_fin=f_h_fin_m,
+            texto_busqueda=kw_menc,
         )
