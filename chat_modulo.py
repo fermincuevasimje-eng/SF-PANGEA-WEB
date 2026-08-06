@@ -342,9 +342,9 @@ def render_chat():
 
 # --- PESTAÑA 1: CANALES PÚBLICOS ---
   with tab_canales:
-    canal_seleccionado = st.radio(
+canal_seleccionado = st.radio(
         "Canal activo:",
-        ["General", "Operativo", "Soporte"],
+        ["General", "Mantenimiento", "Infraestructura", "DAP"],
         horizontal=True,
         key="sf_chat_radio_canal",
     )
