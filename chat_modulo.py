@@ -20,7 +20,7 @@ def get_supabase_client() -> Client:
         st.stop()
 
 
-# Helper para sanitizar estrictamente nombres de archivo para Supabase Storage
+# Sanitización estricta de nombres de archivos
 def sanitizar_nombre_archivo(nombre_original: str) -> str:
     partes = nombre_original.rsplit(".", 1)
     nombre_base = partes[0]
@@ -34,7 +34,7 @@ def sanitizar_nombre_archivo(nombre_original: str) -> str:
     return nombre_base_limpio
 
 
-# Helper para subir un archivo individual al Bucket de Supabase Storage
+# Subir archivo adjunto a Supabase Storage
 def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
     try:
         timestamp = int(time.time() * 1000)
@@ -58,7 +58,7 @@ def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
         return None
 
 
-# Helper en caché para descargar bytes a demanda
+# Descargar bytes con caché
 @st.cache_data(ttl=3600, show_spinner=False)
 def obtener_bytes_adjunto(url: str) -> bytes:
     try:
@@ -71,24 +71,48 @@ def obtener_bytes_adjunto(url: str) -> bytes:
         return None
 
 
-# Helper para consultar usuarios registrados
-def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
+# Consultar canales dinámicos
+def obtener_canales_db(supabase_client) -> list:
+    canales_predeterminados = [
+        "general",
+        "mantenimiento",
+        "infraestructura",
+        "dap",
+        "mapas",
+        "almacen",
+    ]
     try:
-        res = supabase_client.table("mensajes").select("emisor").execute()
+        res = supabase_client.table("canales").select("nombre").execute()
         if res.data:
-            emisores = {
-                fila.get("emisor")
-                for fila in res.data
-                if fila.get("emisor") and fila.get("emisor") != usuario_actual
-            }
-            return sorted(list(emisores))
-        return []
+            canales_db = [
+                row["nombre"].lower()
+                for row in res.data
+                if row.get("nombre")
+            ]
+            return sorted(list(set(canales_predeterminados + canales_db)))
     except Exception:
-        return []
+        pass
+    return canales_predeterminados
+
+
+# Consultar usuarios oficialmente registrados en la tabla 'usuarios'
+def obtener_usuarios_registrados(supabase_client) -> list:
+    try:
+        res = (
+            supabase_client.table("usuarios")
+            .select("nombre")
+            .order("nombre")
+            .execute()
+        )
+        if res.data:
+            return [u["nombre"] for u in res.data if u.get("nombre")]
+    except Exception:
+        pass
+    return ["SF_FERMIN"]
 
 
 # -----------------------------------------------------------------------------
-# FRAGMENTO DE HISTORIAL AUTO-SINCRONIZADO CON NOTIFICACIONES
+# HISTORIAL DE MENSAJES AUTO-SINCRONIZADO
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
 def render_historial_fragment(
@@ -147,12 +171,10 @@ def render_historial_fragment(
                 )
                 data = res.data if res.data else []
 
-            # Buscador por Palabra Clave
             if texto_busqueda and data:
                 kw = texto_busqueda.strip().lower()
                 data = [m for m in data if kw in m.get("mensaje", "").lower()]
 
-            # Filtrado por Fecha y Hora
             if fecha_filtro and data:
                 data_filtrada = []
                 for m in data:
@@ -226,7 +248,9 @@ def render_historial_fragment(
                 msg = fila.get("mensaje", "")
                 url_adjunto_raw = fila.get("url_adjunto", None)
                 canal_origen = fila.get("canal", "general")
-                msg_unique_id = fila.get("id") or f"{usr}_{fila.get('created_at', '')}"
+                msg_unique_id = (
+                    fila.get("id") or f"{usr}_{fila.get('created_at', '')}"
+                )
 
                 raw_time = fila.get("created_at", "")
                 if raw_time:
@@ -251,14 +275,15 @@ def render_historial_fragment(
                     mencion_tag in msg.lower() and not es_propio
                 )
 
-                # --- DISPARO DE NOTIFICACIONES OPCIÓN 1 Y 2 ---
-                if contiene_mencion and msg_unique_id not in st.session_state.notified_msg_ids:
+                if (
+                    contiene_mencion
+                    and msg_unique_id not in st.session_state.notified_msg_ids
+                ):
                     st.session_state.notified_msg_ids.add(msg_unique_id)
-                    
-                    # 1. Alerta emergente In-App
-                    st.toast(f"🔔 ¡{usr} te ha mencionado en #{canal_origen.upper()}!", icon="💬")
-                    
-                    # 2. Chime de Audio + Notificación Push del Navegador (HTML5)
+                    st.toast(
+                        f"🔔 ¡{usr} te ha mencionado en #{canal_origen.upper()}!",
+                        icon="💬",
+                    )
                     components.html(
                         f"""
                         <audio autoplay style="display:none;">
@@ -276,7 +301,7 @@ def render_historial_fragment(
                         </script>
                         """,
                         height=0,
-                        width=0
+                        width=0,
                     )
 
                 with st.chat_message(usr, avatar=avatar_icon):
@@ -379,6 +404,235 @@ def render_historial_fragment(
 
 
 # -----------------------------------------------------------------------------
+# REPOSITORIO DE ARCHIVOS PÚBLICOS (SÓLO CANALES PÚBLICOS)
+# -----------------------------------------------------------------------------
+def render_panel_archivos_publicos(supabase_client):
+    st.subheader("📁 Repositorio de Archivos Públicos")
+    st.caption(
+        "Archivos compartidos en los canales de trabajo (Excluye chats 1 a 1)."
+    )
+
+    try:
+        res = (
+            supabase_client.table("mensajes")
+            .select("*")
+            .neq("canal", "privado")
+            .not_.is_("url_adjunto", "null")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        data = res.data if res.data else []
+    except Exception as e:
+        st.error(f"🔴 Error al cargar repositorio público: {e}")
+        return
+
+    if not data:
+        st.info("📂 No hay archivos públicos en los canales de trabajo.")
+        return
+
+    archivos_lista = []
+    for m in data:
+        urls = m.get("url_adjunto", "").split("|")
+        for u in urls:
+            if u.strip():
+                ext = u.split("?")[0].split(".")[-1].lower()
+                nombre = u.split("?")[0].split("/")[-1]
+                archivos_lista.append({
+                    "nombre": nombre,
+                    "url": u,
+                    "extension": ext,
+                    "emisor": m.get("emisor", "Anónimo"),
+                    "canal": m.get("canal", "general"),
+                    "mensaje": m.get("mensaje", ""),
+                    "created_at": m.get("created_at", ""),
+                })
+
+    col_f1, col_f2, col_f3 = st.columns([2, 2, 2])
+    with col_f1:
+        kw_file = st.text_input(
+            "🔍 Buscar nombre / folio:", placeholder="Ej. AIRIS-1234"
+        )
+    with col_f2:
+        canales_disponibles = ["Todos"] + sorted(
+            list({a["canal"].upper() for a in archivos_lista})
+        )
+        canal_filtro = st.selectbox(
+            "Filtrar por Canal:", canales_disponibles
+        )
+    with col_f3:
+        tipo_filtro = st.selectbox("Tipo de Archivo:", [
+            "Todos",
+            "📷 Imágenes",
+            "📕 PDFs",
+            "📊 Excel",
+            "📝 Word",
+        ])
+
+    filtrados = archivos_lista
+    if kw_file.strip():
+        kw = kw_file.strip().lower()
+        filtrados = [
+            a
+            for a in filtrados
+            if kw in a["nombre"].lower() or kw in a["mensaje"].lower()
+        ]
+
+    if canal_filtro != "Todos":
+        filtrados = [
+            a for a in filtrados if a["canal"].upper() == canal_filtro
+        ]
+
+    if tipo_filtro.startswith("📷"):
+        filtrados = [
+            a
+            for a in filtrados
+            if a["extension"] in ["png", "jpg", "jpeg", "webp", "gif"]
+        ]
+    elif tipo_filtro.startswith("📕"):
+        filtrados = [a for a in filtrados if a["extension"] == "pdf"]
+    elif tipo_filtro.startswith("📊"):
+        filtrados = [
+            a for a in filtrados if a["extension"] in ["xlsx", "xls"]
+        ]
+    elif tipo_filtro.startswith("📝"):
+        filtrados = [
+            a for a in filtrados if a["extension"] in ["docx", "doc"]
+        ]
+
+    st.markdown(f"**Archivos encontrados: `{len(filtrados)}`**")
+    st.markdown("---")
+
+    for idx, item in enumerate(filtrados):
+        col_icon, col_det, col_acc = st.columns([1, 4, 2])
+        ext = item["extension"]
+        icon_str = (
+            "📷"
+            if ext in ["png", "jpg", "jpeg", "webp", "gif"]
+            else "📕" if ext == "pdf" else "📊" if ext in ["xlsx", "xls"] else "📄"
+        )
+
+        with col_icon:
+            st.markdown(f"### {icon_str}")
+        with col_det:
+            st.markdown(f"**{item['nombre']}**")
+            st.caption(
+                f"👤 Por: **{item['emisor']}** | Canal: **#{item['canal'].upper()}**"
+            )
+        with col_acc:
+            st.link_button(
+                "🌐 Abrir", item["url"], use_container_width=True
+            )
+            bytes_f = obtener_bytes_adjunto(item["url"])
+            if bytes_f:
+                st.download_button(
+                    label="📥 Descargar",
+                    data=bytes_f,
+                    file_name=item["nombre"],
+                    key=f"repo_pub_dl_{idx}",
+                    use_container_width=True,
+                )
+        st.markdown("---")
+
+
+# -----------------------------------------------------------------------------
+# REPOSITORIO DE ARCHIVOS PRIVADOS (SÓLO PRIVADOS DEL USUARIO ACTIVO)
+# -----------------------------------------------------------------------------
+def render_panel_archivos_privados(supabase_client, usuario_actual: str):
+    st.subheader("🔒 Mis Archivos Privados")
+    st.caption(
+        "Archivos compartidos exclusivamente en tus chats 1 a 1."
+    )
+
+    try:
+        res = (
+            supabase_client.table("mensajes")
+            .select("*")
+            .eq("canal", "privado")
+            .not_.is_("url_adjunto", "null")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        data = res.data if res.data else []
+    except Exception as e:
+        st.error(f"🔴 Error al cargar repositorio privado: {e}")
+        return
+
+    data_user = [
+        m
+        for m in data
+        if m.get("emisor") == usuario_actual
+        or m.get("destinatario") == usuario_actual
+    ]
+
+    if not data_user:
+        st.info("🔒 No tienes archivos recibidos o enviados en chats 1 a 1.")
+        return
+
+    archivos_lista = []
+    for m in data_user:
+        urls = m.get("url_adjunto", "").split("|")
+        otro_usr = (
+            m.get("destinatario")
+            if m.get("emisor") == usuario_actual
+            else m.get("emisor")
+        )
+        for u in urls:
+            if u.strip():
+                ext = u.split("?")[0].split(".")[-1].lower()
+                nombre = u.split("?")[0].split("/")[-1]
+                archivos_lista.append({
+                    "nombre": nombre,
+                    "url": u,
+                    "extension": ext,
+                    "emisor": m.get("emisor"),
+                    "contacto": otro_usr,
+                    "mensaje": m.get("mensaje", ""),
+                })
+
+    kw_priv_file = st.text_input(
+        "🔍 Buscar en mis archivos privados:",
+        placeholder="Nombre o palabra clave...",
+    )
+    filtrados = archivos_lista
+    if kw_priv_file.strip():
+        kw = kw_priv_file.strip().lower()
+        filtrados = [
+            a
+            for a in filtrados
+            if kw in a["nombre"].lower() or kw in a["mensaje"].lower()
+        ]
+
+    st.markdown(
+        f"**Archivos privados de {usuario_actual}: `{len(filtrados)}`**"
+    )
+    st.markdown("---")
+
+    for idx, item in enumerate(filtrados):
+        col_icon, col_det, col_acc = st.columns([1, 4, 2])
+        with col_icon:
+            st.markdown("### 🔒")
+        with col_det:
+            st.markdown(f"**{item['nombre']}**")
+            st.caption(
+                f"De: **{item['emisor']}** | Para/Con: **{item['contacto']}**"
+            )
+        with col_acc:
+            st.link_button(
+                "🌐 Abrir", item["url"], use_container_width=True
+            )
+            bytes_f = obtener_bytes_adjunto(item["url"])
+            if bytes_f:
+                st.download_button(
+                    label="📥 Descargar",
+                    data=bytes_f,
+                    file_name=item["nombre"],
+                    key=f"repo_priv_dl_{idx}",
+                    use_container_width=True,
+                )
+        st.markdown("---")
+
+
+# -----------------------------------------------------------------------------
 # FUNCIÓN PRINCIPAL DEL MÓDULO
 # -----------------------------------------------------------------------------
 def render_chat():
@@ -395,24 +649,33 @@ def render_chat():
     if "upload_counter" not in st.session_state:
         st.session_state.upload_counter = 0
 
+    # Inicio de Sesión mediante Selección de Usuario Registrado
+    usuarios_registrados = obtener_usuarios_registrados(supabase)
+
     if not st.session_state.sf_chat_user:
-        st.info("👋 Ingresa tu nombre o alias para ingresar al chat.")
+        st.info("👋 Selecciona tu usuario para ingresar al sistema.")
         with st.form("form_registro_chat"):
-            nombre_input = st.text_input("Nombre / Usuario:")
+            usr_select = st.selectbox(
+                "Usuario Oficial Autorizado:", usuarios_registrados
+            )
             btn_entrar = st.form_submit_button("Ingresar al Chat 🚀")
             if btn_entrar:
-                if nombre_input.strip():
-                    user_clean = nombre_input.strip()
-                    st.session_state.sf_chat_user = user_clean
-                    st.query_params["session_user"] = user_clean
-                    st.rerun()
-                else:
-                    st.warning("El nombre de usuario no puede estar vacío.")
+                st.session_state.sf_chat_user = usr_select
+                st.query_params["session_user"] = usr_select
+                st.rerun()
         return
+
+    # Evaluación insensible a mayúsculas/minúsculas para el rol de Admin
+    es_admin = st.session_state.sf_chat_user.strip().upper() == "SF_FERMIN"
 
     col_status, col_logout = st.columns([4, 1])
     with col_status:
-        st.caption(f"🟢 Usuario activo: **{st.session_state.sf_chat_user}**")
+        role_label = (
+            "👑 **ADMINISTRADOR**" if es_admin else "👤 **COLABORADOR**"
+        )
+        st.caption(
+            f"🟢 Usuario: **{st.session_state.sf_chat_user}** ({role_label})"
+        )
     with col_logout:
         if st.button("Salir / Cambiar", key="sf_chat_btn_logout"):
             st.session_state.sf_chat_user = ""
@@ -420,9 +683,19 @@ def render_chat():
                 del st.query_params["session_user"]
             st.rerun()
 
+    modos = [
+        "📢 Canales Públicos",
+        "🔒 Chat 1 a 1",
+        "🔔 Mis Menciones",
+        "📁 Archivos Públicos",
+        "🔒 Mis Archivos Privados",
+    ]
+    if es_admin:
+        modos.append("⚙️ Panel Admin")
+
     modo_chat = st.radio(
-        "Modo de navegación:",
-        ["📢 Canales Públicos", "🔒 Chat 1 a 1 (Privado)", "🔔 Mis Menciones"],
+        "Navegación:",
+        modos,
         horizontal=True,
         key="sf_chat_modo_principal",
         label_visibility="collapsed",
@@ -430,16 +703,19 @@ def render_chat():
 
     # --- MODO 1: CANALES PÚBLICOS ---
     if modo_chat == "📢 Canales Públicos":
+        canales_disponibles = obtener_canales_db(supabase)
+        canales_labels = [c.capitalize() for c in canales_disponibles]
+
         canal_seleccionado = st.radio(
             "Canal activo:",
-            ["General", "Mantenimiento", "Infraestructura", "DAP", "Mapas", "Almacén"],
+            canales_labels,
             horizontal=True,
             key="sf_chat_radio_canal",
             label_visibility="collapsed",
         )
         canal_activo = canal_seleccionado.lower()
 
-        col_search, col_filter = st.columns([3, 1])
+        col_search, col_filter, col_clear = st.columns([3, 1, 1])
         f_fecha_c, f_h_ini_c, f_h_fin_c = None, None, None
 
         with col_search:
@@ -468,6 +744,20 @@ def render_chat():
                             datetime.strptime("23:59", "%H:%M").time(),
                             key="h_fin_c",
                         )
+
+        with col_clear:
+            if es_admin:
+                with st.popover("🧹 Vaciar"):
+                    st.warning(
+                        f"Se eliminarán todos los mensajes del canal #{canal_activo.upper()}."
+                    )
+                    if st.checkbox("⚠️ Confirmar borrado", key="chk_del_c"):
+                        if st.button("Eliminar Historial 🗑️", type="primary"):
+                            supabase.table("mensajes").delete().eq(
+                                "canal", canal_activo
+                            ).execute()
+                            st.success("Canal vaciado con éxito.")
+                            st.rerun()
 
         render_historial_fragment(
             st.session_state.sf_chat_user,
@@ -553,18 +843,16 @@ def render_chat():
             st.rerun()
 
     # --- MODO 2: CHAT PRIVADO 1 A 1 ---
-    elif modo_chat == "🔒 Chat 1 a 1 (Privado)":
-        usuarios_disponibles = obtener_usuarios_chat(
-            supabase, st.session_state.sf_chat_user
-        )
-        if usuarios_disponibles:
+    elif modo_chat == "🔒 Chat 1 a 1":
+        colegas = [
+            u for u in usuarios_registrados if u != st.session_state.sf_chat_user
+        ]
+        if colegas:
             destinatario_activo = st.selectbox(
-                "Colega:",
-                usuarios_disponibles,
-                key="sf_chat_select_privado",
+                "Colega:", colegas, key="sf_chat_select_privado"
             )
 
-            col_search_p, col_filter_p = st.columns([3, 1])
+            col_search_p, col_filter_p, col_clear_p = st.columns([3, 1, 1])
             f_fecha_p, f_h_ini_p, f_h_fin_p = None, None, None
 
             with col_search_p:
@@ -593,6 +881,22 @@ def render_chat():
                                 datetime.strptime("23:59", "%H:%M").time(),
                                 key="h_fin_p",
                             )
+
+            with col_clear_p:
+                if es_admin:
+                    with st.popover("🧹 Vaciar"):
+                        st.warning(
+                            f"Borrar conversación privada entre tú y {destinatario_activo}."
+                        )
+                        if st.checkbox("⚠️ Confirmar borrado", key="chk_del_priv"):
+                            if st.button("Eliminar Chat 🗑️", type="primary"):
+                                supabase.table("mensajes").delete().eq(
+                                    "canal", "privado"
+                                ).or_(
+                                    f"and(emisor.eq.{st.session_state.sf_chat_user},destinatario.eq.{destinatario_activo}),and(emisor.eq.{destinatario_activo},destinatario.eq.{st.session_state.sf_chat_user})"
+                                ).execute()
+                                st.success("Chat privado eliminado.")
+                                st.rerun()
 
             render_historial_fragment(
                 st.session_state.sf_chat_user,
@@ -679,11 +983,9 @@ def render_chat():
                 }).execute()
                 st.rerun()
         else:
-            st.info(
-                "💡 Aún no hay otros usuarios registrados para chatear en privado."
-            )
+            st.info("💡 Aún no hay otros usuarios registrados para chatear.")
 
-    # --- MODO 3: MIS MENCIONES Y ALERTAS ---
+    # --- MODO 3: MIS MENCIONES ---
     elif modo_chat == "🔔 Mis Menciones":
         col_search_m, col_filter_m = st.columns([3, 1])
         f_fecha_m, f_h_ini_m, f_h_fin_m = None, None, None
@@ -723,3 +1025,74 @@ def render_chat():
             hora_fin=f_h_fin_m,
             texto_busqueda=kw_menc,
         )
+
+    # --- MODO 4: ARCHIVOS PÚBLICOS ---
+    elif modo_chat == "📁 Archivos Públicos":
+        render_panel_archivos_publicos(supabase)
+
+    # --- MODO 5: ARCHIVOS PRIVADOS ---
+    elif modo_chat == "🔒 Mis Archivos Privados":
+        render_panel_archivos_privados(supabase, st.session_state.sf_chat_user)
+
+    # --- MODO 6: PANEL ADMIN (SOLO SF_FERMIN) ---
+    elif modo_chat == "⚙️ Panel Admin" and es_admin:
+        st.subheader("⚙️ Panel de Administración Global")
+        st.caption("Administra los usuarios autorizados, canales y borrado del sistema.")
+
+        col_adm_u1, col_adm_u2 = st.columns(2)
+
+        with col_adm_u1:
+            st.markdown("### 👤 Alta de Usuarios")
+            nuevo_usr = st.text_input("Nombre de usuario:", placeholder="Ej. Juan_Perez")
+            if st.button("Registrar Usuario ➕", use_container_width=True):
+                u_clean = nuevo_usr.strip()
+                if u_clean:
+                    try:
+                        supabase.table("usuarios").insert({"nombre": u_clean, "rol": "colaborador"}).execute()
+                        st.success(f"Usuario '{u_clean}' registrado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al registrar usuario: {e}")
+                else:
+                    st.warning("Nombre de usuario no válido.")
+
+        with col_adm_u2:
+            st.markdown("### 🗑️ Baja de Usuarios")
+            usr_borrar = st.selectbox(
+                "Selecciona usuario a eliminar:",
+                [u for u in usuarios_registrados if u.upper() != "SF_FERMIN"]
+            )
+            if st.button("Eliminar Usuario ❌", use_container_width=True):
+                try:
+                    supabase.table("usuarios").delete().eq("nombre", usr_borrar).execute()
+                    st.success(f"Usuario '{usr_borrar}' eliminado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al eliminar: {e}")
+
+        st.markdown("---")
+        col_adm_c1, col_adm_c2 = st.columns(2)
+
+        with col_adm_c1:
+            st.markdown("### ➕ Crear Canal")
+            nuevo_canal = st.text_input("Nombre de canal:", placeholder="Ej. Electrica")
+            if st.button("Crear Canal 🚀", use_container_width=True):
+                c_clean = re.sub(r"[^a-zA-Z0-9_]", "", nuevo_canal.strip().lower())
+                if c_clean:
+                    try:
+                        supabase.table("canales").insert({"nombre": c_clean}).execute()
+                        st.success(f"Canal #{c_clean.upper()} creado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al crear canal: {e}")
+
+        with col_adm_c2:
+            st.markdown("### 🔥 Purgar Todo el Chat")
+            if st.checkbox("⚠️ Confirmar borrado completo de la base de datos", key="chk_wipe_all"):
+                if st.button("BORRAR TODOS LOS MENSAJES", type="primary", use_container_width=True):
+                    try:
+                        supabase.table("mensajes").delete().neq("id", 0).execute()
+                        st.success("Toda la base de datos de mensajes ha sido vaciada.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al purgar: {e}")
