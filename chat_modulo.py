@@ -72,10 +72,7 @@ def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
 
 
 # -----------------------------------------------------------------------------
-# FASE 3: Fragmento aislado para Auto-Refresco en tiempo real (2s)
-# -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-# FASE 3 + FILTROS DE FECHA Y HORA: Fragmento aislado para Auto-Refresco (2s)
+# FASE 3 + PANELES FIJOS: Fragmento con scroll interno e inmovilización superior
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
 def render_historial_fragment(
