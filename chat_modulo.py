@@ -58,7 +58,7 @@ def obtener_bytes_adjunto(url: str) -> bytes:
 # -----------------------------------------------------------------------------
 # FASE 3: Fragmento aislado para Auto-Refresco en tiempo real (Sincronización fluida)
 # -----------------------------------------------------------------------------
-@st.fragment(run_every=5)
+@st.fragment(run_every=2)
 def render_historial_fragment(usuario_actual: str, canal: str = "general"):
   # Obtenemos la conexión aquí adentro para evitar bloqueos del fragmento
   supabase = get_supabase_client()
