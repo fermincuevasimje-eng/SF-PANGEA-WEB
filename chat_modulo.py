@@ -18,10 +18,10 @@ def get_supabase_client() -> Client:
     st.stop()
 
 
-# Helper para subir archivos al Bucket de Supabase Storage
+# Helper para subir un archivo individual al Bucket de Supabase Storage
 def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
   try:
-    timestamp = int(time.time())
+    timestamp = int(time.time() * 1000)  # Milisegundos para evitar colisiones
     nombre_archivo_limpio = uploaded_file.name.replace(" ", "_")
     path_destino = f"mensajes/{timestamp}_{nombre_archivo_limpio}"
 
@@ -38,11 +38,11 @@ def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
     )
     return public_url
   except Exception as e:
-    st.error(f"🔴 Error al subir el archivo adjunto: {e}")
+    st.error(f"🔴 Error al subir el archivo {uploaded_file.name}: {e}")
     return None
 
 
-# Helper en caché para obtener los bytes de la imagen/archivo y habilitar la descarga nativa en móviles
+# Helper en caché para obtener bytes y habilitar descarga nativa en celulares
 @st.cache_data(ttl=3600, show_spinner=False)
 def obtener_bytes_adjunto(url: str) -> bytes:
   try:
@@ -64,6 +64,9 @@ def render_chat():
   # 2. Control de Identificación de Usuario
   if "sf_chat_user" not in st.session_state:
     st.session_state.sf_chat_user = ""
+
+  if "upload_counter" not in st.session_state:
+    st.session_state.upload_counter = 0
 
   if not st.session_state.sf_chat_user:
     st.info("👋 Ingresa tu nombre o alias para ingresar al chat.")
@@ -104,16 +107,38 @@ def render_chat():
       st.error(f"🔴 Error al consultar mensajes en Supabase: {err}")
       return []
 
+  # Mapa de Mime Types para descargas móviles de múltiples formatos
+  mime_types = {
+      "png": "image/png",
+      "jpg": "image/jpeg",
+      "jpeg": "image/jpeg",
+      "webp": "image/webp",
+      "gif": "image/gif",
+      "pdf": "application/pdf",
+      "xlsx": (
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      ),
+      "xls": "application/vnd.ms-excel",
+      "docx": (
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ),
+      "doc": "application/msword",
+      "pptx": (
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      ),
+      "ppt": "application/vnd.ms-powerpoint",
+  }
+
   # 4. Carga y Renderizado del Historial
   mensajes = cargar_historial(canal="general")
 
   chat_container = st.container()
   with chat_container:
     if mensajes:
-      for idx, fila in enumerate(mensajes):
+      for msg_idx, fila in enumerate(mensajes):
         usr = fila.get("emisor", "Anónimo")
         msg = fila.get("mensaje", "")
-        url_adjunto = fila.get("url_adjunto", None)
+        url_adjunto_raw = fila.get("url_adjunto", None)
 
         # Formatear fecha y hora convertida a Horario de México (UTC-6)
         raw_time = fila.get("created_at", "")
@@ -133,103 +158,117 @@ def render_chat():
         with st.chat_message(usr, avatar=avatar_icon):
           st.markdown(f"**{usr}** `<{tstamp}>`\n\n{msg}")
 
-          # Renderizado del archivo adjunto (Miniatura + Botón NATIVO de descarga para celular)
-          if url_adjunto:
-            ext = url_adjunto.split("?")[0].split(".")[-1].lower()
-            nombre_archivo = url_adjunto.split("?")[0].split("/")[-1]
+          # Renderizar 1 o varios adjuntos guardados (separados por '|')
+          if url_adjunto_raw:
+            lista_urls = url_adjunto_raw.split("|")
 
-            # Descargar bytes para permitir descarga directa en móviles
-            file_bytes = obtener_bytes_adjunto(url_adjunto)
+            for file_idx, url_adjunto in enumerate(lista_urls):
+              ext = url_adjunto.split("?")[0].split(".")[-1].lower()
+              nombre_archivo = url_adjunto.split("?")[0].split("/")[-1]
 
-            mime_types = {
-                "png": "image/png",
-                "jpg": "image/jpeg",
-                "jpeg": "image/jpeg",
-                "webp": "image/webp",
-                "gif": "image/gif",
-                "pdf": "application/pdf",
-                "xlsx": (
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                ),
-                "docx": (
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                ),
-            }
-            mime_actual = mime_types.get(ext, "application/octet-stream")
+              file_bytes = obtener_bytes_adjunto(url_adjunto)
+              mime_actual = mime_types.get(ext, "application/octet-stream")
 
-            if ext in ["png", "jpg", "jpeg", "webp", "gif"]:
-              col_thumb, col_actions = st.columns([1, 2])
+              st.markdown("---")
+              if ext in ["png", "jpg", "jpeg", "webp", "gif"]:
+                col_thumb, col_actions = st.columns([1, 2])
 
-              with col_thumb:
-                # Miniatura compacta (180px)
-                st.image(url_adjunto, width=180)
+                with col_thumb:
+                  st.image(url_adjunto, width=180)
 
-              with col_actions:
-                if file_bytes:
-                  st.download_button(
-                      label="📥 Descargar al celular / PC",
-                      data=file_bytes,
-                      file_name=nombre_archivo,
-                      mime=mime_actual,
+                with col_actions:
+                  if file_bytes:
+                    st.download_button(
+                        label="📥 Descargar al celular / PC",
+                        data=file_bytes,
+                        file_name=nombre_archivo,
+                        mime=mime_actual,
+                        use_container_width=True,
+                        key=f"dl_btn_{msg_idx}_{file_idx}",
+                    )
+                  st.link_button(
+                      "🌐 Abrir en pestaña",
+                      url_adjunto,
                       use_container_width=True,
-                      key=f"dl_btn_{idx}",
                   )
-                st.link_button(
-                    "🌐 Abrir en pestaña",
-                    url_adjunto,
-                    use_container_width=True,
+                  with st.expander("🔍 Vista previa en chat"):
+                    st.image(url_adjunto, use_container_width=True)
+              else:
+                # Íconos según extensión del documento
+                icon_doc = "📄"
+                if ext in ["xlsx", "xls"]:
+                  icon_doc = "📊"
+                elif ext in ["docx", "doc"]:
+                  icon_doc = "📝"
+                elif ext in ["pptx", "ppt"]:
+                  icon_doc = "🖥️"
+                elif ext == "pdf":
+                  icon_doc = "📕"
+
+                st.markdown(
+                    f"{icon_doc} **Archivo adjunto:** `{nombre_archivo}`"
                 )
-                with st.expander("🔍 Vista previa en chat"):
-                  st.image(url_adjunto, use_container_width=True)
-            else:
-              # Para otros tipos de archivos (PDF, Excel, Word, etc.)
-              st.markdown(f"📎 **Archivo adjunto:** `{nombre_archivo}`")
-              col_btn1, col_btn2 = st.columns(2)
-              with col_btn1:
-                if file_bytes:
-                  st.download_button(
-                      label="📥 Descargar al celular / PC",
-                      data=file_bytes,
-                      file_name=nombre_archivo,
-                      mime=mime_actual,
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                  if file_bytes:
+                    st.download_button(
+                        label="📥 Descargar archivo",
+                        data=file_bytes,
+                        file_name=nombre_archivo,
+                        mime=mime_actual,
+                        use_container_width=True,
+                        key=f"dl_btn_file_{msg_idx}_{file_idx}",
+                    )
+                with col_btn2:
+                  st.link_button(
+                      "🌐 Abrir en pestaña",
+                      url_adjunto,
                       use_container_width=True,
-                      key=f"dl_btn_file_{idx}",
                   )
-              with col_btn2:
-                st.link_button(
-                    "🌐 Abrir en pestaña",
-                    url_adjunto,
-                    use_container_width=True,
-                )
     else:
       st.info("No hay mensajes aún. ¡Sé el primero en escribir!")
 
-  # 5. Entrada para Adjuntar Archivos con Folio/Ticket/AIRIS Obligatorio
-  with st.popover("📎 Adjuntar evidencia o documento"):
-    archivo_adjunto = st.file_uploader(
-        "Selecciona una imagen o archivo",
-        type=["png", "jpg", "jpeg", "pdf", "xlsx", "docx"],
-        key="sf_chat_file_uploader",
+  # 5. Entrada para Adjuntar Archivos (Permite Múltiples y Autolimpia)
+  count = st.session_state.upload_counter
+  with st.popover("📎 Adjuntar evidencias o documentos"):
+    archivos_adjuntos = st.file_uploader(
+        "Selecciona uno o varios archivos",
+        type=[
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "pdf",
+            "xlsx",
+            "xls",
+            "docx",
+            "doc",
+            "pptx",
+            "ppt",
+        ],
+        accept_multiple_files=True,
+        key=f"sf_chat_uploader_{count}",
     )
 
-    if archivo_adjunto:
-      st.caption(f"📄 Archivo seleccionado: **{archivo_adjunto.name}**")
+    if archivos_adjuntos:
+      st.caption(f"📁 **Archivos seleccionados:** {len(archivos_adjuntos)}")
 
       # Campo obligatorio
       folio_input = st.text_input(
           "Número de Folio / Ticket / AIRIS *",
-          key="sf_chat_folio_input",
+          key=f"sf_chat_folio_{count}",
           placeholder="Ej. AIRIS-12345 / Folio 987",
       )
       comentario_adjunto = st.text_area(
           "Comentario adicional (Opcional):",
-          key="sf_chat_comentario_adjunto",
-          placeholder="Detalles sobre la evidencia...",
+          key=f"sf_chat_comentario_{count}",
+          placeholder="Detalles sobre las evidencias...",
       )
 
       if st.button(
-          "Enviar Evidencia 🚀",
-          key="btn_enviar_evidencia",
+          "Enviar Evidencias 🚀",
+          key=f"btn_enviar_{count}",
           use_container_width=True,
       ):
         if not folio_input.strip():
@@ -238,10 +277,17 @@ def render_chat():
               " AIRIS."
           )
         else:
-          with st.spinner("Subiendo archivo a Supabase Storage..."):
-            url_adj = subir_adjunto_supabase(archivo_adjunto, supabase)
+          urls_subidas = []
+          with st.spinner("Subiendo archivos a Supabase Storage..."):
+            for f in archivos_adjuntos:
+              url_f = subir_adjunto_supabase(f, supabase)
+              if url_f:
+                urls_subidas.append(url_f)
 
-          if url_adj:
+          if urls_subidas:
+            # Concatenamos URLs con '|' para guardar múltiples archivos en un registro
+            url_adjunto_final = "|".join(urls_subidas)
+
             mensaje_final = (
                 f"📌 **Folio / Ticket / AIRIS:** `{folio_input.strip()}`"
             )
@@ -253,11 +299,13 @@ def render_chat():
                 "emisor": st.session_state.sf_chat_user,
                 "mensaje": mensaje_final,
                 "destinatario": None,
-                "url_adjunto": url_adj,
+                "url_adjunto": url_adjunto_final,
             }
 
             try:
               supabase.table("mensajes").insert(nuevo_registro).execute()
+              # Incrementar contador para reiniciar controles del formulario
+              st.session_state.upload_counter += 1
               st.rerun()
             except Exception as write_err:
               st.error(f"🔴 Error al enviar evidencia: {write_err}")
