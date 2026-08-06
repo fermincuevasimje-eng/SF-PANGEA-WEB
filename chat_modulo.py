@@ -4,6 +4,7 @@ import urllib.request
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import Client, create_client
 
 
@@ -87,7 +88,7 @@ def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
 
 
 # -----------------------------------------------------------------------------
-# FRAGMENTO DE HISTORIAL AUTO-SINCRONIZADO (2s)
+# FRAGMENTO DE HISTORIAL AUTO-SINCRONIZADO CON NOTIFICACIONES
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
 def render_historial_fragment(
@@ -101,6 +102,9 @@ def render_historial_fragment(
     texto_busqueda: str = "",
 ):
     supabase = get_supabase_client()
+
+    if "notified_msg_ids" not in st.session_state:
+        st.session_state.notified_msg_ids = set()
 
     def cargar_historial():
         try:
@@ -222,6 +226,7 @@ def render_historial_fragment(
                 msg = fila.get("mensaje", "")
                 url_adjunto_raw = fila.get("url_adjunto", None)
                 canal_origen = fila.get("canal", "general")
+                msg_unique_id = fila.get("id") or f"{usr}_{fila.get('created_at', '')}"
 
                 raw_time = fila.get("created_at", "")
                 if raw_time:
@@ -245,6 +250,34 @@ def render_historial_fragment(
                 contiene_mencion = (
                     mencion_tag in msg.lower() and not es_propio
                 )
+
+                # --- DISPARO DE NOTIFICACIONES OPCIÓN 1 Y 2 ---
+                if contiene_mencion and msg_unique_id not in st.session_state.notified_msg_ids:
+                    st.session_state.notified_msg_ids.add(msg_unique_id)
+                    
+                    # 1. Alerta emergente In-App
+                    st.toast(f"🔔 ¡{usr} te ha mencionado en #{canal_origen.upper()}!", icon="💬")
+                    
+                    # 2. Chime de Audio + Notificación Push del Navegador (HTML5)
+                    components.html(
+                        f"""
+                        <audio autoplay style="display:none;">
+                            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+                        </audio>
+                        <script>
+                        if (Notification.permission === 'granted') {{
+                            new Notification("🔔 SF Pangea Chat", {{
+                                body: "{usr} te ha mencionado en #{canal_origen.upper()}",
+                                icon: "https://cdn-icons-png.flaticon.com/512/732/732200.png"
+                            }});
+                        }} else if (Notification.permission !== 'denied') {{
+                            Notification.requestPermission();
+                        }}
+                        </script>
+                        """,
+                        height=0,
+                        width=0
+                    )
 
                 with st.chat_message(usr, avatar=avatar_icon):
                     if contiene_mencion and not solo_menciones:
@@ -346,14 +379,13 @@ def render_historial_fragment(
 
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN PRINCIPAL DEL MÓDULO (INTERFAZ FLUIDA Y COMPACTA)
+# FUNCIÓN PRINCIPAL DEL MÓDULO
 # -----------------------------------------------------------------------------
 def render_chat():
     st.header("💬 SF Pangea Chat")
 
     supabase = get_supabase_client()
 
-    # Persistencia de usuario en URL
     if "session_user" in st.query_params:
         st.session_state.sf_chat_user = st.query_params["session_user"]
 
@@ -378,7 +410,6 @@ def render_chat():
                     st.warning("El nombre de usuario no puede estar vacío.")
         return
 
-    # Encabezado compacto de usuario
     col_status, col_logout = st.columns([4, 1])
     with col_status:
         st.caption(f"🟢 Usuario activo: **{st.session_state.sf_chat_user}**")
@@ -389,7 +420,6 @@ def render_chat():
                 del st.query_params["session_user"]
             st.rerun()
 
-    # Navegación por Modo Superior
     modo_chat = st.radio(
         "Modo de navegación:",
         ["📢 Canales Públicos", "🔒 Chat 1 a 1 (Privado)", "🔔 Mis Menciones"],
@@ -402,14 +432,13 @@ def render_chat():
     if modo_chat == "📢 Canales Públicos":
         canal_seleccionado = st.radio(
             "Canal activo:",
-            ["General", "Mantenimiento", "Infraestructura", "DAP", "Mapas"],
+            ["General", "Mantenimiento", "Infraestructura", "DAP", "Mapas", "Almacén"],
             horizontal=True,
             key="sf_chat_radio_canal",
             label_visibility="collapsed",
         )
         canal_activo = canal_seleccionado.lower()
 
-        # Barra de Herramientas Compacta (Buscador + Filtro en 1 sola línea)
         col_search, col_filter = st.columns([3, 1])
         f_fecha_c, f_h_ini_c, f_h_fin_c = None, None, None
 
@@ -535,7 +564,6 @@ def render_chat():
                 key="sf_chat_select_privado",
             )
 
-            # Barra de Herramientas Compacta para Privados
             col_search_p, col_filter_p = st.columns([3, 1])
             f_fecha_p, f_h_ini_p, f_h_fin_p = None, None, None
 
@@ -657,7 +685,6 @@ def render_chat():
 
     # --- MODO 3: MIS MENCIONES Y ALERTAS ---
     elif modo_chat == "🔔 Mis Menciones":
-        # Barra de Herramientas Compacta para Menciones
         col_search_m, col_filter_m = st.columns([3, 1])
         f_fecha_m, f_h_ini_m, f_h_fin_m = None, None, None
 
