@@ -74,68 +74,79 @@ def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
 # -----------------------------------------------------------------------------
 # FASE 3: Fragmento aislado para Auto-Refresco en tiempo real (2s)
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# FASE 3 + FILTROS DE FECHA Y HORA: Fragmento aislado para Auto-Refresco (2s)
+# -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
 def render_historial_fragment(
     usuario_actual: str,
     canal: str = "general",
     destinatario: str = None,
     solo_menciones: bool = False,
+    fecha_filtro=None,
+    hora_inicio=None,
+    hora_fin=None,
 ):
   supabase = get_supabase_client()
 
   def cargar_historial():
     try:
-      if solo_menciones:
-        # Carga mensajes globales donde te etiquetaron con @tu_usuario
-        res = (
-            supabase.table("mensajes")
-            .select("*")
-            .order("created_at", desc=True)
-            .execute()
-        )
-        if res.data:
-          tag = f"@{usuario_actual.lower()}"
-          return [
-              m
-              for m in res.data
-              if tag in m.get("mensaje", "").lower()
-              and m.get("emisor") != usuario_actual
-          ]
-        return []
+      query = supabase.table("mensajes").select("*")
 
+      if solo_menciones:
+        res = query.order("created_at", desc=True).execute()
+        data = res.data if res.data else []
+        tag = f"@{usuario_actual.lower()}"
+        data = [
+            m
+            for m in data
+            if tag in m.get("mensaje", "").lower()
+            and m.get("emisor") != usuario_actual
+        ]
       elif canal == "privado" and destinatario:
-        # Carga conversación bidireccional 1 a 1
         res = (
-            supabase.table("mensajes")
-            .select("*")
-            .eq("canal", "privado")
+            query.eq("canal", "privado")
             .order("created_at", desc=False)
             .execute()
         )
-        if res.data:
-          return [
-              m
-              for m in res.data
-              if (
-                  m.get("emisor") == usuario_actual
-                  and m.get("destinatario") == destinatario
-              )
-              or (
-                  m.get("emisor") == destinatario
-                  and m.get("destinatario") == usuario_actual
-              )
-          ]
-        return []
+        data = res.data if res.data else []
+        data = [
+            m
+            for m in data
+            if (
+                m.get("emisor") == usuario_actual
+                and m.get("destinatario") == destinatario
+            )
+            or (
+                m.get("emisor") == destinatario
+                and m.get("destinatario") == usuario_actual
+            )
+        ]
       else:
-        # Carga canal público
-        res = (
-            supabase.table("mensajes")
-            .select("*")
-            .eq("canal", canal)
-            .order("created_at", desc=False)
-            .execute()
-        )
-        return res.data if res.data else []
+        res = query.eq("canal", canal).order("created_at", desc=False).execute()
+        data = res.data if res.data else []
+
+      # Filtrado por Fecha y Hora (si se activó en la interfaz)
+      if fecha_filtro and data:
+        data_filtrada = []
+        for m in data:
+          raw_time = m.get("created_at", "")
+          if raw_time:
+            try:
+              dt_utc = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+              dt_local = dt_utc.astimezone(ZoneInfo("America/Mexico_City"))
+
+              if dt_local.date() == fecha_filtro:
+                if hora_inicio and hora_fin:
+                  if hora_inicio <= dt_local.time() <= hora_fin:
+                    data_filtrada.append(m)
+                else:
+                  data_filtrada.append(m)
+            except Exception:
+              pass
+        return data_filtrada
+
+      return data
     except Exception as err:
       st.error(f"🔴 Error al consultar mensajes en Supabase: {err}")
       return []
@@ -203,7 +214,6 @@ def render_historial_fragment(
         es_propio = usr == usuario_actual
         avatar_icon = "👤" if es_propio else "💬"
 
-        # Detección de mención
         mencion_tag = f"@{usuario_actual.lower()}"
         contiene_mencion = mencion_tag in msg.lower() and not es_propio
 
@@ -282,7 +292,7 @@ def render_historial_fragment(
                       use_container_width=True,
                   )
     else:
-      st.info("No hay mensajes en este espacio aún.")
+      st.info("No hay mensajes para el filtro o fecha seleccionados.")
 
 
 # -----------------------------------------------------------------------------
