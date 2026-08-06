@@ -58,7 +58,7 @@ def obtener_bytes_adjunto(url: str) -> bytes:
 # Helper para consultar usuarios registrados
 def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
   try:
-    res = supabase.table("mensajes").select("emisor").execute()
+    res = supabase_client.table("mensajes").select("emisor").execute()
     if res.data:
       emisores = {
           fila.get("emisor")
@@ -72,7 +72,7 @@ def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
 
 
 # -----------------------------------------------------------------------------
-# FASE 3 + PANELES FIJOS: Fragmento con scroll interno e inmovilización superior
+# FASE 3 + PANELES FIJOS + FILTROS DE FECHA Y HORA (2s)
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
 def render_historial_fragment(
@@ -188,7 +188,7 @@ def render_historial_fragment(
 
   mensajes = cargar_historial()
 
-# Contenedor con altura fija y scroll interno independiente para congelar el menú superior
+  # Contenedor con altura fija y scroll interno independiente para congelar el menú superior
   chat_container = st.container(height=500)
   with chat_container:
     if mensajes:
@@ -340,9 +340,9 @@ def render_chat():
       "🔔 Mis Menciones",
   ])
 
-# --- PESTAÑA 1: CANALES PÚBLICOS ---
+  # --- PESTAÑA 1: CANALES PÚBLICOS ---
   with tab_canales:
-canal_seleccionado = st.radio(
+    canal_seleccionado = st.radio(
         "Canal activo:",
         ["General", "Mantenimiento", "Infraestructura", "DAP"],
         horizontal=True,
