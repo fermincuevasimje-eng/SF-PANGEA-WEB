@@ -342,7 +342,7 @@ def render_chat():
       "🔔 Mis Menciones",
   ])
 
-  # --- PESTAÑA 1: CANALES PÚBLICOS ---
+# --- PESTAÑA 1: CANALES PÚBLICOS ---
   with tab_canales:
     canal_seleccionado = st.radio(
         "Canal activo:",
@@ -352,8 +352,34 @@ def render_chat():
     )
     canal_activo = canal_seleccionado.lower()
 
+    # Filtro por Fecha y Hora opcional para Canales
+    f_fecha_c, f_h_ini_c, f_h_fin_c = None, None, None
+    with st.expander("📅 Filtrar canal por fecha / hora (Opcional)"):
+      c1_c, c2_c = st.columns(2)
+      with c1_c:
+        if st.checkbox("Activar filtro de fecha", key="chk_f_canales"):
+          f_fecha_c = st.date_input("Selecciona día:", key="date_canales")
+      with c2_c:
+        if f_fecha_c and st.checkbox(
+            "Especificar rango de horas", key="chk_h_canales"
+        ):
+          f_h_ini_c = st.time_input(
+              "Desde:",
+              datetime.strptime("00:00", "%H:%M").time(),
+              key="h_ini_c",
+          )
+          f_h_fin_c = st.time_input(
+              "Hasta:",
+              datetime.strptime("23:59", "%H:%M").time(),
+              key="h_fin_c",
+          )
+
     render_historial_fragment(
-        st.session_state.sf_chat_user, canal=canal_activo
+        st.session_state.sf_chat_user,
+        canal=canal_activo,
+        fecha_filtro=f_fecha_c,
+        hora_inicio=f_h_ini_c,
+        hora_fin=f_h_fin_c,
     )
 
     # Controles de envío para Pestaña 1
@@ -415,7 +441,9 @@ def render_chat():
               st.session_state.upload_counter += 1
               st.rerun()
 
-    prompt_canal = st.chat_input(f"Escribe un mensaje en #{canal_activo.upper()}...")
+    prompt_canal = st.chat_input(
+        f"Escribe un mensaje en #{canal_activo.upper()}..."
+    )
     if prompt_canal:
       supabase.table("mensajes").insert({
           "canal": canal_activo,
@@ -521,6 +549,31 @@ def render_chat():
 
   # --- PESTAÑA 3: MIS MENCIONES Y ALERTAS ---
   with tab_menciones:
+    f_fecha_m, f_h_ini_m, f_h_fin_m = None, None, None
+    with st.expander("📅 Filtrar menciones por fecha / hora (Opcional)"):
+      c1_m, c2_m = st.columns(2)
+      with c1_m:
+        if st.checkbox("Activar filtro de fecha", key="chk_f_menciones"):
+          f_fecha_m = st.date_input("Selecciona día:", key="date_menciones")
+      with c2_m:
+        if f_fecha_m and st.checkbox(
+            "Especificar rango de horas", key="chk_h_menciones"
+        ):
+          f_h_ini_m = st.time_input(
+              "Desde:",
+              datetime.strptime("00:00", "%H:%M").time(),
+              key="h_ini_m",
+          )
+          f_h_fin_m = st.time_input(
+              "Hasta:",
+              datetime.strptime("23:59", "%H:%M").time(),
+              key="h_fin_m",
+          )
+
     render_historial_fragment(
-        st.session_state.sf_chat_user, solo_menciones=True
+        st.session_state.sf_chat_user,
+        solo_menciones=True,
+        fecha_filtro=f_fecha_m,
+        hora_inicio=f_h_ini_m,
+        hora_fin=f_h_fin_m,
     )
