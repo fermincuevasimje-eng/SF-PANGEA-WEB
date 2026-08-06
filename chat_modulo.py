@@ -55,24 +55,67 @@ def obtener_bytes_adjunto(url: str) -> bytes:
     return None
 
 
+# Helper para consultar lista de usuarios únicos registrados en el historial
+def obtener_usuarios_chat(supabase_client, usuario_actual: str) -> list:
+  try:
+    res = supabase.table("mensajes").select("emisor").execute()
+    if res.data:
+      emisores = {
+          fila.get("emisor")
+          for fila in res.data
+          if fila.get("emisor") and fila.get("emisor") != usuario_actual
+      }
+      return sorted(list(emisores))
+    return []
+  except Exception:
+    return []
+
+
 # -----------------------------------------------------------------------------
-# FASE 3: Fragmento aislado para Auto-Refresco en tiempo real (Sincronización fluida)
+# FASE 3 + CANALES + PRIVADOS + @MENCIONES: Fragmento aislado para Auto-Refresco (2s)
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
-def render_historial_fragment(usuario_actual: str, canal: str = "general"):
-  # Obtenemos la conexión aquí adentro para evitar bloqueos del fragmento
+def render_historial_fragment(
+    usuario_actual: str, canal: str = "general", destinatario: str = None
+):
   supabase = get_supabase_client()
 
   def cargar_historial():
     try:
-      res = (
-          supabase.table("mensajes")
-          .select("*")
-          .eq("canal", canal)
-          .order("created_at", desc=False)
-          .execute()
-      )
-      return res.data if res.data else []
+      if canal == "privado" and destinatario:
+        # Carga mensajes del chat 1 a 1 entre usuario_actual y destinatario
+        res = (
+            supabase.table("mensajes")
+            .select("*")
+            .eq("canal", "privado")
+            .order("created_at", desc=False)
+            .execute()
+        )
+        if res.data:
+          # Filtrar solo la conversación bidireccional entre ambos
+          return [
+              m
+              for m in res.data
+              if (
+                  m.get("emisor") == usuario_actual
+                  and m.get("destinatario") == destinatario
+              )
+              or (
+                  m.get("emisor") == destinatario
+                  and m.get("destinatario") == usuario_actual
+              )
+          ]
+        return []
+      else:
+        # Carga mensajes del canal público correspondiente
+        res = (
+            supabase.table("mensajes")
+            .select("*")
+            .eq("canal", canal)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        return res.data if res.data else []
     except Exception as err:
       st.error(f"🔴 Error al consultar mensajes en Supabase: {err}")
       return []
@@ -98,12 +141,17 @@ def render_historial_fragment(usuario_actual: str, canal: str = "general"):
       "ppt": "application/vnd.ms-powerpoint",
   }
 
-  # Indicador visual del estado del auto-refresco
+  # Indicador visual de sincronización en vivo
   hora_actual = datetime.now(ZoneInfo("America/Mexico_City")).strftime(
       "%H:%M:%S"
   )
+  etiqueta_canal = (
+      f"🔒 Chat Privado con **{destinatario}**"
+      if canal == "privado"
+      else f"📢 Canal **#{canal.upper()}**"
+  )
   st.caption(
-      f"🟢 **Chat Sincronizado en Vivo** • Última actualización: `{hora_actual}`"
+      f"🟢 **{etiqueta_canal}** • Sincronizado en Vivo (`{hora_actual}`)"
   )
 
   mensajes = cargar_historial()
@@ -131,7 +179,15 @@ def render_historial_fragment(usuario_actual: str, canal: str = "general"):
         es_propio = usr == usuario_actual
         avatar_icon = "👤" if es_propio else "💬"
 
+        # Detección de @Mención al usuario activo
+        mencion_tag = f"@{usuario_actual.lower()}"
+        contiene_mencion = mencion_tag in msg.lower() and not es_propio
+
         with st.chat_message(usr, avatar=avatar_icon):
+          # Alerta visual destacada si te etiquetaron en este mensaje
+          if contiene_mencion:
+            st.warning(f"🔔 **¡{usr} te ha mencionado en este mensaje!**")
+
           st.markdown(f"**{usr}** `<{tstamp}>`\n\n{msg}")
 
           if url_adjunto_raw:
@@ -200,11 +256,13 @@ def render_historial_fragment(usuario_actual: str, canal: str = "general"):
                       use_container_width=True,
                   )
     else:
-      st.info("No hay mensajes aún. ¡Sé el primero en escribir!")
+      st.info(
+          "No hay mensajes en este espacio aún. ¡Sé el primero en escribir!"
+      )
 
 
 # -----------------------------------------------------------------------------
-# Función principal de Renderizado del Módulo
+# Función Principal del Módulo
 # -----------------------------------------------------------------------------
 def render_chat():
   st.header("💬 SF Pangea Chat")
@@ -212,7 +270,7 @@ def render_chat():
 
   supabase = get_supabase_client()
 
-  # 2. Control de Identificación de Usuario
+  # Control de Usuario y Formulario
   if "sf_chat_user" not in st.session_state:
     st.session_state.sf_chat_user = ""
 
@@ -232,7 +290,7 @@ def render_chat():
           st.warning("El nombre de usuario no puede estar vacío.")
     return
 
-  # Barra superior de estado de sesión
+  # Barra superior de estado de usuario
   col_status, col_logout = st.columns([4, 1])
   with col_status:
     st.success(f"🟢 Usuario activo: **{st.session_state.sf_chat_user}**")
@@ -243,10 +301,61 @@ def render_chat():
 
   st.divider()
 
-  # Llama al fragmento pasando solo tipos de datos simples (String)
-  render_historial_fragment(st.session_state.sf_chat_user, canal="general")
+  # ---------------------------------------------------------------------------
+  # Selector de Canales y Chat Privado (1 a 1)
+  # ---------------------------------------------------------------------------
+  col_chan, col_dest = st.columns([2, 2])
 
-  # 5. Entrada para Adjuntar Archivos
+  with col_chan:
+    canal_seleccionado = st.selectbox(
+        "📍 Selecciona espacio de conversación:",
+        [
+            "📢 General",
+            "⚙️ Operativo",
+            "🆘 Soporte",
+            "🔒 Chat Privado (1 a 1)",
+        ],
+        key="sf_chat_canal_select",
+    )
+
+  canal_map = {
+      "📢 General": "general",
+      "⚙️ Operativo": "operativo",
+      "🆘 Soporte": "soporte",
+      "🔒 Chat Privado (1 a 1)": "privado",
+  }
+  canal_activo = canal_map[canal_seleccionado]
+
+  destinatario_activo = None
+  if canal_activo == "privado":
+    with col_dest:
+      usuarios_disponibles = obtener_usuarios_chat(
+          supabase, st.session_state.sf_chat_user
+      )
+      if usuarios_disponibles:
+        destinatario_activo = st.selectbox(
+            "👤 Selecciona usuario para mensaje privado:",
+            usuarios_disponibles,
+            key="sf_chat_destinatario_select",
+        )
+      else:
+        st.info("💡 Aún no hay otros usuarios en el historial para conversar.")
+
+  st.markdown("---")
+
+  # Llama al fragmento de renderizado en tiempo real (2s)
+  if canal_activo == "privado" and not destinatario_activo:
+    st.warning("👈 Por favor selecciona un usuario arriba para iniciar la charla privada.")
+  else:
+    render_historial_fragment(
+        st.session_state.sf_chat_user,
+        canal=canal_activo,
+        destinatario=destinatario_activo,
+    )
+
+  # ---------------------------------------------------------------------------
+  # Adjuntos de Evidencias (Múltiples y con Autolimpia)
+  # ---------------------------------------------------------------------------
   count = st.session_state.upload_counter
   with st.popover("📎 Adjuntar evidencias o documentos"):
     archivos_adjuntos = st.file_uploader(
@@ -293,6 +402,8 @@ def render_chat():
               "⚠️ Debes ingresar obligatoriamente el número de Folio / Ticket /"
               " AIRIS."
           )
+        elif canal_activo == "privado" and not destinatario_activo:
+          st.error("⚠️ Debes seleccionar un destinatario para el chat privado.")
         else:
           urls_subidas = []
           with st.spinner("Subiendo archivos a Supabase Storage..."):
@@ -311,10 +422,10 @@ def render_chat():
               mensaje_final += f"\n\n{comentario_adjunto.strip()}"
 
             nuevo_registro = {
-                "canal": "general",
+                "canal": canal_activo,
                 "emisor": st.session_state.sf_chat_user,
                 "mensaje": mensaje_final,
-                "destinatario": None,
+                "destinatario": destinatario_activo,
                 "url_adjunto": url_adjunto_final,
             }
 
@@ -325,20 +436,30 @@ def render_chat():
             except Exception as write_err:
               st.error(f"🔴 Error al enviar evidencia: {write_err}")
 
-  # 6. Entrada para Mensajes Tradicionales (Texto)
-  prompt = st.chat_input("Escribe un mensaje de texto para SF Pangea...")
+  # ---------------------------------------------------------------------------
+  # Entrada para Mensajes Tradicionales (Texto)
+  # ---------------------------------------------------------------------------
+  placeholder_prompt = (
+      f"Mensaje privado para {destinatario_activo}..."
+      if canal_activo == "privado" and destinatario_activo
+      else f"Escribe un mensaje en #{canal_activo.upper()} (puedes usar @usuario)..."
+  )
+  prompt = st.chat_input(placeholder_prompt)
 
   if prompt:
-    nuevo_registro = {
-        "canal": "general",
-        "emisor": st.session_state.sf_chat_user,
-        "mensaje": prompt,
-        "destinatario": None,
-        "url_adjunto": None,
-    }
+    if canal_activo == "privado" and not destinatario_activo:
+      st.error("⚠️ Selecciona un destinatario arriba antes de enviar un mensaje privado.")
+    else:
+      nuevo_registro = {
+          "canal": canal_activo,
+          "emisor": st.session_state.sf_chat_user,
+          "mensaje": prompt,
+          "destinatario": destinatario_activo,
+          "url_adjunto": None,
+      }
 
-    try:
-      supabase.table("mensajes").insert(nuevo_registro).execute()
-      st.rerun()
-    except Exception as write_err:
-      st.error(f"🔴 Error al enviar mensaje: {write_err}")
+      try:
+        supabase.table("mensajes").insert(nuevo_registro).execute()
+        st.rerun()
+      except Exception as write_err:
+        st.error(f"🔴 Error al enviar mensaje: {write_err}")
