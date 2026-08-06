@@ -331,17 +331,18 @@ def render_chat():
             st.session_state.sf_chat_user = ""
             st.rerun()
 
+# ---------------------------------------------------------------------------
+    # SELECCIÓN DE MODO DE NAVEGACIÓN SUPERIOR (RÁPIDO Y LIGERO)
     # ---------------------------------------------------------------------------
-    # ORGANIZACIÓN POR PESTAÑAS (TABS) - RÁPIDO Y CÓMODO
-    # ---------------------------------------------------------------------------
-    tab_canales, tab_privados, tab_menciones = st.tabs([
-        "📢 Canales Públicos",
-        "🔒 Chat 1 a 1 (Privado)",
-        "🔔 Mis Menciones",
-    ])
+    modo_chat = st.radio(
+        "Modo de navegación:",
+        ["📢 Canales Públicos", "🔒 Chat 1 a 1 (Privado)", "🔔 Mis Menciones"],
+        horizontal=True,
+        key="sf_chat_modo_principal",
+    )
 
-    # --- PESTAÑA 1: CANALES PÚBLICOS ---
-    with tab_canales:
+    # --- MODO 1: CANALES PÚBLICOS ---
+    if modo_chat == "📢 Canales Públicos":
         canal_seleccionado = st.radio(
             "Canal activo:",
             ["General", "Mantenimiento", "Infraestructura", "DAP"],
@@ -380,7 +381,7 @@ def render_chat():
             hora_fin=f_h_fin_c,
         )
 
-        # Controles de envío para Pestaña 1
+        # Controles de envío para Canales
         count = st.session_state.upload_counter
         with st.popover("📎 Adjuntar evidencias a #" + canal_activo.upper()):
             archivos_adjuntos = st.file_uploader(
@@ -452,8 +453,8 @@ def render_chat():
             }).execute()
             st.rerun()
 
-    # --- PESTAÑA 2: CHAT PRIVADO 1 A 1 ---
-    with tab_privados:
+    # --- MODO 2: CHAT PRIVADO 1 A 1 ---
+    elif modo_chat == "🔒 Chat 1 a 1 (Privado)":
         usuarios_disponibles = obtener_usuarios_chat(
             supabase, st.session_state.sf_chat_user
         )
@@ -471,3 +472,107 @@ def render_chat():
             )
 
             count = st.session_state.upload_counter
+            with st.popover(f"📎 Adjuntar archivo privado para {destinatario_activo}"):
+                archivos_privados = st.file_uploader(
+                    "Selecciona archivos",
+                    type=[
+                        "png",
+                        "jpg",
+                        "jpeg",
+                        "webp",
+                        "gif",
+                        "pdf",
+                        "xlsx",
+                        "xls",
+                        "docx",
+                        "doc",
+                        "pptx",
+                        "ppt",
+                    ],
+                    accept_multiple_files=True,
+                    key=f"sf_chat_uploader_priv_{count}",
+                )
+                if archivos_privados:
+                    folio_priv = st.text_input(
+                        "Número de Folio / Ticket / AIRIS *",
+                        key=f"sf_chat_folio_priv_{count}",
+                    )
+                    coment_priv = st.text_area(
+                        "Comentario (Opcional):", key=f"sf_chat_coment_priv_{count}"
+                    )
+                    if st.button(
+                        "Enviar Evidencia Privada 🚀",
+                        key=f"btn_enviar_priv_{count}",
+                        use_container_width=True,
+                    ):
+                        if not folio_priv.strip():
+                            st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
+                        else:
+                            urls = [
+                                subir_adjunto_supabase(f, supabase)
+                                for f in archivos_privados
+                                if f
+                            ]
+                            urls_validas = [u for u in urls if u]
+                            if urls_validas:
+                                msg_f = f"📌 **Folio / Ticket / AIRIS:** `{folio_priv.strip()}`"
+                                if coment_priv.strip():
+                                    msg_f += f"\n\n{coment_priv.strip()}"
+                                supabase.table("mensajes").insert({
+                                    "canal": "privado",
+                                    "emisor": st.session_state.sf_chat_user,
+                                    "mensaje": msg_f,
+                                    "destinatario": destinatario_activo,
+                                    "url_adjunto": "|".join(urls_validas),
+                                }).execute()
+                                st.session_state.upload_counter += 1
+                                st.rerun()
+
+            prompt_privado = st.chat_input(
+                f"Mensaje privado directo para {destinatario_activo}..."
+            )
+            if prompt_privado:
+                supabase.table("mensajes").insert({
+                    "canal": "privado",
+                    "emisor": st.session_state.sf_chat_user,
+                    "mensaje": prompt_privado,
+                    "destinatario": destinatario_activo,
+                    "url_adjunto": None,
+                }).execute()
+                st.rerun()
+        else:
+            st.info(
+                "💡 Aún no hay otros usuarios registrados en el historial para conversar"
+                " en privado."
+            )
+
+    # --- MODO 3: MIS MENCIONES Y ALERTAS ---
+    elif modo_chat == "🔔 Mis Menciones":
+        f_fecha_m, f_h_ini_m, f_h_fin_m = None, None, None
+        with st.expander("📅 Filtrar menciones por fecha / hora (Opcional)"):
+            c1_m, c2_m = st.columns(2)
+            with c1_m:
+                if st.checkbox("Activar filtro de fecha", key="chk_f_menciones"):
+                    f_fecha_m = st.date_input("Selecciona día:", key="date_menciones")
+            with c2_m:
+                if f_fecha_m and st.checkbox(
+                    "Especificar rango de horas", key="chk_h_menciones"
+                ):
+                    f_h_ini_m = st.time_input(
+                        "Desde:",
+                        datetime.strptime("00:00", "%H:%M").time(),
+                        key="h_ini_m",
+                    )
+                    f_h_fin_m = st.time_input(
+                        "Hasta:",
+                        datetime.strptime("23:59", "%H:%M").time(),
+                        key="h_fin_m",
+                    )
+
+        render_historial_fragment(
+            st.session_state.sf_chat_user,
+            solo_menciones=True,
+            fecha_filtro=f_fecha_m,
+            hora_inicio=f_h_ini_m,
+            hora_fin=f_h_fin_m,
+        )
