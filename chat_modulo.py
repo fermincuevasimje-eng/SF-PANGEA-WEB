@@ -191,7 +191,8 @@ def render_historial_fragment(
 
   mensajes = cargar_historial()
 
-  chat_container = st.container()
+# Contenedor con altura fija y scroll interno independiente para congelar el menú superior
+  chat_container = st.container(height=500)
   with chat_container:
     if mensajes:
       for msg_idx, fila in enumerate(mensajes):
