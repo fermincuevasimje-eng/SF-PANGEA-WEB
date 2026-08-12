@@ -97,15 +97,16 @@ if st.session_state.usuario_nombre == "Brigadas":
         if st.sidebar.button("🔄 Cambiar Brigada"):
             st.session_state.brigada_activa = ""
             st.rerun()
-else:
-    st.sidebar.markdown(f"👤 **Usuario:** {st.session_state.usuario_nombre}")
-
-if st.sidebar.button("🔒 Cerrar Sesión"):
-    st.session_state.authenticated = False
-    st.session_state.usuario_nombre = ""
-    st.session_state.brigada_activa = ""
-    st.session_state.rol = ""
-    st.rerun()
+# Selector secundario únicamente si ingresa "Brigadas" y aún no elige cuadrilla
+if st.session_state.usuario_nombre == "Brigadas" and not st.session_state.brigada_activa:
+    st.title("🚜 Selección de Brigada Activa")
+    st.info("Has ingresado con la cuenta general de Brigadas. Selecciona la cuadrilla activa:")
+    
+    b_sel = st.selectbox("Selecciona Brigada:", [f"Brigada {i}" for i in range(1, 18)], key="sb_sel_brigada_inicial")
+    if st.button("🚀 Confirmar y Entrar", type="primary", use_container_width=True, key="btn_confirm_brigada"):
+        st.session_state.brigada_activa = b_sel
+        st.rerun()
+    st.stop()
 # =========================================================
 # --- FIN DEL BLOQUE DE AUTENTICACIÓN ---
 # =========================================================
@@ -492,32 +493,48 @@ with st.sidebar:
         v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
         max_puntos_ruta = st.slider("Puntos Máximos por Ruta (Segmentación):", 5, 50, 15)
         st.write("---")
-    # --- 4. SIDEBAR ---
-    with st.sidebar:
-        st.title("⚙️ Panel Operativo")
-        st.write(f"**Usuario:** {st.session_state.usuario_nombre}")
-        st.write("---")
-        if st.button("🏠 Inicio", use_container_width=True): navegar("Inicio")
-        if st.button("🚀 SF1-Generador de Rutas", use_container_width=True): navegar("SF1")
-        if st.button("📁 SF2-Bajas", use_container_width=True): navegar("SF2")
-        if st.button("📊 SF3-Captura y Métricas", use_container_width=True): navegar("SF3")
-        if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): navegar("SF4")
-        if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): navegar("SF5")
-        if st.button("📦 SF6-Almacén e Inventario", use_container_width=True): navegar("SF6")
-        st.write("---")
-        if st.button("💬 SF Pangea Chat", use_container_width=True): navegar("SF_CHAT")
-        st.write("---")
-        if st.session_state.menu == "SF1":
-            st.subheader("📊 Ajustes GdR Multi-Ruta")
-            t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
-            v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
-            max_puntos_ruta = st.slider("Puntos Máximos por Ruta (Segmentación):", 5, 50, 15)
-            st.write("---")
-        if st.button("🚪 Cerrar Sesión", use_container_width=True):
-            st.session_state.autenticado = False
-            st.query_params.clear()  # 🧹 Limpia la URL completa al salir
+    # --- 4. SIDEBAR OPERATIVO UNIFICADO ---
+with st.sidebar:
+    st.title("⚙️ Panel Operativo")
+    
+    # Control de nombre a mostrar
+    if st.session_state.usuario_nombre == "Brigadas" and st.session_state.brigada_activa:
+        st.markdown(f"👤 **Usuario:** {st.session_state.usuario_nombre}")
+        st.markdown(f"🚜 **Activa:** {st.session_state.brigada_activa}")
+        if st.button("🔄 Cambiar Brigada", key="btn_change_brigade_side"):
+            st.session_state.brigada_activa = ""
             st.rerun()
-        st.info("SF PANGEA VPLUS ULTRA")
+    else:
+        st.markdown(f"👤 **Usuario:** {st.session_state.usuario_nombre}")
+
+    st.write("---")
+    
+    # Navegación del menú con claves únicas
+    if st.button("🏠 Inicio", use_container_width=True, key="btn_nav_inicio"): navegar("Inicio")
+    if st.button("🚀 SF1-Generador de Rutas", use_container_width=True, key="btn_nav_sf1"): navegar("SF1")
+    if st.button("📁 SF2-Bajas", use_container_width=True, key="btn_nav_sf2"): navegar("SF2")
+    if st.button("📊 SF3-Captura y Métricas", use_container_width=True, key="btn_nav_sf3"): navegar("SF3")
+    if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True, key="btn_nav_sf4"): navegar("SF4")
+    if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True, key="btn_nav_sf5"): navegar("SF5")
+    if st.button("📦 SF6-Almacén e Inventario", use_container_width=True, key="btn_nav_sf6"): navegar("SF6")
+    
+    st.write("---")
+    if st.button("💬 SF Pangea Chat", use_container_width=True, key="btn_nav_chat"): navegar("SF_CHAT")
+    st.write("---")
+    
+    if st.session_state.menu == "SF1":
+        st.subheader("📊 Ajustes GdR Multi-Ruta")
+        t_por_punto = st.slider("Minutos por Atención", 5, 60, 20, key="slider_t_punto")
+        v_promedio = st.slider("Velocidad km/h", 10, 80, 25, key="slider_v_prom")
+        max_puntos_ruta = st.slider("Puntos Máximos por Ruta (Segmentación):", 5, 50, 15, key="slider_max_pts")
+        st.write("---")
+
+    if st.button("🔒 Cerrar Sesión", use_container_width=True, key="btn_logout_sidebar"):
+        st.session_state.authenticated = False
+        st.session_state.usuario_nombre = ""
+        st.session_state.brigada_activa = ""
+        st.session_state.rol = ""
+        st.rerun()
 # --- 5. CUERPO LÓGICO ---
     if st.session_state.menu == "Inicio":
         st.title("👋 Bienvenido a SF PANGEA")
