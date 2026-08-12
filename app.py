@@ -824,8 +824,6 @@ elif st.session_state.menu == "SF2":
             if st.button("🗑️ Limpiar TODO", disabled=not seguro_limpiar):
                 st.session_state.lista_bajas = {}
                 st.rerun()
-        else: 
-            st.info("Esperando captura...")
 
     with tab_boveda:
         st.subheader("🗄️ Historial Permanente")
