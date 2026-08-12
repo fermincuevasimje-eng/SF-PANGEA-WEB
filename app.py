@@ -514,26 +514,26 @@ if st.session_state.menu == "Inicio":
 elif st.session_state.menu == "SF_CHAT":
     chat_modulo.render_chat()
 
-    elif st.session_state.menu == "SF3":
-        st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
+elif st.session_state.menu == "SF3":
+    st.title("🛠️ Módulo SF3 - Gestión y Métricas")
 
-        # --- CONEXIÓN DE SEGURIDAD CON GOOGLE SHEETS ---
-        scope = ["https://www.googleapis.com/auth/spreadsheets"]
-        creds_dict = {
-            "type": st.secrets["connections"]["gsheets"]["type"],
-            "project_id": st.secrets["connections"]["gsheets"]["project_id"],
-            "private_key_id": st.secrets["connections"]["gsheets"]["private_key_id"],
-            "private_key": st.secrets["connections"]["gsheets"]["private_key"].replace('\\n', '\n'),
-            "client_email": st.secrets["connections"]["gsheets"]["client_email"],
-            "client_id": st.secrets["connections"]["gsheets"]["client_id"],
-            "auth_uri": st.secrets["connections"]["gsheets"]["auth_uri"],
-            "token_uri": st.secrets["connections"]["gsheets"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["connections"]["gsheets"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["connections"]["gsheets"]["client_x509_cert_url"]
-        }
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        client = gspread.authorize(creds)
-        SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
+    # --- CONEXIÓN DE SEGURIDAD CON GOOGLE SHEETS ---
+    scope = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds_dict = {
+        "type": st.secrets["connections"]["gsheets"]["type"],
+        "project_id": st.secrets["connections"]["gsheets"]["project_id"],
+        "private_key_id": st.secrets["connections"]["gsheets"]["private_key_id"],
+        "private_key": st.secrets["connections"]["gsheets"]["private_key"].replace('\\n', '\n'),
+        "client_email": st.secrets["connections"]["gsheets"]["client_email"],
+        "client_id": st.secrets["connections"]["gsheets"]["client_id"],
+        "auth_uri": st.secrets["connections"]["gsheets"]["auth_uri"],
+        "token_uri": st.secrets["connections"]["gsheets"]["token_uri"],
+        "auth_provider_x509_cert_url": st.secrets["connections"]["gsheets"]["auth_provider_x509_cert_url"],
+        "client_x509_cert_url": st.secrets["connections"]["gsheets"]["client_x509_cert_url"]
+    }
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    client = gspread.authorize(creds)
+    SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
         
         try:
             sh = client.open_by_key(SHEET_ID)
