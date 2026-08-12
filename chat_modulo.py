@@ -659,11 +659,14 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
 # FUNCIÓN PRINCIPAL DEL MÓDULO
 # -----------------------------------------------------------------------------
 def render_chat():
-    st.header("💬 SF Pangea Chat")
+    st.header("💬 SF Pangea Chat - Centro de Comunicación DAP")
 
     supabase = get_supabase_client()
 
-    if "session_user" in st.query_params:
+    # Sincronización automática con la sesión global de app.py
+    if "usuario_nombre" in st.session_state and st.session_state.usuario_nombre:
+        st.session_state.sf_chat_user = st.session_state.usuario_nombre
+    elif "session_user" in st.query_params:
         st.session_state.sf_chat_user = st.query_params["session_user"]
 
     if "sf_chat_user" not in st.session_state:
