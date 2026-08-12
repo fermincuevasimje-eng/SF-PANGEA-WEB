@@ -538,152 +538,193 @@ elif st.session_state.menu == "SF3":
     try:
         sh = client.open_by_key(SHEET_ID)
         ws = sh.worksheet("Boveda_Bajas")
-    except:
+    except Exception:
         ws = sh.get_worksheet(0)
 
-        # --- SINCRONIZACIÓN AUTOMÁTICA ADAPTADA ---
-        if "manual_db" not in st.session_state:
-            st.session_state.manual_db = []
-            try:
-                valores_sheet = ws.get_all_values()
-                if valores_sheet:
-                    headers = [str(h).strip() for h in valores_sheet[0]]
-                    if "ID Registro" in headers and "Datos Captura" in headers:
-                        idx_id = headers.index("ID Registro")
-                        idx_datos = headers.index("Datos Captura")
-                        for row in valores_sheet[1:]:
-                            if len(row) > idx_id and str(row[idx_id]).startswith("SF3-MET-"):
-                                try:
-                                    datos_raw = row[idx_datos]
-                                    vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                                    st.session_state.manual_db.append(vale_parsed)
-                                except: pass
-            except Exception as e:
-                st.sidebar.warning(f"Sincronizando métricas: {e}")
+    # --- SINCRONIZACIÓN AUTOMÁTICA ADAPTADA ---
+    if "manual_db" not in st.session_state:
+        st.session_state.manual_db = []
+        try:
+            valores_sheet = ws.get_all_values()
+            if valores_sheet:
+                headers = [str(h).strip() for h in valores_sheet[0]]
+                if "ID Registro" in headers and "Datos Captura" in headers:
+                    idx_id = headers.index("ID Registro")
+                    idx_datos = headers.index("Datos Captura")
+                    for row in valores_sheet[1:]:
+                        if len(row) > idx_id and str(row[idx_id]).startswith("SF3-MET-"):
+                            try:
+                                datos_raw = row[idx_datos]
+                                vale_parsed = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                                st.session_state.manual_db.append(vale_parsed)
+                            except Exception:
+                                pass
+        except Exception as e:
+            st.sidebar.warning(f"Sincronizando métricas: {e}")
 
-        if "reset_key" not in st.session_state:
-            st.session_state.reset_key = 0
-        rk = st.session_state.reset_key
+    if "reset_key" not in st.session_state:
+        st.session_state.reset_key = 0
+    rk = st.session_state.reset_key
 
-        # --- FORMULARIO ---
-        with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
-            st.write("📍 **Paso 1: Ubicación**")
-            col_geo1, col_geo2 = st.columns(2)
-            with col_geo1:
-                f_del = st.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"del_manual_{rk}")
-            with col_geo2:
-                opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
-                f_utb = st.selectbox("UTB", opciones_utb_f, key=f"utb_manual_{rk}")
+    # --- FORMULARIO ---
+    with st.expander("📝 REGISTRAR NUEVA ATENCIÓN (FORMULARIO)", expanded=False):
+        st.write("📍 **Paso 1: Ubicación**")
+        col_geo1, col_geo2 = st.columns(2)
+        with col_geo1:
+            f_del = st.selectbox("Delegación", sorted(list(CATALOGO_MAESTRO.keys())), key=f"del_manual_{rk}")
+        with col_geo2:
+            opciones_utb_f = sorted(CATALOGO_MAESTRO.get(f_del, []))
+            f_utb = st.selectbox("UTB", opciones_utb_f, key=f"utb_manual_{rk}")
 
-            with st.form(key=f"form_sf3_core_{rk}", clear_on_submit=True):
-                st.write("📝 **Paso 2: Detalles de la Atención**")
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1: f_fecha = st.date_input("Fecha")
-                with c2: f_ot = st.text_input("O.T.")
-                with c3: f_folio = st.text_input("Folio / Ticket / IMEI")
-                f_calle = st.text_input("Calle")
+        with st.form(key=f"form_sf3_core_{rk}", clear_on_submit=True):
+            st.write("📝 **Paso 2: Detalles de la Atención**")
+            c1, c2, c3 = st.columns([1, 1, 2])
+            with c1:
+                f_fecha = st.date_input("Fecha")
+            with c2:
+                f_ot = st.text_input("O.T.")
+            with c3:
+                f_folio = st.text_input("Folio / Ticket / IMEI")
+            f_calle = st.text_input("Calle")
 
-                m1, m2, m3, m4 = st.columns(4)
-                with m1: f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
-                with m2: f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
-                with m3: f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
-                with m4: f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
+            m1, m2, m3, m4 = st.columns(4)
+            with m1:
+                f_rehab = st.number_input("7. Rehabilitación", min_value=0, step=1)
+            with m2:
+                f_manto = st.number_input("8. Mantenimiento", min_value=0, step=1)
+            with m3:
+                f_sust = st.number_input("9. Sustitución", min_value=0, step=1)
+            with m4:
+                f_ampli = st.number_input("10. Ampliación", min_value=0, step=1)
 
-                f_obs = st.text_area("11. Observaciones")
-                btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA PERMANENTE", use_container_width=True)
+            f_obs = st.text_area("11. Observaciones")
+            btn_guardar = st.form_submit_button("🚀 GUARDAR REGISTRO EN LISTA PERMANENTE", use_container_width=True)
 
-                if btn_guardar:
-                    payload = {"FECHA":f_fecha.strftime("%d/%m/%Y"), "OT":f_ot.upper(), "CALLE":f_calle.upper(), "DELEGACIÓN":f_del, "UTB":f_utb, "FOLIO":f_folio.upper(), "REHAB":int(f_rehab), "MANTO":int(f_manto), "SUST":int(f_sust), "AMPLI":int(f_ampli), "OBS":f_obs}
-                    st.session_state.manual_db.append(payload)
-                    ws.append_row([f"SF3-MET-{f_ot.upper()}", datetime.now().strftime("%d/%m/%Y %H:%M"), f_del, "", "", json.dumps(payload), ""])
-                    st.session_state.reset_key += 1
+            if btn_guardar:
+                payload = {
+                    "FECHA": f_fecha.strftime("%d/%m/%Y"),
+                    "OT": f_ot.upper(),
+                    "CALLE": f_calle.upper(),
+                    "DELEGACIÓN": f_del,
+                    "UTB": f_utb,
+                    "FOLIO": f_folio.upper(),
+                    "REHAB": int(f_rehab),
+                    "MANTO": int(f_manto),
+                    "SUST": int(f_sust),
+                    "AMPLI": int(f_ampli),
+                    "OBS": f_obs
+                }
+                st.session_state.manual_db.append(payload)
+                ws.append_row([f"SF3-MET-{f_ot.upper()}", datetime.now().strftime("%d/%m/%Y %H:%M"), f_del, "", "", json.dumps(payload), ""])
+                st.session_state.reset_key += 1
+                st.rerun()
+
+    # --- CONSOLA DE GESTIÓN (EDIT/ELIMINAR) ---
+    with st.expander("🛠️ GESTIÓN DE REGISTROS (EDICIÓN/BORRADO)", expanded=False):
+        if st.session_state.manual_db:
+            sel = st.selectbox("Seleccionar:", [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db])
+            idx = [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db].index(sel)
+            col_e, col_d, col_b = st.columns(3)
+            if col_e.button("✏️ Editar"):
+                st.session_state.edit = idx
+            if col_d.button("🗑️ Eliminar"):
+                st.session_state.borra = idx
+            if col_b.button("💥 Borrar Último"):
+                st.session_state.borra_ult = True
+            
+            if "edit" in st.session_state:
+                reg = st.session_state.manual_db[st.session_state.edit]
+                nr = st.number_input("Rehab", value=reg['REHAB'])
+                if st.button("💾 Guardar Cambios"):
+                    st.session_state.manual_db[st.session_state.edit].update({"REHAB": nr})
+                    cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
+                    if cell:
+                        ws.update_cell(cell.row, 6, json.dumps(st.session_state.manual_db[st.session_state.edit]))
+                    del st.session_state.edit
+                    st.rerun()
+            if "borra" in st.session_state and st.checkbox("Confirmar"):
+                if st.button("Ejecutar"):
+                    reg = st.session_state.manual_db.pop(st.session_state.borra)
+                    cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
+                    if cell:
+                        ws.delete_rows(cell.row)
+                    del st.session_state.borra
+                    st.rerun()
+            if "borra_ult" in st.session_state and st.checkbox("Confirmar"):
+                if st.button("Ejecutar"):
+                    last = st.session_state.manual_db.pop()
+                    cell = ws.find(f"SF3-MET-{last['OT']}", in_column=1)
+                    if cell:
+                        ws.delete_rows(cell.row)
+                    del st.session_state.borra_ult
                     st.rerun()
 
-        # --- CONSOLA DE GESTIÓN (EDIT/ELIMINAR) ---
-        with st.expander("🛠️ GESTIÓN DE REGISTROS (EDICIÓN/BORRADO)", expanded=False):
-            if st.session_state.manual_db:
-                sel = st.selectbox("Seleccionar:", [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db])
-                idx = [f"{r['OT']} | {r['FECHA']}" for r in st.session_state.manual_db].index(sel)
-                col_e, col_d, col_b = st.columns(3)
-                if col_e.button("✏️ Editar"): st.session_state.edit = idx
-                if col_d.button("🗑️ Eliminar"): st.session_state.borra = idx
-                if col_b.button("💥 Borrar Último"): st.session_state.borra_ult = True
-                
-                if "edit" in st.session_state:
-                    reg = st.session_state.manual_db[st.session_state.edit]
-                    nr = st.number_input("Rehab", value=reg['REHAB'])
-                    if st.button("💾 Guardar Cambios"):
-                        st.session_state.manual_db[st.session_state.edit].update({"REHAB": nr})
-                        cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
-                        if cell: ws.update_cell(cell.row, 6, json.dumps(st.session_state.manual_db[st.session_state.edit]))
-                        del st.session_state.edit; st.rerun()
-                if "borra" in st.session_state and st.checkbox("Confirmar"):
-                    if st.button("Ejecutar"):
-                        reg = st.session_state.manual_db.pop(st.session_state.borra)
-                        cell = ws.find(f"SF3-MET-{reg['OT']}", in_column=1)
-                        if cell: ws.delete_rows(cell.row)
-                        del st.session_state.borra; st.rerun()
-                if "borra_ult" in st.session_state and st.checkbox("Confirmar"):
-                    if st.button("Ejecutar"):
-                        last = st.session_state.manual_db.pop()
-                        cell = ws.find(f"SF3-MET-{last['OT']}", in_column=1)
-                        if cell: ws.delete_rows(cell.row)
-                        del st.session_state.borra_ult; st.rerun()
+    # --- FILTROS Y RESUMEN (TU LÓGICA ORIGINAL) ---
+    st.markdown("---")
+    up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
+    if up_cap:
+        try:
+            ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
+            st.session_state.masivo_pangea = load_massive_data(up_cap, ext)
+        except Exception as e:
+            st.error(f"Error: {e}")
+    
+    if "masivo_pangea" not in st.session_state:
+        st.session_state.masivo_pangea = None
+    
+    col_f1, col_f2 = st.columns(2)
+    if 'sel_del_val' not in st.session_state:
+        st.session_state.sel_del_val = "TODAS"
+    if 'sel_utb_val' not in st.session_state:
+        st.session_state.sel_utb_val = "TODAS"
+    
+    sel_del = col_f1.selectbox("📍 Filtrar TODO por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="sel_del_val")
+    lista_utbs = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
+    sel_utb = col_f2.selectbox("🔍 Filtrar TODO por UTB:", lista_utbs, key="sel_utb_val")
 
-        # --- FILTROS Y RESUMEN (TU LÓGICA ORIGINAL) ---
-        st.markdown("---")
-        up_cap = st.file_uploader("📂 Opcional: Cargar Archivo de Captura Masiva", type=["csv", "xlsx"], key="up_cap_sf3")
-        if up_cap:
-            try:
-                ext = 'xlsx' if up_cap.name.endswith('.xlsx') else 'csv'
-                st.session_state.masivo_pangea = load_massive_data(up_cap, ext)
-            except Exception as e: st.error(f"Error: {e}")
-        
-        if "masivo_pangea" not in st.session_state: st.session_state.masivo_pangea = None
-        
-        col_f1, col_f2 = st.columns(2)
-        if 'sel_del_val' not in st.session_state: st.session_state.sel_del_val = "TODAS"
-        if 'sel_utb_val' not in st.session_state: st.session_state.sel_utb_val = "TODAS"
-        
-        sel_del = col_f1.selectbox("📍 Filtrar TODO por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="sel_del_val")
-        lista_utbs = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
-        sel_utb = col_f2.selectbox("🔍 Filtrar TODO por UTB:", lista_utbs, key="sel_utb_val")
+    pieces_reporte = []
+    if st.session_state.manual_db:
+        df_m = pd.DataFrame(st.session_state.manual_db)
+        if sel_del != "TODAS":
+            df_m = df_m[df_m['DELEGACIÓN'] == sel_del]
+        if sel_utb != "TODAS":
+            df_m = df_m[df_m['UTB'] == sel_utb]
+        if not df_m.empty:
+            pieces_reporte.append(df_m)
 
-        pieces_reporte = []
-        if st.session_state.manual_db:
-            df_m = pd.DataFrame(st.session_state.manual_db)
-            if sel_del != "TODAS": df_m = df_m[df_m['DELEGACIÓN'] == sel_del]
-            if sel_utb != "TODAS": df_m = df_m[df_m['UTB'] == sel_utb]
-            if not df_m.empty: pieces_reporte.append(df_m)
+    if st.session_state.masivo_pangea is not None:
+        df_filt = st.session_state.masivo_pangea.copy()
+        if sel_del != "TODAS":
+            df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
+        if sel_utb != "TODAS":
+            df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
+        if not df_filt.empty:
+            df_av = df_filt.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
+            df_av.columns = ["FECHA", "OT", "FOLIO", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
+            df_av["OBS"] = ""
+            pieces_reporte.append(df_av)
 
-        if st.session_state.masivo_pangea is not None:
-            df_filt = st.session_state.masivo_pangea.copy()
-            if sel_del != "TODAS": df_filt = df_filt[df_filt['del_norm'] == normalizar_texto(sel_del)]
-            if sel_utb != "TODAS": df_filt = df_filt[df_filt['utb_norm'] == normalizar_texto(sel_utb)]
-            if not df_filt.empty:
-                df_av = df_filt.iloc[:, [4, 6, 15, 19, 22, 23, 29, 30, 31, 39]].copy()
-                df_av.columns = ["FECHA", "OT", "FOLIO", "CALLE", "DELEGACIÓN", "UTB", "REHAB", "MANTO", "SUST", "AMPLI"]
-                df_av["OBS"] = ""
-                pieces_reporte.append(df_av)
+    df_final = pd.concat(pieces_reporte, ignore_index=True) if pieces_reporte else pd.DataFrame()
+    if not df_final.empty:
+        for c in ["REHAB", "MANTO", "SUST", "AMPLI"]:
+            df_final[c] = pd.to_numeric(df_final[c], errors='coerce').fillna(0).astype(int)
+        st.metric("🔧 Totales", int(df_final["REHAB"].sum()), delta=f"Manto: {int(df_final['MANTO'].sum())}")
+        st.dataframe(df_final.astype(str), use_container_width=True)
 
-        df_final = pd.concat(pieces_reporte, ignore_index=True) if pieces_reporte else pd.DataFrame()
-        if not df_final.empty:
-            for c in ["REHAB", "MANTO", "SUST", "AMPLI"]: df_final[c] = pd.to_numeric(df_final[c], errors='coerce').fillna(0).astype(int)
-            st.metric("🔧 Totales", int(df_final["REHAB"].sum()), delta=f"Manto: {int(df_final['MANTO'].sum())}")
-            st.dataframe(df_final.astype(str), use_container_width=True)
+    # --- DESCARGAS ---
+    if not df_final.empty:
+        def generar_reporte(df, hoja):
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name=hoja)
+            return output.getvalue()
+        d1, d2, d3 = st.columns(3)
+        d1.download_button("📂 Reporte MASIVO", generar_reporte(df_final, "MASIVO"), "REPORTE_MASIVO.xlsx")
+        d2.download_button("📝 Reporte MANUAL", generar_reporte(df_final, "MANUAL"), "REPORTE_MANUAL.xlsx")
+        d3.download_button("🚀 Reporte UNIFICADO", generar_reporte(df_final, "UNIFICADO"), "REPORTE_UNIFICADO.xlsx")
 
-        # --- DESCARGAS ---
-        if not df_final.empty:
-            def generar_reporte(df, hoja):
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer: df.to_excel(writer, index=False, sheet_name=hoja)
-                return output.getvalue()
-            d1, d2, d3 = st.columns(3)
-            d1.download_button("📂 Reporte MASIVO", generar_reporte(df_final, "MASIVO"), "REPORTE_MASIVO.xlsx")
-            d2.download_button("📝 Reporte MANUAL", generar_reporte(df_final, "MANUAL"), "REPORTE_MANUAL.xlsx")
-            d3.download_button("🚀 Reporte UNIFICADO", generar_reporte(df_final, "UNIFICADO"), "REPORTE_UNIFICADO.xlsx")
-    elif st.session_state.menu == "SF2":
-        st.title("📁 SF2 - Módulo de Baja de Folios")
+elif st.session_state.menu == "SF2":
+    st.title("📁 SF2 - Módulo de Baja de Folios")
 
         # --- 1. CONEXIÓN ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
