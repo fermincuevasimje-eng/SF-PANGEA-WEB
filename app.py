@@ -544,7 +544,6 @@ elif st.session_state.menu == "SF3":
         ws = sh.worksheet("Boveda_Bajas")
     except Exception:
         ws = sh.get_worksheet(0)
-
     # --- SINCRONIZACIÓN AUTOMÁTICA ADAPTADA ---
     if "manual_db" not in st.session_state:
         st.session_state.manual_db = []
