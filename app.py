@@ -729,7 +729,6 @@ elif st.session_state.menu == "SF3":
 
 elif st.session_state.menu == "SF2":
     st.title("📁 SF2 - Módulo de Baja de Folios")
-
         # --- 1. CONEXIÓN ---
         scope = ["https://www.googleapis.com/auth/spreadsheets"]
         creds_dict = {
