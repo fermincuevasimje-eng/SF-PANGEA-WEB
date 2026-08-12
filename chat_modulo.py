@@ -695,8 +695,9 @@ def render_chat():
                 st.rerun()
         return
 
-    # Evaluación insensible a mayúsculas/minúsculas para el rol de Admin
-    es_admin = st.session_state.sf_chat_user.strip().upper() == "SF_FERMIN"
+    # Evaluación de Administrador Supremo Maestro (SF_FERMIN)
+    usr_actual_clean = st.session_state.sf_chat_user.strip().upper()
+    es_admin = usr_actual_clean in ["SF_FERMIN", "SF_FERMÍN", "FERMIN"]
 
     col_status, col_logout = st.columns([4, 1])
     with col_status:
