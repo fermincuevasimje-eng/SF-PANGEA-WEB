@@ -534,12 +534,12 @@ elif st.session_state.menu == "SF3":
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
     SHEET_ID = "14_fewol5DiFXoiO102wviiWR08Lw3PKHzEjSbMwxUm8"
-        
-        try:
-            sh = client.open_by_key(SHEET_ID)
-            ws = sh.worksheet("Boveda_Bajas")
-        except:
-            ws = sh.get_worksheet(0)
+
+    try:
+        sh = client.open_by_key(SHEET_ID)
+        ws = sh.worksheet("Boveda_Bajas")
+    except:
+        ws = sh.get_worksheet(0)
 
         # --- SINCRONIZACIÓN AUTOMÁTICA ADAPTADA ---
         if "manual_db" not in st.session_state:
