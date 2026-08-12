@@ -24,13 +24,10 @@ from supabase import create_client
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
 st.set_page_config(page_title="SF PANGEA VPLUS ULTRA", layout="wide")
-# =========================================================
-# --- BLOQUE DE AUTENTICACIÓN Y CONTROL DE ACCESO ---
-# =========================================================
-import hashlib
-from supabase import create_client
 
-# Conexión con base de datos Supabase
+# =========================================================
+# --- BLOQUE DE AUTENTICACIÓN Y CONTROL DE ACCESO (SUPABASE) ---
+# =========================================================
 supabase_url = st.secrets["supabase"]["url"]
 supabase_key = st.secrets["supabase"]["key"]
 supabase = create_client(supabase_url, supabase_key)
