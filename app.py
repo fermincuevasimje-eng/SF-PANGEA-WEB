@@ -443,19 +443,7 @@ def load_massive_data(file, extension):
     df['utb_norm'] = df.iloc[:, 23].astype(str).apply(normalizar_texto)
     return df
 
-# --- 3. AUTENTICACIÓN Y ESTADO ---
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
-
-# 🔄 REPETICIÓN / RECUPERACIÓN AUTOMÁTICA DE SESIÓN (PROTECCIÓN F5)
-if not st.session_state.autenticado and "session_user" in st.query_params:
-    user_url = st.query_params["session_user"]
-    if user_url == "SF_ADMIN":
-        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
-    elif user_url == "GuaDAP":
-        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
-
-# 📌 RECUPERAR MÓDULO/MENÚ ACTIVO TRAS UN F5
+# --- 3. ESTADO Y NAVEGACIÓN ---
 if "menu" in st.query_params:
     st.session_state.menu = st.query_params["menu"]
 elif "menu" not in st.session_state:
@@ -482,25 +470,28 @@ def navegar(destino):
     st.session_state.menu = destino
     st.query_params["menu"] = destino
 
-if not st.session_state.autenticado:
-    st.title("🔐 Acceso SF PANGEA")
-    col_u, col_p = st.columns(2)
-    with col_u: u = st.text_input("Usuario")
-    with col_p: p = st.text_input("Contraseña", type="password")
-    if st.button("🚀 Ingresar", use_container_width=True):
-        if u == "SF" and p == "1827":
-            st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
-            st.query_params["session_user"] = "SF_ADMIN"
-            st.query_params["menu"] = st.session_state.menu
-            st.rerun()
-        elif u == "GuaDAP" and p == "1111":
-            st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
-            st.query_params["session_user"] = "GuaDAP"
-            st.query_params["menu"] = st.session_state.menu
-            st.rerun()
-        else:
-            st.error("Acceso denegado")
-else:
+# --- 4. SIDEBAR OPERATIVO ---
+with st.sidebar:
+    st.title("⚙️ Panel Operativo")
+    nombre_mostrar = st.session_state.brigada_activa if (st.session_state.usuario_nombre == "Brigadas" and st.session_state.brigada_activa) else st.session_state.usuario_nombre
+    st.write(f"**Usuario:** {nombre_mostrar}")
+    st.write("---")
+    if st.button("🏠 Inicio", use_container_width=True): navegar("Inicio")
+    if st.button("🚀 SF1-Generador de Rutas", use_container_width=True): navegar("SF1")
+    if st.button("📁 SF2-Bajas", use_container_width=True): navegar("SF2")
+    if st.button("📊 SF3-Captura y Métricas", use_container_width=True): navegar("SF3")
+    if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): navegar("SF4")
+    if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): navegar("SF5")
+    if st.button("📦 SF6-Almacén e Inventario", use_container_width=True): navegar("SF6")
+    st.write("---")
+    if st.button("💬 SF Pangea Chat", use_container_width=True): navegar("SF_CHAT")
+    st.write("---")
+    if st.session_state.menu == "SF1":
+        st.subheader("📊 Ajustes GdR Multi-Ruta")
+        t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
+        v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
+        max_puntos_ruta = st.slider("Puntos Máximos por Ruta (Segmentación):", 5, 50, 15)
+        st.write("---")
     # --- 4. SIDEBAR ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
