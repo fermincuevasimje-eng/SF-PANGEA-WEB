@@ -708,9 +708,9 @@ def render_chat():
     with col_logout:
         if st.button("Salir / Cambiar", key="sf_chat_btn_logout"):
             st.session_state.sf_chat_user = ""
-            st.session_state.usuario_nombre = ""
-            st.session_state.autenticado = False
-            st.query_params.clear()
+            st.session_state.chat_manual_logout = True
+            if "session_user" in st.query_params:
+                del st.query_params["session_user"]
             st.rerun()
 
     modos = [
