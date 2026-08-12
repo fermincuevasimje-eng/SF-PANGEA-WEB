@@ -690,6 +690,7 @@ def render_chat():
             btn_entrar = st.form_submit_button("Ingresar al Chat 🚀")
             if btn_entrar:
                 st.session_state.sf_chat_user = usr_select
+                st.session_state.chat_manual_logout = False
                 st.query_params["session_user"] = usr_select
                 st.rerun()
         return
