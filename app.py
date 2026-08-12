@@ -394,7 +394,8 @@ def get_real_route(coords_list):
         return None, None
 
 def normalizar_texto(texto):
-    if not isinstance(texto, str): texto = str(texto)
+    if not isinstance(texto, str):
+        texto = str(texto)
     texto = "".join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
     return texto.lower().strip()
 
@@ -404,9 +405,11 @@ def extraer_carga_robusta(punto_dict, tipo):
     texto_fuente = ""
     for col in posibles_cols:
         if col in punto_dict and str(punto_dict[col]).strip() != "":
-            texto_fuente = str(punto_dict[col]); break
+            texto_fuente = str(punto_dict[col])
+            break
     t_norm = normalizar_texto(texto_fuente)
-    for p, n in d_letras.items(): t_norm = t_norm.replace(p, n)
+    for p, n in d_letras.items():
+        t_norm = t_norm.replace(p, n)
     patrones = {
         'lum': r'(\d+)\s*(?:lampara|foco|reflector|arbotante|luminari[oa]|unidad|brazo|farol[a]?|punto de luz)s?',
         'poste': r'(\d+)\s*(?:poste|estructura|columna)s?',
@@ -414,7 +417,8 @@ def extraer_carga_robusta(punto_dict, tipo):
     }
     if tipo == 'cable':
         m = re.search(patrones['cable'], t_norm)
-        if m: return int(m.group(1))
+        if m:
+            return int(m.group(1))
         if any(w in t_norm for w in ['cable', 'conductor', 'linea', 'red']):
             m_flex = re.search(r'(\d+)\s*(?:metro|m)s?', t_norm)
             return int(m_flex.group(1)) if m_flex else 0
@@ -631,7 +635,7 @@ elif st.session_state.menu == "SF3":
                 st.session_state.borra = idx
             if col_b.button("💥 Borrar Último"):
                 st.session_state.borra_ult = True
-            
+
             if "edit" in st.session_state:
                 reg = st.session_state.manual_db[st.session_state.edit]
                 nr = st.number_input("Rehab", value=reg['REHAB'])
@@ -668,16 +672,16 @@ elif st.session_state.menu == "SF3":
             st.session_state.masivo_pangea = load_massive_data(up_cap, ext)
         except Exception as e:
             st.error(f"Error: {e}")
-    
+
     if "masivo_pangea" not in st.session_state:
         st.session_state.masivo_pangea = None
-    
+
     col_f1, col_f2 = st.columns(2)
     if 'sel_del_val' not in st.session_state:
         st.session_state.sel_del_val = "TODAS"
     if 'sel_utb_val' not in st.session_state:
         st.session_state.sel_utb_val = "TODAS"
-    
+
     sel_del = col_f1.selectbox("📍 Filtrar TODO por Delegación:", ["TODAS"] + sorted(list(CATALOGO_MAESTRO.keys())), key="sel_del_val")
     lista_utbs = ["TODAS"] + (sorted(CATALOGO_MAESTRO.get(sel_del, [])) if sel_del != "TODAS" else sorted(list(MAPA_UTB_DEL.keys())))
     sel_utb = col_f2.selectbox("🔍 Filtrar TODO por UTB:", lista_utbs, key="sel_utb_val")
