@@ -19,9 +19,93 @@ from openpyxl.styles import PatternFill
 import config
 import data_manager
 import chat_modulo
+import hashlib
+from supabase import create_client
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
 st.set_page_config(page_title="SF PANGEA VPLUS ULTRA", layout="wide")
+
+# =========================================================
+# --- INICIO DE PARED DE AUTENTICACIÓN (PEGA AQUÍ) ---
+# =========================================================
+supabase_url = st.secrets["supabase"]["url"]
+supabase_key = st.secrets["supabase"]["key"]
+supabase = create_client(supabase_url, supabase_key)
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "usuario_nombre" not in st.session_state:
+    st.session_state.usuario_nombre = ""
+if "brigada_activa" not in st.session_state:
+    st.session_state.brigada_activa = ""
+if "rol" not in st.session_state:
+    st.session_state.rol = ""
+
+if not st.session_state.authenticated:
+    st.markdown("""
+        <style>
+            [data-testid="stSidebar"] {display: none;}
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.title("🛡️ SF Pangea - Acceso Institucional")
+    st.caption("Dirección de Alumbrado Público - Toluca")
+
+    with st.form("form_login_sfpangea"):
+        user_input = st.text_input("Usuario:").strip()
+        pass_input = st.text_input("Contraseña:", type="password").strip()
+        btn_login = st.form_submit_button("🔑 Iniciar Sesión", use_container_width=True, type="primary")
+
+    if btn_login:
+        if user_input and pass_input:
+            pass_hashed = hash_password(pass_input)
+            try:
+                res = supabase.table("usuarios").select("*").eq("nombre", user_input).eq("password_hash", pass_hashed).execute()
+                if res.data:
+                    st.session_state.authenticated = True
+                    st.session_state.usuario_nombre = res.data[0]["nombre"]
+                    st.session_state.rol = res.data[0].get("rol", "colaborador")
+                    st.success("✅ Acceso correcto.")
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña incorrectos.")
+            except Exception as e:
+                st.error(f"⚠️ Error de conexión con Supabase: {e}")
+        else:
+            st.warning("⚠️ Ingresa usuario y contraseña.")
+    st.stop()
+
+if st.session_state.usuario_nombre == "Brigadas":
+    if not st.session_state.brigada_activa:
+        st.title("🚜 Selección de Brigada Activa")
+        st.info("Has ingresado con la cuenta general de Brigadas. Selecciona la cuadrilla activa:")
+        
+        b_sel = st.selectbox("Selecciona Brigada:", [f"Brigada {i}" for i in range(1, 18)])
+        if st.button("🚀 Confirmar y Entrar", type="primary", use_container_width=True):
+            st.session_state.brigada_activa = b_sel
+            st.rerun()
+        st.stop()
+    else:
+        st.sidebar.markdown(f"👤 **Usuario:** {st.session_state.usuario_nombre}")
+        st.sidebar.markdown(f"🚜 **Activa:** {st.session_state.brigada_activa}")
+        if st.sidebar.button("🔄 Cambiar Brigada"):
+            st.session_state.brigada_activa = ""
+            st.rerun()
+else:
+    st.sidebar.markdown(f"👤 **Usuario:** {st.session_state.usuario_nombre}")
+
+if st.sidebar.button("🔒 Cerrar Sesión"):
+    st.session_state.authenticated = False
+    st.session_state.usuario_nombre = ""
+    st.session_state.brigada_activa = ""
+    st.session_state.rol = ""
+    st.rerun()
+# =========================================================
+# --- FIN DE PARED DE AUTENTICACIÓN ---
+# =========================================================
 
 st.markdown(
     """
