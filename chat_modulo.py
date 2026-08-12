@@ -663,11 +663,19 @@ def render_chat():
 
     supabase = get_supabase_client()
 
+    # --- PUENTE DE UNIFICACIÓN DE USUARIO ---
+    if "usuario_nombre" in st.session_state and st.session_state.usuario_nombre and not st.session_state.get("sf_chat_user"):
+        st.session_state.sf_chat_user = st.session_state.usuario_nombre
+
     if "session_user" in st.query_params:
         st.session_state.sf_chat_user = st.query_params["session_user"]
+        st.session_state.usuario_nombre = st.query_params["session_user"]
 
     if "sf_chat_user" not in st.session_state:
         st.session_state.sf_chat_user = ""
+        
+    if "usuario_nombre" not in st.session_state:
+        st.session_state.usuario_nombre = ""
 
     if "upload_counter" not in st.session_state:
         st.session_state.upload_counter = 0
