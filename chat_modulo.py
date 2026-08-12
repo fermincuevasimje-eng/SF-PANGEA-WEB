@@ -675,6 +675,9 @@ def render_chat():
     if "upload_counter" not in st.session_state:
         st.session_state.upload_counter = 0
 
+    if "notified_msg_ids" not in st.session_state:
+        st.session_state.notified_msg_ids = set()
+
     # Inicio de Sesión mediante Selección de Usuario Registrado
     usuarios_registrados = obtener_usuarios_registrados(supabase)
 
