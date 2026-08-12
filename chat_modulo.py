@@ -663,12 +663,15 @@ def render_chat():
 
     supabase = get_supabase_client()
 
-    # Sincronización automática con la sesión global (salvo si se pidió cambiar usuario en chat)
-    if "usuario_nombre" in st.session_state and st.session_state.usuario_nombre and not st.session_state.get("chat_manual_logout", False):
+    # Si se solicitó cerrar/cambiar usuario manualmente en el chat, limpiar la variable
+    if st.session_state.get("chat_manual_logout", False):
+        st.session_state.sf_chat_user = ""
+        st.session_state.usuario_nombre = ""
+    elif "usuario_nombre" in st.session_state and st.session_state.usuario_nombre:
         st.session_state.sf_chat_user = st.session_state.usuario_nombre
-    elif "session_user" in st.query_params and not st.session_state.get("chat_manual_logout", False):
+    elif "session_user" in st.query_params:
         st.session_state.sf_chat_user = st.query_params["session_user"]
-        
+
     if "sf_chat_user" not in st.session_state:
         st.session_state.sf_chat_user = ""
 
@@ -690,6 +693,7 @@ def render_chat():
             btn_entrar = st.form_submit_button("Ingresar al Chat 🚀")
             if btn_entrar:
                 st.session_state.sf_chat_user = usr_select
+                st.session_state.usuario_nombre = usr_select
                 st.session_state.chat_manual_logout = False
                 st.query_params["session_user"] = usr_select
                 st.rerun()
@@ -710,6 +714,7 @@ def render_chat():
     with col_logout:
         if st.button("Salir / Cambiar", key="sf_chat_btn_logout"):
             st.session_state.sf_chat_user = ""
+            st.session_state.usuario_nombre = ""
             st.session_state.chat_manual_logout = True
             if "session_user" in st.query_params:
                 del st.query_params["session_user"]
