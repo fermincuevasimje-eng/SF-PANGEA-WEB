@@ -663,12 +663,12 @@ def render_chat():
 
     supabase = get_supabase_client()
 
-    # Sincronización automática con la sesión global de app.py
-    if "usuario_nombre" in st.session_state and st.session_state.usuario_nombre:
+    # Sincronización automática con la sesión global (salvo si se pidió cambiar usuario en chat)
+    if "usuario_nombre" in st.session_state and st.session_state.usuario_nombre and not st.session_state.get("chat_manual_logout", False):
         st.session_state.sf_chat_user = st.session_state.usuario_nombre
-    elif "session_user" in st.query_params:
+    elif "session_user" in st.query_params and not st.session_state.get("chat_manual_logout", False):
         st.session_state.sf_chat_user = st.query_params["session_user"]
-
+        
     if "sf_chat_user" not in st.session_state:
         st.session_state.sf_chat_user = ""
 
