@@ -1124,12 +1124,25 @@ def render_chat():
                         st.error(f"Error al crear canal: {e}")
 
         with col_adm_c2:
-            st.markdown("### 🔥 Purgar Todo el Chat")
-            if st.checkbox("⚠️ Confirmar borrado completo de la base de datos", key="chk_wipe_all"):
-                if st.button("BORRAR TODOS LOS MENSAJES", type="primary", use_container_width=True):
-                    try:
-                        supabase.table("mensajes").delete().neq("id", 0).execute()
-                        st.success("Toda la base de datos de mensajes ha sido vaciada.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al purgar: {e}")
+            st.markdown("### 🗑️ Eliminar Canal")
+            canales_existentes = obtener_canales_db(supabase)
+            canal_borrar = st.selectbox("Selecciona canal a eliminar:", canales_existentes, key="sb_borrar_canal")
+            if st.button("Eliminar Canal ❌", use_container_width=True):
+                try:
+                    supabase.table("canales").delete().eq("nombre", canal_borrar.lower()).execute()
+                    supabase.table("mensajes").delete().eq("canal", canal_borrar.lower()).execute()
+                    st.success(f"Canal #{canal_borrar.upper()} y sus mensajes fueron eliminados.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al eliminar canal: {e}")
+
+        st.markdown("---")
+        st.markdown("### 🔥 Purgar Todo el Chat")
+        if st.checkbox("⚠️ Confirmar borrado completo de la base de datos", key="chk_wipe_all"):
+            if st.button("BORRAR TODOS LOS MENSAJES", type="primary", use_container_width=True):
+                try:
+                    supabase.table("mensajes").delete().neq("id", 0).execute()
+                    st.success("Toda la base de datos de mensajes ha sido vaciada.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al purgar: {e}")
