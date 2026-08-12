@@ -44,6 +44,8 @@ if "brigada_activa" not in st.session_state:
     st.session_state.brigada_activa = ""
 if "rol" not in st.session_state:
     st.session_state.rol = ""
+if "perfil" not in st.session_state:
+    st.session_state.perfil = ""
 
 # Pared de Login (Bloquea la aplicación si no está autenticado)
 if not st.session_state.authenticated:
@@ -67,9 +69,12 @@ if not st.session_state.authenticated:
             try:
                 res = supabase.table("usuarios").select("*").eq("nombre", user_input).eq("password_hash", pass_hashed).execute()
                 if res.data:
+                    rol_db = str(res.data[0].get("rol", "colaborador")).lower()
                     st.session_state.authenticated = True
                     st.session_state.usuario_nombre = res.data[0]["nombre"]
-                    st.session_state.rol = res.data[0].get("rol", "colaborador")
+                    st.session_state.rol = rol_db
+                    # Define perfil para compatibilidad interna con SF1-SF6
+                    st.session_state.perfil = "CONSULTA" if rol_db in ["consulta", "invitado"] else "ADMIN"
                     st.success("✅ Acceso correcto.")
                     st.rerun()
                 else:
@@ -80,23 +85,6 @@ if not st.session_state.authenticated:
             st.warning("⚠️ Ingresa usuario y contraseña.")
     st.stop()
 
-# Selector secundario para la cuenta general "Brigadas"
-if st.session_state.usuario_nombre == "Brigadas":
-    if not st.session_state.brigada_activa:
-        st.title("🚜 Selección de Brigada Activa")
-        st.info("Has ingresado con la cuenta general de Brigadas. Selecciona la cuadrilla activa:")
-        
-        b_sel = st.selectbox("Selecciona Brigada:", [f"Brigada {i}" for i in range(1, 18)])
-        if st.button("🚀 Confirmar y Entrar", type="primary", use_container_width=True):
-            st.session_state.brigada_activa = b_sel
-            st.rerun()
-        st.stop()
-    else:
-        st.sidebar.markdown(f"👤 **Usuario:** {st.session_state.usuario_nombre}")
-        st.sidebar.markdown(f"🚜 **Activa:** {st.session_state.brigada_activa}")
-        if st.sidebar.button("🔄 Cambiar Brigada"):
-            st.session_state.brigada_activa = ""
-            st.rerun()
 # Selector secundario únicamente si ingresa "Brigadas" y aún no elige cuadrilla
 if st.session_state.usuario_nombre == "Brigadas" and not st.session_state.brigada_activa:
     st.title("🚜 Selección de Brigada Activa")
@@ -107,9 +95,11 @@ if st.session_state.usuario_nombre == "Brigadas" and not st.session_state.brigad
         st.session_state.brigada_activa = b_sel
         st.rerun()
     st.stop()
+
 # =========================================================
 # --- FIN DEL BLOQUE DE AUTENTICACIÓN ---
 # =========================================================
+
 st.markdown(
     """
     <style>
@@ -141,25 +131,25 @@ HOJA_PAPELERA = "Trash"
 
 # --- 1.5 CATÁLOGO MAESTRO ACTUALIZADO ---
 CATALOGO_MAESTRO = {
-    "ADOLFO LOPEZ MATEOS": ['PARQUES NACIONALES I', 'MIGUEL HIDALGO  (CORRALITOS)', 'PARQUES NACIONALES  II'],
+    "ADOLFO LOPEZ MATEOS": ['PARQUES NACIONALES I', 'MIGUEL HIDALGO (CORRALITOS)', 'PARQUES NACIONALES II'],
     "ARBOL DE LAS MANITAS": ['ZOPILOCALCO SUR', 'ZOPILOCALCO NORTE', 'LOMAS ALTAS', 'HUITZILA Y DOCTORES', 'NIÑOS HEROES (PENSIONES)'],
     "BARRIO TRADICIONALES": ['SANTA BARBARA', 'EL COPORO', 'LA RETAMA', 'SAN MIGUEL APINAHUISCO', 'UNION', 'SAN LUIS OBISPO'],
     "CACALOMACAN": ['CENTRO', 'RANCHO SAN MIGUEL ZACANGO', 'SAGRADO CORAZON', 'EL ARENAL'],
     "CALIXTLAHUACA": ['SAN FRANCISCO DE ASIS', 'ZONA ARQUEOLOGICA', 'EL CALVARIO', 'PALMILLAS'],
-    "CAPULTITLAN": ['SAN ISIDRO LABRADOR', 'PASEOS DEL  VALLE', 'SAN JUDAS TADEO', 'LA SOLEDAD', 'LOS PINOS', 'GUADALUPE'],
+    "CAPULTITLAN": ['SAN ISIDRO LABRADOR', 'PASEOS DEL VALLE', 'SAN JUDAS TADEO', 'LA SOLEDAD', 'LOS PINOS', 'GUADALUPE'],
     "CENTRO HISTORICO": ['CENTRO', 'SANTA CLARA', '5 DE MAYO', 'FRANCISCO MURGUIA (EL RANCHITO)', 'LA MERCED ( ALAMEDA)'],
     "CERRILLO VISTA HERMOSA": ['EL CERRILLO', 'EL EMBARCADERO'],
     "CIUDAD UNIVERSITARIA": ['PLAZAS DE SAN BUENAVENTURA', 'SAN BERNARDINO', 'VICENTE GUERRERO'],
     "COLON": ['COLON Y CIPRES I', 'COLON Y CIPRES II', 'ISIDRO FABELA PRIMERA SECCION', 'ISIDRO FABELA SEGUNDA SECCION', 'RANCHO DOLORES'],
-    "DEL PARQUE": ['DEL PARQUE   I', 'DEL PARQUE  II', 'LAZARO CARDENAS', 'AMPLIACION LAZARO CARDENAS', 'AZTECA'],
+    "DEL PARQUE": ['DEL PARQUE I', 'DEL PARQUE II', 'LAZARO CARDENAS', 'AMPLIACION LAZARO CARDENAS', 'AZTECA'],
     "INDEPENDENCIA": ['REFORMA Y FERROCARRILES NACIONALES', 'METEORO', 'INDEPENDENCIA', 'LAS TORRES (CIENTIFICOS)', 'SAN JUAN BUENAVISTA'],
     "LA MAQUINITA": ['RANCHO LA MORA', 'LOS ANGELES', 'CARLOS HANK Y LOS FRAILES', 'GUADALUPE, CLUB JARDIN Y LA MAGDALENA', 'TLACOPA'],
     "METROPOLITANA": ['LAS PALOMAS', 'LAS MARGARITAS', 'RANCHO MAYA'],
-    "MODERNA DE LA CRUZ": ['MODERNA DE LA CRUZ  I', 'MODERNA DE LA CRUZ  II', 'BOSQUES DE COLON'],
+    "MODERNA DE LA CRUZ": ['MODERNA DE LA CRUZ I', 'MODERNA DE LA CRUZ II', 'BOSQUES DE COLON'],
     "MORELOS": ['MORELOS 1A SECCION', 'MORELOS 2A SECCION', 'FEDERAL (ADOLFO LOPEZ MATEOS)'],
-    "NUEVA OXTOTITLAN": ['NUEVA OXTOTITLAN  I', 'NUEVA OXTOTITLAN II'],
-    "OCHO CEDROS": ['OCHO CEDROS  I', 'VILLA HOGAR', 'OCHO CEDROS  II', '8 CEDROS SEGUNDA SECCION'],
-    "SAN ANDRES CUEXCONTITLAN": ['SAN ANDRES', 'LA CONCEPCION', 'SANTA ROSA', 'LA NATIVIDAD', 'EJIDO SAN DIEGO DE LOS PADRES CUEXCONTITLAN', 'SAN DIEGO DE LOS PADRES I', 'SAN DIEGO DE LOS PADRES II', 'JICALTEPEC  CUEXCONTITLAN', 'LOMA LA PROVIDENCIA', 'EJIDO DE LA Y', 'LA LOMA CUEXCONTITLAN'],
+    "NUEVA OXTOTITLAN": ['NUEVA OXTOTITLAN I', 'NUEVA OXTOTITLAN II'],
+    "OCHO CEDROS": ['OCHO CEDROS I', 'VILLA HOGAR', 'OCHO CEDROS II', '8 CEDROS SEGUNDA SECCION'],
+    "SAN ANDRES CUEXCONTITLAN": ['SAN ANDRES', 'LA CONCEPCION', 'SANTA ROSA', 'LA NATIVIDAD', 'EJIDO SAN DIEGO DE LOS PADRES CUEXCONTITLAN', 'SAN DIEGO DE LOS PADRES I', 'SAN DIEGO DE LOS PADRES II', 'JICALTEPEC CUEXCONTITLAN', 'LOMA LA PROVIDENCIA', 'EJIDO DE LA Y', 'LA LOMA CUEXCONTITLAN'],
     "SAN ANTONIO BUENAVISTA": ['CAMINO REAL', 'JOSE MARIA HEREDIA', 'LOS ROSALES'],
     "SAN BUENAVENTURA": ['INSURGENTES', 'PENSADOR MEXICANO', 'ALAMEDA 2000', 'CULTURAL', 'DEL DEPORTE', 'GUADALUPE'],
     "SAN CAYETANO DE MORELOS": ['SAN CAYETANO', 'CERRILLO PIEDRAS BLANCAS'],
@@ -169,12 +159,12 @@ CATALOGO_MAESTRO = {
     "SAN LORENZO TEPALTITLAN": ['CENTRO', 'LAS FLORES', 'EL CHARCO', 'SAN ANGELIN', 'LA CRUZ COMALCO', 'SAN ISIDRO', 'DEL PANTEON', 'RINCON DE SAN LORENZO', 'LA LOMA', 'CELANESE', 'EL MOGOTE'],
     "SAN MARCOS YACHIHUACALTEPEC": ['NORTE', 'SUR'],
     "SAN MARTIN TOLTEPEC": ['SAN MARTIN', 'PASEOS DE SAN MARTIN', 'SAN ISIDRO', 'LA PALMA TOLTEPEC', 'SEBASTIAN LERDO DE TEJADA', 'EJIDO DE SAN MARCOS YACHIHUACALTEPEC'],
-    "SAN MATEO OTZACATIPAN": ['PONIENTE   I', 'PONIENTE  I I', 'RANCHO SAN JOSE', 'CANALEJA', 'ORIENTE  I', 'ORIENTE  II', 'LA MAGDALENA OTZACATIPAN', 'SANTA CRUZ OTZACATIPAN', 'SAN JOSE GUADALUPE OTZACATIPAN', 'SAN DIEGO DE LOS PADRES OTZACATIPAN', 'SAN BLAS OTZACATIPAN', 'SAN NICOLAS TOLENTINO I', 'SAN NICOLAS TOLENTINO II', 'LA CRESPA', 'JARDINES DE LA CRESPA', 'GEOVILLAS ARBOLEDA', 'LA FLORESTA', 'GEOVILLAS DE LA INDEPENDENCIA', 'VICENTE LOMBARDO', 'ARBOLEDAS'],
-    "SAN MATEO OXTOTITLAN": ['CENTRO', 'TLALNEPANTLA', 'ATOTONILCO', 'RINCON DEL PARQUE', 'NIÑOS HEROES I', 'NIÑOS HEROES  II', 'TIERRA Y LIBERTAD', 'PROTIMBOS', '20 DE NOVIEMBRE', '14 DE DICIEMBRE', 'EL TRIGO', 'SAN JORGE'],
-    "SAN PABLO AUTOPAN": ['DE JESUS 1A  SECCION', 'STA MARIA TLACHALOYITA', 'PUEBLO NUEVO  I', 'PUEBLO NUEVO  II', 'SANTA CRUZ  I', 'SANTA CRUZ  II', 'DE JESUS 3A SECCION', 'DE JESUS 2A SECCION', 'OJO DE AGUA', 'AVIACION AUTOPAN', 'SAN CARLOS AUTOPAN', 'SAN DIEGO LINARES', 'SAN DIEGO', 'REAL DE SAN PABLO', 'XICALTEPEC', 'GALAXIA TOLUCA', 'JICALTEPEC AUTOPAN'],
+    "SAN MATEO OTZACATIPAN": ['PONIENTE I', 'PONIENTE I I', 'RANCHO SAN JOSE', 'CANALEJA', 'ORIENTE I', 'ORIENTE II', 'LA MAGDALENA OTZACATIPAN', 'SANTA CRUZ OTZACATIPAN', 'SAN JOSE GUADALUPE OTZACATIPAN', 'SAN DIEGO DE LOS PADRES OTZACATIPAN', 'SAN BLAS OTZACATIPAN', 'SAN NICOLAS TOLENTINO I', 'SAN NICOLAS TOLENTINO II', 'LA CRESPA', 'JARDINES DE LA CRESPA', 'GEOVILLAS ARBOLEDA', 'LA FLORESTA', 'GEOVILLAS DE LA INDEPENDENCIA', 'VICENTE LOMBARDO', 'ARBOLEDAS'],
+    "SAN MATEO OXTOTITLAN": ['CENTRO', 'TLALNEPANTLA', 'ATOTONILCO', 'RINCON DEL PARQUE', 'NIÑOS HEROES I', 'NIÑOS HEROES II', 'TIERRA Y LIBERTAD', 'PROTIMBOS', '20 DE NOVIEMBRE', '14 DE DICIEMBRE', 'EL TRIGO', 'SAN JORGE'],
+    "SAN PABLO AUTOPAN": ['DE JESUS 1A SECCION', 'STA MARIA TLACHALOYITA', 'PUEBLO NUEVO I', 'PUEBLO NUEVO II', 'SANTA CRUZ I', 'SANTA CRUZ II', 'DE JESUS 3A SECCION', 'DE JESUS 2A SECCION', 'OJO DE AGUA', 'AVIACION AUTOPAN', 'SAN CARLOS AUTOPAN', 'SAN DIEGO LINARES', 'SAN DIEGO', 'REAL DE SAN PABLO', 'XICALTEPEC', 'GALAXIA TOLUCA', 'JICALTEPEC AUTOPAN'],
     "SAN PEDRO TOTOLTEPEC": ['DEL CENTRO', 'MANZANA SUR', 'DEL PANTEON', 'GEOVILLAS', 'FRANCISCO I. MADERO', 'LA GALIA', 'NUEVA SAN FRANCISCO', 'SAN MIGUEL TOTOLTEPEC', 'BORDO DE LAS CANASTAS', 'SAN FRANCISCO TOTOLTEPEC', 'GUADALUPE TOTOLTEPEC', 'SAN BLAS TOTOLTEPEC', 'LA CONSTITUCION TOTOLTEPEC', 'ARROYO VISTA HERMOSA'],
     "SAN SEBASTIAN": ['VALLE VERDE Y TERMINAL', 'PROGRESO', 'IZCALLI IPIEM', 'SAN SEBASTIAN Y VERTICE', 'IZCALLI TOLUCA', 'SALVADOR SANCHEZ COLIN', 'COMISION FEDERAL DE ELECTRICIDAD', 'VALLE DON CAMILO'],
-    "SANCHEZ": ['SOR JUANA INES DE LA CRUZ', 'ELECTRICISTAS LOCALES', 'LA TERESONA I', 'LA TERESONA  II', 'LA TERESONA   III', 'SECTOR POPULAR'],
+    "SANCHEZ": ['SOR JUANA INES DE LA CRUZ', 'ELECTRICISTAS LOCALES', 'LA TERESONA I', 'LA TERESONA II', 'LA TERESONA III', 'SECTOR POPULAR'],
     "SANTA ANA TLAPALTITLAN": ['16 DE SEPTIEMBRE', 'PINO SUAREZ', 'DEL PANTEON', 'INDEPENDENCIA', 'SANTA MARIA SUR', 'SANTA MARIA NORTE', 'BUENAVISTA'],
     "SANTA CRUZ ATZCAPOTZALTONGO": ['SANTA CRUZ SUR', 'SANTA CRUZ NORTE', 'EX HACIENDA LA MAGDALENA'],
     "SANTA MARIA DE LAS ROSAS": ['SANTA MARIA DE LAS ROSAS', 'NUEVA SANTA MARIA DE LAS ROSAS', 'UNIDAD VICTORIA', 'LA MAGDALENA', 'NUEVA SANTA MARIA', 'BENITO JUAREZ', 'EVA SAMANO DE LOPEZ MATEOS', 'EMILIANO ZAPATA'],
@@ -193,8 +183,7 @@ CATALOGO_MAESTRO = {
 
 MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lista}
 
-# --- 1.6 INVENTARIO MAESTRO () ---
-# --- 1.6 INVENTARIO MAESTRO () ---
+# --- 1.6 INVENTARIO MAESTRO ---
 STOCK_INICIAL = [
     {"ID": "MAT-01", "Material": "FOTOCELDA 220V", "Stock": 100, "Min": 10, "Unidad": "Piezas"},
     {"ID": "MAT-02", "Material": "CABLE 2+1 # 6 BOBINA DE 300", "Stock": 100, "Min": 10, "Unidad": "Metros"},
@@ -471,29 +460,7 @@ def navegar(destino):
     st.session_state.menu = destino
     st.query_params["menu"] = destino
 
-# --- 4. SIDEBAR OPERATIVO ---
-with st.sidebar:
-    st.title("⚙️ Panel Operativo")
-    nombre_mostrar = st.session_state.brigada_activa if (st.session_state.usuario_nombre == "Brigadas" and st.session_state.brigada_activa) else st.session_state.usuario_nombre
-    st.write(f"**Usuario:** {nombre_mostrar}")
-    st.write("---")
-    if st.button("🏠 Inicio", use_container_width=True): navegar("Inicio")
-    if st.button("🚀 SF1-Generador de Rutas", use_container_width=True): navegar("SF1")
-    if st.button("📁 SF2-Bajas", use_container_width=True): navegar("SF2")
-    if st.button("📊 SF3-Captura y Métricas", use_container_width=True): navegar("SF3")
-    if st.button("🏗️ SF4-Diseño de Procesos", use_container_width=True): navegar("SF4")
-    if st.button("🛡️ SF5-Anti-Duplicados", use_container_width=True): navegar("SF5")
-    if st.button("📦 SF6-Almacén e Inventario", use_container_width=True): navegar("SF6")
-    st.write("---")
-    if st.button("💬 SF Pangea Chat", use_container_width=True): navegar("SF_CHAT")
-    st.write("---")
-    if st.session_state.menu == "SF1":
-        st.subheader("📊 Ajustes GdR Multi-Ruta")
-        t_por_punto = st.slider("Minutos por Atención", 5, 60, 20)
-        v_promedio = st.slider("Velocidad km/h", 10, 80, 25)
-        max_puntos_ruta = st.slider("Puntos Máximos por Ruta (Segmentación):", 5, 50, 15)
-        st.write("---")
-    # --- 4. SIDEBAR OPERATIVO UNIFICADO ---
+# --- 4. SIDEBAR OPERATIVO UNIFICADO (ÚNICA INSTANCIA) ---
 with st.sidebar:
     st.title("⚙️ Panel Operativo")
     
@@ -534,16 +501,18 @@ with st.sidebar:
         st.session_state.usuario_nombre = ""
         st.session_state.brigada_activa = ""
         st.session_state.rol = ""
+        st.session_state.perfil = ""
         st.rerun()
-# --- 5. CUERPO LÓGICO ---
-    if st.session_state.menu == "Inicio":
-        st.title("👋 Bienvenido a SF PANGEA")
-        st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
-        st.write("Seleccione un módulo en el menú lateral para comenzar.")
-        st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
 
-    elif st.session_state.menu == "SF_CHAT":
-        chat_modulo.render_chat()
+# --- 5. CUERPO LÓGICO ---
+if st.session_state.menu == "Inicio":
+    st.title("👋 Bienvenido a SF PANGEA")
+    st.info("Sistema de Gestión Operativa - Dirección de Alumbrado Público")
+    st.write("Seleccione un módulo en el menú lateral para comenzar.")
+    st.image("https://img.icons8.com/clouds/500/000000/map-marker.png", width=150)
+
+elif st.session_state.menu == "SF_CHAT":
+    chat_modulo.render_chat()
 
     elif st.session_state.menu == "SF3":
         st.title(f"🛠️ Módulo SF3 - Gestión y Métricas")
