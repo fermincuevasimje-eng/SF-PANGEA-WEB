@@ -476,7 +476,7 @@ def render_panel_archivos_publicos(supabase_client):
                     "created_at": m.get("created_at", ""),
                 })
 
-    col_f1, col_f2, col_f3 = st.columns([2, 2, 2])
+    col_f1, col_f2, col_f3, col_f4 = st.columns([2, 2, 2, 2])
     with col_f1:
         kw_file = st.text_input(
             "🔍 Buscar nombre / folio:", placeholder="Ej. AIRIS-1234"
@@ -496,6 +496,11 @@ def render_panel_archivos_publicos(supabase_client):
             "📊 Excel",
             "📝 Word",
         ])
+    with col_f4:
+        chk_fecha_pub = st.checkbox("📅 Filtrar por fecha", key="chk_f_repo_pub")
+        fecha_pub_sel = None
+        if chk_fecha_pub:
+            fecha_pub_sel = st.date_input("Selecciona día:", key="date_repo_pub")
 
     filtrados = archivos_lista
     if kw_file.strip():
@@ -528,6 +533,20 @@ def render_panel_archivos_publicos(supabase_client):
             a for a in filtrados if a["extension"] in ["docx", "doc"]
         ]
 
+    if fecha_pub_sel and filtrados:
+        data_f = []
+        for a in filtrados:
+            raw_t = a.get("created_at", "")
+            if raw_t:
+                try:
+                    dt_u = datetime.fromisoformat(raw_t.replace("Z", "+00:00"))
+                    dt_l = dt_u.astimezone(ZoneInfo("America/Mexico_City"))
+                    if dt_l.date() == fecha_pub_sel:
+                        data_f.append(a)
+                except Exception:
+                    pass
+        filtrados = data_f
+
     st.markdown(f"**Archivos encontrados: `{len(filtrados)}`**")
     st.markdown("---")
 
@@ -540,12 +559,24 @@ def render_panel_archivos_publicos(supabase_client):
             else "📕" if ext == "pdf" else "📊" if ext in ["xlsx", "xls"] else "📄"
         )
 
+        raw_time = item.get("created_at", "")
+        tstamp_str = ""
+        if raw_time:
+            try:
+                dt_u = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                dt_l = dt_u.astimezone(ZoneInfo("America/Mexico_City"))
+                tstamp_str = dt_l.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                tstamp_str = str(raw_time)
+
         with col_icon:
             st.markdown(f"### {icon_str}")
         with col_det:
-            st.markdown(f"**{item['nombre']}**")
+            st.markdown(f"**Archivo:** `{item['nombre']}`")
+            if item["mensaje"]:
+                st.markdown(f"🏷️ **Folio / Detalles:**\n{item['mensaje']}")
             st.caption(
-                f"👤 Por: **{item['emisor']}** | Canal: **#{item['canal'].upper()}**"
+                f"👤 Por: **{item['emisor']}** | Canal: **#{item['canal'].upper()}** | 📅 `{tstamp_str}`"
             )
         with col_acc:
             st.link_button(
@@ -561,7 +592,6 @@ def render_panel_archivos_publicos(supabase_client):
                     use_container_width=True,
                 )
         st.markdown("---")
-
 
 # -----------------------------------------------------------------------------
 # REPOSITORIO DE ARCHIVOS PRIVADOS (SÓLO PRIVADOS DEL USUARIO ACTIVO)
