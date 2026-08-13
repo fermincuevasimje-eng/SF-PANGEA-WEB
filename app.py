@@ -418,9 +418,23 @@ if not st.session_state.autenticado:
     with col_login_2:
         st.subheader("Iniciar Sesión")
         
-        # Selector de usuario maestro, brigadas 1 a 17 y especiales 1 a 3
+        # Lista completa de usuarios administrativos y de campo
+        usuarios_administrativos = [
+            "Director",
+            "GuaDAP",
+            "Edith",
+            "Jefe Mant.",
+            "Jefe Infra.",
+            "Almacén 1",
+            "Almacén 2",
+            "DAP 1",
+            "DAP 2",
+            "DAP 3"
+        ]
+        
         opciones_usuario = (
             ["SF (Super Admin Maestro)"] 
+            + usuarios_administrativos
             + [f"Brigada {i}" for i in range(1, 18)] 
             + [f"Especial {i}" for i in range(1, 4)]
         )
