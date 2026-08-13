@@ -8,13 +8,18 @@ import streamlit.components.v1 as components
 from supabase import Client, create_client
 
 USUARIOS_OFICIALES_DEFAULT = [
-    "SF", "Director", "Jefe Mant", "Jefe Infra", "GuaDAP",
-    "Almacen1", "Almacen2", "Ditto", "Especial",
-    "Brigada 1", "Brigada 2", "Brigada 3", "Brigada 4", "Brigada 5",
-    "Brigada 6", "Brigada 7", "Brigada 8", "Brigada 9", "Brigada 10",
-    "Brigada 11", "Brigada 12", "Brigada 13", "Brigada 14", "Brigada 15",
-    "Brigada 16", "Brigada 17"
-]
+    "SF",
+    "Director",
+    "GuaDAP",
+    "Edith",
+    "Jefe Mant.",
+    "Jefe Infra.",
+    "Almacén 1",
+    "Almacén 2",
+    "DAP 1",
+    "DAP 2",
+    "DAP 3",
+] + [f"Brigada {i}" for i in range(1, 18)] + [f"Especial {i}" for i in range(1, 4)]
 
 # 1. Conexión Segura a Supabase
 @st.cache_resource
