@@ -646,12 +646,21 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
                     "emisor": m.get("emisor"),
                     "contacto": otro_usr,
                     "mensaje": m.get("mensaje", ""),
+                    "created_at": m.get("created_at", ""),
                 })
 
-    kw_priv_file = st.text_input(
-        "🔍 Buscar en mis archivos privados:",
-        placeholder="Nombre o palabra clave...",
-    )
+    col_p1, col_p2 = st.columns([3, 2])
+    with col_p1:
+        kw_priv_file = st.text_input(
+            "🔍 Buscar en mis archivos privados:",
+            placeholder="Nombre, folio o palabra clave...",
+        )
+    with col_p2:
+        chk_fecha_priv = st.checkbox("📅 Filtrar por fecha", key="chk_f_repo_priv")
+        fecha_priv_sel = None
+        if chk_fecha_priv:
+            fecha_priv_sel = st.date_input("Selecciona día:", key="date_repo_priv")
+
     filtrados = archivos_lista
     if kw_priv_file.strip():
         kw = kw_priv_file.strip().lower()
@@ -661,6 +670,20 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
             if kw in a["nombre"].lower() or kw in a["mensaje"].lower()
         ]
 
+    if fecha_priv_sel and filtrados:
+        data_f = []
+        for a in filtrados:
+            raw_t = a.get("created_at", "")
+            if raw_t:
+                try:
+                    dt_u = datetime.fromisoformat(raw_t.replace("Z", "+00:00"))
+                    dt_l = dt_u.astimezone(ZoneInfo("America/Mexico_City"))
+                    if dt_l.date() == fecha_priv_sel:
+                        data_f.append(a)
+                except Exception:
+                    pass
+        filtrados = data_f
+
     st.markdown(
         f"**Archivos privados de {usuario_actual}: `{len(filtrados)}`**"
     )
@@ -668,12 +691,24 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
 
     for idx, item in enumerate(filtrados):
         col_icon, col_det, col_acc = st.columns([1, 4, 2])
+        raw_time = item.get("created_at", "")
+        tstamp_str = ""
+        if raw_time:
+            try:
+                dt_u = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                dt_l = dt_u.astimezone(ZoneInfo("America/Mexico_City"))
+                tstamp_str = dt_l.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                tstamp_str = str(raw_time)
+
         with col_icon:
             st.markdown("### 🔒")
         with col_det:
-            st.markdown(f"**{item['nombre']}**")
+            st.markdown(f"**Archivo:** `{item['nombre']}`")
+            if item["mensaje"]:
+                st.markdown(f"🏷️ **Folio / Detalles:**\n{item['mensaje']}")
             st.caption(
-                f"De: **{item['emisor']}** | Para/Con: **{item['contacto']}**"
+                f"De: **{item['emisor']}** | Para/Con: **{item['contacto']}** | 📅 `{tstamp_str}`"
             )
         with col_acc:
             st.link_button(
