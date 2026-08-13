@@ -1065,7 +1065,7 @@ def render_chat():
                             ]
                             urls_validas = [u for u in urls if u]
                             if urls_validas:
-                                msg_f = f"📌 **Folio / Ticket / AIRIS:** `{folio_priv.strip()}`"
+                                msg_f = f"### 📌 Folio / Ticket / AIRIS: {folio_priv.strip()}"
                                 if coment_priv.strip():
                                     msg_f += f"\n\n{coment_priv.strip()}"
                                 supabase.table("mensajes").insert({
