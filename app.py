@@ -467,6 +467,8 @@ if not st.session_state.autenticado:
             else:
                 st.error("❌ Contraseña incorrecta. Verifique sus credenciales.")
 else:
+    # 🔔 ESCUCHADOR GLOBAL DE NOTIFICACIONES Y MENCIONES
+    chat_modulo.escuchador_menciones_global()
     # --- 4. SIDEBAR ---
     with st.sidebar:
         st.title("⚙️ Panel Operativo")
