@@ -1152,3 +1152,77 @@ def render_chat():
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al purgar: {e}")
+# -----------------------------------------------------------------------------
+# ESCUCHADOR GLOBAL DE MENCIONES Y MENSAJES PRIVADOS (PARA APP.PY)
+# -----------------------------------------------------------------------------
+@st.fragment(run_every=3)
+def escuchador_menciones_global():
+    """
+    Escucha de fondo que se invoca en app.py para disparar alertas auditivas
+    y visuales (toast) sin importar en qué módulo o pantalla esté el usuario.
+    """
+    if not st.session_state.get("autenticado", False):
+        return
+
+    usuario_actual = st.session_state.get("usuario_nombre", "") or st.session_state.get("sf_chat_user", "")
+    if not usuario_actual:
+        return
+
+    if "notified_msg_ids" not in st.session_state:
+        st.session_state.notified_msg_ids = set()
+
+    try:
+        supabase = get_supabase_client()
+        res = (
+            supabase.table("mensajes")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(15)
+            .execute()
+        )
+        mensajes = res.data if res.data else []
+
+        for m in mensajes:
+            emisor = m.get("emisor", "")
+            if emisor == usuario_actual:
+                continue
+
+            msg_id = m.get("id") or f"{emisor}_{m.get('created_at', '')}"
+            msg_text = m.get("mensaje", "")
+            canal_origen = m.get("canal", "general")
+            destinatario = m.get("destinatario", None)
+
+            es_mencion = evaluar_mencion_inteligente(msg_text, usuario_actual)
+            es_privado_para_mi = (canal_origen == "privado" and destinatario == usuario_actual)
+
+            if (es_mencion or es_privado_para_mi) and msg_id not in st.session_state.notified_msg_ids:
+                st.session_state.notified_msg_ids.add(msg_id)
+
+                if es_privado_para_mi and not es_mencion:
+                    alerta_texto = f"🔒 ¡Nuevo mensaje privado de {emisor}!"
+                else:
+                    alerta_texto = f"🔔 ¡{emisor} te ha mencionado en #{canal_origen.upper()}!"
+
+                st.toast(alerta_texto, icon="💬")
+
+                components.html(
+                    f"""
+                    <audio autoplay style="display:none;">
+                        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+                    </audio>
+                    <script>
+                    if (Notification.permission === 'granted') {{
+                        new Notification("🔔 SF Pangea Chat", {{
+                            body: "{alerta_texto}",
+                            icon: "https://cdn-icons-png.flaticon.com/512/732/732200.png"
+                        }});
+                    }} else if (Notification.permission !== 'denied') {{
+                        Notification.requestPermission();
+                    }}
+                    </script>
+                    """,
+                    height=0,
+                    width=0,
+                )
+    except Exception:
+        pass
