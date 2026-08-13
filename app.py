@@ -418,56 +418,54 @@ if not st.session_state.autenticado:
     with col_login_2:
         st.subheader("Iniciar Sesión")
         
-        # Lista completa de usuarios administrativos y de campo
-        usuarios_administrativos = [
-            "Director",
-            "GuaDAP",
-            "Edith",
-            "Jefe Mant.",
-            "Jefe Infra.",
-            "Almacén 1",
-            "Almacén 2",
-            "DAP 1",
-            "DAP 2",
-            "DAP 3"
-        ]
+        # Diccionario de credenciales centralizadas
+        USUARIOS_PASSWORDS = {
+            "SF": "2938",
+            "Director": "DIR1",
+            "GuaDAP": "GDP1",
+            "Edith": "EDT2",
+            "Jefe Mant.": "JMN3",
+            "Jefe Infra.": "JIF4",
+            "Almacén 1": "ALM1",
+            "Almacén 2": "ALM2",
+            "DAP 1": "DAP1",
+            "DAP 2": "DAP2",
+            "DAP 3": "DAP3",
+        }
         
-        opciones_usuario = (
-            ["SF (Super Admin Maestro)"] 
-            + usuarios_administrativos
-            + [f"Brigada {i}" for i in range(1, 18)] 
-            + [f"Especial {i}" for i in range(1, 4)]
-        )
-        
-        user_sel = st.selectbox("Seleccione Usuario:", opciones_usuario)
-        
-        if user_sel == "SF (Super Admin Maestro)":
-            pass_input = st.text_input("Contraseña de Super Admin:", type="password")
+        # Añadir Brigadas 1 a 17 y Especiales 1 a 3
+        for i in range(1, 18):
+            USUARIOS_PASSWORDS[f"Brigada {i}"] = f"BR{i:02d}"
             
-            if st.button("Ingresar al Sistema 🚀", use_container_width=True):
-                if pass_input == "2938":
-                    st.session_state.autenticado = True
-                    st.session_state.usuario_autenticado = True
-                    st.session_state.usuario_nombre = "SF"
-                    st.session_state.es_super_admin = True
-                    st.session_state.perfil = "ADMIN"
-                    st.query_params["session_user"] = "SF"
-                    st.query_params["menu"] = st.session_state.menu
-                    st.success("🎉 Bienvenido Super Admin Maestro SF.")
-                    st.rerun()
-                else:
-                    st.error("❌ Contraseña incorrecta para el usuario Maestro SF.")
-        else:
-            if st.button("Ingresar al Sistema 🚀", use_container_width=True):
+        for i in range(1, 4):
+            USUARIOS_PASSWORDS[f"Especial {i}"] = f"ESP{i}"
+
+        # Lista de opciones para el selector
+        opciones_usuario = ["SF (Super Admin Maestro)"] + [u for u in USUARIOS_PASSWORDS.keys() if u != "SF"]
+        
+        user_sel_raw = st.selectbox("Seleccione Usuario:", opciones_usuario)
+        
+        # Limpieza del nombre seleccionado
+        user_sel = "SF" if user_sel_raw == "SF (Super Admin Maestro)" else user_sel_raw
+        
+        pass_input = st.text_input(f"Contraseña para {user_sel}:", type="password")
+        
+        if st.button("Ingresar al Sistema 🚀", use_container_width=True):
+            clave_correcta = USUARIOS_PASSWORDS.get(user_sel)
+            
+            if pass_input == clave_correcta:
+                es_sf = (user_sel == "SF")
                 st.session_state.autenticado = True
                 st.session_state.usuario_autenticado = True
                 st.session_state.usuario_nombre = user_sel
-                st.session_state.es_super_admin = False
-                st.session_state.perfil = "OPERATIVO"
+                st.session_state.es_super_admin = es_sf
+                st.session_state.perfil = "ADMIN" if es_sf else "OPERATIVO"
                 st.query_params["session_user"] = user_sel
                 st.query_params["menu"] = st.session_state.menu
                 st.success(f"🎉 Bienvenido {user_sel}.")
                 st.rerun()
+            else:
+                st.error("❌ Contraseña incorrecta. Verifique sus credenciales.")
 else:
     # --- 4. SIDEBAR ---
     with st.sidebar:
