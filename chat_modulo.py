@@ -593,6 +593,7 @@ def render_panel_archivos_publicos(supabase_client):
                 )
         st.markdown("---")
 
+
 # -----------------------------------------------------------------------------
 # REPOSITORIO DE ARCHIVOS PRIVADOS (SÓLO PRIVADOS DEL USUARIO ACTIVO)
 # -----------------------------------------------------------------------------
@@ -774,22 +775,25 @@ def render_chat():
     usr_actual_clean = st.session_state.sf_chat_user.strip().upper()
     es_admin = usr_actual_clean == "SF"
 
-    col_status, col_logout = st.columns([4, 1])
-    with col_status:
-        role_label = (
-            "👑 **ADMINISTRADOR**" if es_admin else "👤 **COLABORADOR**"
-        )
+    # SOLO EL USUARIO 'SF' TIENE ACCESO AL BOTÓN DE SALIR / CAMBIAR DE USUARIO
+    if es_admin:
+        col_status, col_logout = st.columns([4, 1])
+        with col_status:
+            st.caption(
+                f"🟢 Usuario: **{st.session_state.sf_chat_user}** (👑 **ADMINISTRADOR**)"
+            )
+        with col_logout:
+            if st.button("Salir / Cambiar", key="sf_chat_btn_logout"):
+                st.session_state.sf_chat_user = ""
+                st.session_state.usuario_nombre = ""
+                st.session_state.chat_manual_logout = True
+                if "session_user" in st.query_params:
+                    del st.query_params["session_user"]
+                st.rerun()
+    else:
         st.caption(
-            f"🟢 Usuario: **{st.session_state.sf_chat_user}** ({role_label})"
+            f"🟢 Usuario: **{st.session_state.sf_chat_user}** (👤 **COLABORADOR**)"
         )
-    with col_logout:
-        if st.button("Salir / Cambiar", key="sf_chat_btn_logout"):
-            st.session_state.sf_chat_user = ""
-            st.session_state.usuario_nombre = ""
-            st.session_state.chat_manual_logout = True
-            if "session_user" in st.query_params:
-                del st.query_params["session_user"]
-            st.rerun()
 
     modos = [
         "📢 Canales Públicos",
@@ -952,7 +956,6 @@ def render_chat():
 
     # --- MODO 2: CHAT PRIVADO 1 A 1 ---
     elif modo_chat == "🔒 Chat 1 a 1":
-        usuarios_registrados = obtener_usuarios_registrados(supabase)
         colegas = [
             u for u in usuarios_registrados if u != st.session_state.sf_chat_user
         ]
@@ -1148,7 +1151,6 @@ def render_chat():
         st.subheader("⚙️ Panel de Administración Global")
         st.caption("Administra los usuarios autorizados, canales y borrado del sistema.")
 
-        usuarios_registrados = obtener_usuarios_registrados(supabase)
         col_adm_u1, col_adm_u2 = st.columns(2)
 
         with col_adm_u1:
@@ -1219,6 +1221,8 @@ def render_chat():
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al purgar: {e}")
+
+
 # -----------------------------------------------------------------------------
 # ESCUCHADOR GLOBAL DE MENCIONES Y MENSAJES PRIVADOS (PARA APP.PY)
 # -----------------------------------------------------------------------------
