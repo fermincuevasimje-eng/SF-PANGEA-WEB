@@ -7,12 +7,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 from supabase import Client, create_client
 
-# Lista Oficial de Respaldo (27 Usuarios)
 USUARIOS_OFICIALES_DEFAULT = [
-    "SF_FERMIN", "Director", "Jefe Mant.", "Jefe Infra.", "Guadarrama",
-    "Almacén1", "Almacén 2", "DAP1", "DAP2", "DAP3",
-    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10",
-    "B11", "B12", "B13", "B14", "B15", "B16", "B17"
+    "SF", "Director", "Jefe Mant", "Jefe Infra", "GuaDAP",
+    "Almacen1", "Almacen2", "Ditto", "Especial",
+    "Brigada 1", "Brigada 2", "Brigada 3", "Brigada 4", "Brigada 5",
+    "Brigada 6", "Brigada 7", "Brigada 8", "Brigada 9", "Brigada 10",
+    "Brigada 11", "Brigada 12", "Brigada 13", "Brigada 14", "Brigada 15",
+    "Brigada 16", "Brigada 17"
 ]
 
 # 1. Conexión Segura a Supabase
@@ -699,9 +700,9 @@ def render_chat():
                 st.rerun()
         return
 
-    # Evaluación de Administrador Supremo Maestro (SF_FERMIN)
+    # Evaluación de Administrador Supremo Maestro Único ('SF')
     usr_actual_clean = st.session_state.sf_chat_user.strip().upper()
-    es_admin = usr_actual_clean in ["SF_FERMIN", "SF_FERMÍN", "FERMIN"]
+    es_admin = usr_actual_clean == "SF"
 
     col_status, col_logout = st.columns([4, 1])
     with col_status:
@@ -1097,7 +1098,7 @@ def render_chat():
             st.markdown("### 🗑️ Baja de Usuarios")
             usr_borrar = st.selectbox(
                 "Selecciona usuario a eliminar:",
-                [u for u in usuarios_registrados if u.upper() != "SF_FERMIN"]
+                [u for u in usuarios_registrados if u.upper() != "SF"]
             )
             if st.button("Eliminar Usuario ❌", use_container_width=True):
                 try:
