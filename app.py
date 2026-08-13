@@ -359,15 +359,28 @@ def load_massive_data(file, extension):
 
 # --- 3. AUTENTICACIÓN Y ESTADO ---
 if "autenticado" not in st.session_state:
-    st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = False, None, ""
+    st.session_state.autenticado = False
+
+if "usuario_autenticado" not in st.session_state:
+    st.session_state.usuario_autenticado = False
+
+if "usuario_nombre" not in st.session_state:
+    st.session_state.usuario_nombre = ""
+
+if "es_super_admin" not in st.session_state:
+    st.session_state.es_super_admin = False
+
+if "perfil" not in st.session_state:
+    st.session_state.perfil = None
 
 # 🔄 REPETICIÓN / RECUPERACIÓN AUTOMÁTICA DE SESIÓN (PROTECCIÓN F5)
 if not st.session_state.autenticado and "session_user" in st.query_params:
     user_url = st.query_params["session_user"]
-    if user_url == "SF_ADMIN":
-        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
-    elif user_url == "GuaDAP":
-        st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
+    st.session_state.autenticado = True
+    st.session_state.usuario_autenticado = True
+    st.session_state.usuario_nombre = user_url
+    st.session_state.es_super_admin = (user_url == "SF")
+    st.session_state.perfil = "ADMIN" if user_url == "SF" else "OPERATIVO"
 
 # 📌 RECUPERAR MÓDULO/MENÚ ACTIVO TRAS UN F5
 if "menu" in st.query_params:
@@ -397,23 +410,50 @@ def navegar(destino):
     st.query_params["menu"] = destino
 
 if not st.session_state.autenticado:
-    st.title("🔐 Acceso SF PANGEA")
-    col_u, col_p = st.columns(2)
-    with col_u: u = st.text_input("Usuario")
-    with col_p: p = st.text_input("Contraseña", type="password")
-    if st.button("🚀 Ingresar", use_container_width=True):
-        if u == "SF" and p == "1827":
-            st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "ADMIN", "SF_ADMIN"
-            st.query_params["session_user"] = "SF_ADMIN"
-            st.query_params["menu"] = st.session_state.menu
-            st.rerun()
-        elif u == "GuaDAP" and p == "1111":
-            st.session_state.autenticado, st.session_state.perfil, st.session_state.usuario_nombre = True, "CONSULTA", "GuaDAP"
-            st.query_params["session_user"] = "GuaDAP"
-            st.query_params["menu"] = st.session_state.menu
-            st.rerun()
+    st.title("🔑 Sistema SF_Pangea - Autenticación")
+    st.markdown("---")
+    
+    col_login_1, col_login_2, col_login_3 = st.columns([1, 2, 1])
+    
+    with col_login_2:
+        st.subheader("Iniciar Sesión")
+        
+        # Selector de usuario maestro, brigadas 1 a 17 y especiales 1 a 3
+        opciones_usuario = (
+            ["SF (Super Admin Maestro)"] 
+            + [f"Brigada {i}" for i in range(1, 18)] 
+            + [f"Especial {i}" for i in range(1, 4)]
+        )
+        
+        user_sel = st.selectbox("Seleccione Usuario:", opciones_usuario)
+        
+        if user_sel == "SF (Super Admin Maestro)":
+            pass_input = st.text_input("Contraseña de Super Admin:", type="password")
+            
+            if st.button("Ingresar al Sistema 🚀", use_container_width=True):
+                if pass_input == "2938":
+                    st.session_state.autenticado = True
+                    st.session_state.usuario_autenticado = True
+                    st.session_state.usuario_nombre = "SF"
+                    st.session_state.es_super_admin = True
+                    st.session_state.perfil = "ADMIN"
+                    st.query_params["session_user"] = "SF"
+                    st.query_params["menu"] = st.session_state.menu
+                    st.success("🎉 Bienvenido Super Admin Maestro SF.")
+                    st.rerun()
+                else:
+                    st.error("❌ Contraseña incorrecta para el usuario Maestro SF.")
         else:
-            st.error("Acceso denegado")
+            if st.button("Ingresar al Sistema 🚀", use_container_width=True):
+                st.session_state.autenticado = True
+                st.session_state.usuario_autenticado = True
+                st.session_state.usuario_nombre = user_sel
+                st.session_state.es_super_admin = False
+                st.session_state.perfil = "OPERATIVO"
+                st.query_params["session_user"] = user_sel
+                st.query_params["menu"] = st.session_state.menu
+                st.success(f"🎉 Bienvenido {user_sel}.")
+                st.rerun()
 else:
     # --- 4. SIDEBAR ---
     with st.sidebar:
