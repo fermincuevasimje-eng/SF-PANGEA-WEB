@@ -1097,7 +1097,7 @@ else:
                                 "🗺️ KML Maestro Clásico",
                                 kml_c.kml().encode("utf-8"),
                                 file_name=f"SF_CLASICA_{up_name}.kml",
-                                mime="application/vnd.google-earth.kml+xml",
+                                mime="application/octet-stream",
                                 use_container_width=True,
                             )
                             cc4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
@@ -1349,7 +1349,13 @@ else:
                             c1, c2, c3, c4 = st.columns(4)
                             c1.download_button("📗 Excel Multi-Resumen Pro", buf_xlsx.getvalue(), file_name=f"SF_MULTI_PRO_{up_name}.xlsx", use_container_width=True)
                             c2.download_button("📊 CSV Multi-Estático", csv_multi_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_MULTI_PRO_{up_name}.csv", use_container_width=True)
-                            c3.download_button(                                 "🗺️ KML Maestro Detallado",                                 kml.kml().encode("utf-8"),                                 file_name=f"SF_MULTI_PRO_{up_name}.kml",                                 mime="application/vnd.google-earth.kml+xml",                                 use_container_width=True,                             )
+                            c3.download_button(
+                                "🗺️ KML Maestro Detallado",
+                                kml.kml().encode("utf-8"),
+                                file_name=f"SF_MULTI_PRO_{up_name}.kml",
+                                mime="application/octet-stream",
+                                use_container_width=True,
+                            )
                             c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR LOTE EN BITÁCORA", use_container_width=True, key="reg_m"):
