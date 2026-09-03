@@ -1393,7 +1393,7 @@ else:
                             st.error("No se pudieron extraer coordenadas válidas en Modo Multi-Ruta.")
                     except Exception as e: st.error(f"Error en Motor Multi-Ruta V24: {e}")
 
-        # ==========================================
+       # ==========================================
         # PESTAÑA 3: BITÁCORA DE PROCESOS
         # ==========================================
         with tab2:
@@ -1413,7 +1413,21 @@ else:
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=pd.concat([df_tr, df_bt.loc[idx_e]], ignore_index=True))
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PRINCIPAL, data=df_bt.drop(idx_e))
                                 st.success("Movido."); time.sleep(1); st.rerun()
-                    st.dataframe(df_bt_v.sort_values("ID_Reg", ascending=False), hide_index=True, use_container_width=True)
+
+                    # --- CONTROLES DE PAGINACIÓN PARA AHORRO DE DATOS MÓVILES ---
+                    df_bt_sorted = df_bt_v.sort_values("ID_Reg", ascending=False)
+                    num_items_bt = len(df_bt_sorted)
+                    col_pag1, col_pag2 = st.columns([2, 1])
+                    with col_pag1:
+                        tam_pag_bt = st.selectbox("Registros por página (Bitácora):", [10, 25, 50, 100], index=0, key="tam_pag_bt")
+                    with col_pag2:
+                        tot_pags_bt = max(1, (num_items_bt + tam_pag_bt - 1) // tam_pag_bt)
+                        pag_bt = st.number_input("Página (Bitácora):", min_value=1, max_value=tot_pags_bt, value=1, step=1, key="pag_bt")
+
+                    inicio_bt = (pag_bt - 1) * tam_pag_bt
+                    fin_bt = inicio_bt + tam_pag_bt
+                    st.dataframe(df_bt_sorted.iloc[inicio_bt:fin_bt], hide_index=True, use_container_width=True)
+                    st.caption(f"Mostrando {min(inicio_bt+1, num_items_bt)} - {min(fin_bt, num_items_bt)} de {num_items_bt} registros.")
                 else: 
                     st.info("Bitácora vacía.")
             except Exception as e: 
@@ -1445,7 +1459,21 @@ else:
                                 df_vacio = pd.DataFrame(columns=df_tr.columns)
                                 conn.update(spreadsheet=URL_DB, worksheet=HOJA_PAPELERA, data=df_vacio)
                                 st.success("¡Papelera purgada!"); time.sleep(1); st.rerun()
-                        st.dataframe(df_tr_v, hide_index=True, use_container_width=True)
+
+                        # --- CONTROLES DE PAGINACIÓN PARA AHORRO DE DATOS MÓVILES ---
+                        df_tr_sorted = df_tr_v.sort_values("ID_Reg", ascending=False)
+                        num_items_tr = len(df_tr_sorted)
+                        col_pag_tr1, col_pag_tr2 = st.columns([2, 1])
+                        with col_pag_tr1:
+                            tam_pag_tr = st.selectbox("Registros por página (Papelera):", [10, 25, 50, 100], index=0, key="tam_pag_tr")
+                        with col_pag_tr2:
+                            tot_pags_tr = max(1, (num_items_tr + tam_pag_tr - 1) // tam_pag_tr)
+                            pag_tr = st.number_input("Página (Papelera):", min_value=1, max_value=tot_pags_tr, value=1, step=1, key="pag_tr")
+
+                        inicio_tr = (pag_tr - 1) * tam_pag_tr
+                        fin_tr = inicio_tr + tam_pag_tr
+                        st.dataframe(df_tr_sorted.iloc[inicio_tr:fin_tr], hide_index=True, use_container_width=True)
+                        st.caption(f"Mostrando {min(inicio_tr+1, num_items_tr)} - {min(fin_tr, num_items_tr)} de {num_items_tr} registros.")
                     else: 
                         st.info("Papelera vacía.")
                 except Exception as e: 
