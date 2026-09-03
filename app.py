@@ -21,12 +21,45 @@ import data_manager
 import chat_modulo
 
 # --- 1. CONFIGURACIÓN E INTERFAZ (MARCA DE AGUA SF) ---
-st.set_page_config(page_title="SF PANGEA VPLUS ULTRA", layout="wide")
+st.set_page_config(
+    page_title="SF PANGEA VPLUS ULTRA",
+    layout="wide",
+    page_icon="🗺️",
+    initial_sidebar_state="collapsed",
+)
+
+# Configuración del Manifiesto PWA para instalación nativa
+pwa_manifest_json = json.dumps({
+    "name": "SF PANGEA VPLUS ULTRA",
+    "short_name": "SF PANGEA",
+    "description": "Sistema de Gestión Operativa - Alumbrado Público",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#0e1117",
+    "theme_color": "#1f4e78",
+    "orientation": "portrait",
+    "icons": [{
+        "src": "https://img.icons8.com/clouds/500/000000/map-marker.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any maskable",
+    }],
+})
+manifest_b64 = base64.b64encode(pwa_manifest_json.encode()).decode()
 
 st.markdown(
-    """
+    f"""
+    <!-- Inyección Meta Tags PWA Móvil -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SF PANGEA">
+    <meta name="theme-color" content="#1f4e78">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/clouds/500/000000/map-marker.png">
+    <link rel="manifest" href="data:application/json;base64,{manifest_b64}">
+
     <style>
-    .main::before {
+    .main::before {{
         content: "SF";
         position: fixed;
         top: 50%;
@@ -37,14 +70,14 @@ st.markdown(
         z-index: -1;
         pointer-events: none;
         font-weight: bold;
-    }
-    [data-testid="stMetricValue"] {
+    }}
+    [data-testid="stMetricValue"] {{
         font-size: 28px;
         color: #1f4e78;
-    }
+    }}
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 BASE_COORDS = (19.291395219739588, -99.63555838631413)
