@@ -1349,17 +1349,36 @@ else:
                                 csv_multi_buffer.write(f"Tiempo Estimado:,{m_info['tiempo']}\n\n")
 
                             st.write("---")
-                            c1, c2, c3, c4 = st.columns(4)
-                            c1.download_button("📗 Excel Multi-Resumen Pro", buf_xlsx.getvalue(), file_name=f"SF_MULTI_PRO_{up_name}.xlsx", use_container_width=True)
-                            c2.download_button("📊 CSV Multi-Estático", csv_multi_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_MULTI_PRO_{up_name}.csv", use_container_width=True)
-                            c3.download_button(
+                            st.markdown("##### 📥 Exportación de Resultados y Mapa Multi-Ruta")
+                            mc1, mc2 = st.columns(2)
+
+                            mc1.download_button(
+                                "📗 Excel Multi-Resumen Pro",
+                                buf_xlsx.getvalue(),
+                                file_name=f"SF_MULTI_PRO_{up_name}.xlsx",
+                                use_container_width=True,
+                            )
+                            mc2.download_button(
+                                "📊 CSV Multi-Estático",
+                                csv_multi_buffer.getvalue().encode("utf-8-sig"),
+                                file_name=f"SF_MULTI_PRO_{up_name}.csv",
+                                use_container_width=True,
+                            )
+
+                            mc3, mc4 = st.columns(2)
+
+                            mc3.download_button(
                                 "🗺️ KML Maestro Detallado",
                                 kml.kml().encode("utf-8"),
                                 file_name=f"SF_MULTI_PRO_{up_name}.kml",
                                 mime="application/octet-stream",
                                 use_container_width=True,
                             )
-                            c4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
+                            mc4.link_button(
+                                "🚀 My Maps",
+                                "https://www.google.com/maps/d/",
+                                use_container_width=True,
+                            )
 
                             if st.button("💾 REGISTRAR LOTE EN BITÁCORA", use_container_width=True, key="reg_m"):
                                 try:
