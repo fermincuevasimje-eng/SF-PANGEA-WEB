@@ -1012,9 +1012,10 @@ else:
                             st.dataframe(df_export_c, use_container_width=True, hide_index=True)
 
                             st.write("---")
-                            cc1, cc2, cc3, cc4 = st.columns(4)
-                            
-                           # Convertir columnas críticas a numéricas para permitir sumatorias en Excel
+                            st.markdown("##### 📥 Exportación de Resultados y Mapa")
+                            cc1, cc2 = st.columns(2)
+
+                            # Convertir columnas críticas a numéricas para permitir sumatorias en Excel
                             df_export_excel = df_export_c.copy()
                             for col_num in ['Cant_Luminarias', 'Cant_Postes', 'Cant_Cable_m']:
                                 df_export_excel[col_num] = pd.to_numeric(df_export_excel[col_num], errors='coerce').fillna(0).astype(int)
@@ -1025,18 +1026,18 @@ else:
                                 ws = writer.sheets['Ruta_Clasica_SF']
                                 last_row = len(ruta_ordenada) + 1
                                 res_row = last_row + 2
-                                
+
                                 ws.cell(row=res_row, column=2, value="--- RESUMEN OPERATIVO DINÁMICO ---")
                                 ws.cell(row=res_row+1, column=1, value="Total Puntos:"); ws.cell(row=res_row+1, column=2, value=len(ruta_ordenada))
                                 ws.cell(row=res_row+2, column=1, value="Total Luminarias:"); ws.cell(row=res_row+2, column=2, value=f"=SUM(C2:C{last_row})")
                                 ws.cell(row=res_row+3, column=1, value="Total Postes:"); ws.cell(row=res_row+3, column=2, value=f"=SUM(D2:D{last_row})")
                                 ws.cell(row=res_row+4, column=1, value="Total Cable:"); ws.cell(row=res_row+4, column=2, value=f"=SUM(E2:E{last_row})")
                                 ws.cell(row=res_row+5, column=1, value="Distancia:"); ws.cell(row=res_row+5, column=2, value=f"{round(dist_real_km,2)} km")
-                                
+
                                 f_calc = f"ROUND(((B{res_row+2}+B{res_row+3})*{t_por_punto})+({round(dist_real_km,2)}/{v_promedio}*60),0)"
                                 ws.cell(row=res_row+6, column=1, value="Tiempo Estimado:")
                                 ws.cell(row=res_row+6, column=2, value=f'=INT({f_calc}/60) & " h " & MOD({f_calc},60) & " m"')
-                                
+
                                 fg, fa = PatternFill(start_color="E2E2E2", end_color="E2E2E2", fill_type="solid"), PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
                                 for r in range(2, last_row + 1):
                                     if int(df_export_c.iloc[r-2]['Cant_Postes']) > 0:
@@ -1045,7 +1046,7 @@ else:
                                         for cell in ws[r]: cell.fill = fa
 
                             cc1.download_button("📗 Excel Pro Dinámico", buf_xlsx_c.getvalue(), file_name=f"SF_CLASICA_{up_name}.xlsx", use_container_width=True)
-                            
+
                             csv_buffer = io.StringIO()
                             df_export_c.to_csv(csv_buffer, index=False)
                             csv_buffer.write(f"\n--- RESUMEN OPERATIVO DINÁMICO ---\n")
@@ -1057,9 +1058,11 @@ else:
                             csv_buffer.write(f"Tiempo Estimado:,{t_estimado}\n")
                             cc2.download_button("📊 CSV Estático", csv_buffer.getvalue().encode('utf-8-sig'), file_name=f"SF_CLASICA_{up_name}.csv", use_container_width=True)
 
+                            cc3, cc4 = st.columns(2)
+
                             kml_c = simplekml.Kml()
                             folder_c = kml_c.newfolder(name=f"🚚 Ruta Única Clásica ({len(ruta_ordenada)} Pts)")
-                            
+
                             for p in ruta_ordenada:
                                 pnt = folder_c.newpoint(name=f"{p['ID_Pangea_Nombre']}", coords=[(p['lon_aux'], p['lat_aux'])])
                                 h = "<![CDATA[<table border='1' style='width:300px; border-collapse:collapse; font-family:Arial; font-size:12px;'>"
