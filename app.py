@@ -1093,7 +1093,13 @@ else:
                                 ls.style.linestyle.width = 4
                                 ls.style.linestyle.color = 'ff00ffff'
 
-                            cc3.download_button("🗺️ KML Maestro Clásico", kml_c.kml(), file_name=f"SF_CLASICA_{up_name}.kml", use_container_width=True)
+                            cc3.download_button(
+                                "🗺️ KML Maestro Clásico",
+                                kml_c.kml().encode("utf-8"),
+                                file_name=f"SF_CLASICA_{up_name}.kml",
+                                mime="application/vnd.google-earth.kml+xml",
+                                use_container_width=True,
+                            )
                             cc4.link_button("🚀 My Maps", "https://www.google.com/maps/d/", use_container_width=True)
 
                             if st.button("💾 REGISTRAR RUTA CLÁSICA EN BITÁCORA", use_container_width=True, key="reg_c"):
