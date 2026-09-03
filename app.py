@@ -45,13 +45,13 @@ pwa_manifest_json = json.dumps({
     "categories": ["business", "productivity"],
     "icons": [
         {
-            "src": "https://img.icons8.com/clouds/500/000000/map-marker.png",
+            "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Google_Maps_pin.svg/512px-Google_Maps_pin.svg.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
         },
         {
-            "src": "https://img.icons8.com/clouds/192/000000/map-marker.png",
+            "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Google_Maps_pin.svg/192px-Google_Maps_pin.svg.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
@@ -68,7 +68,7 @@ st.markdown(
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SF PANGEA">
     <meta name="theme-color" content="#1f4e78">
-    <link rel="apple-touch-icon" href="https://img.icons8.com/clouds/500/000000/map-marker.png">
+    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Google_Maps_pin.svg/512px-Google_Maps_pin.svg.png">
     <link rel="manifest" href="data:application/json;base64,{manifest_b64}">
 
     <style>
