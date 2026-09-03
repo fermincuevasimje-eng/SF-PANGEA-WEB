@@ -33,17 +33,30 @@ pwa_manifest_json = json.dumps({
     "name": "SF PANGEA VPLUS ULTRA",
     "short_name": "SF PANGEA",
     "description": "Sistema de Gestión Operativa - Alumbrado Público",
-    "start_url": "./",
+    "start_url": "/",
+    "id": "/",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#0e1117",
     "theme_color": "#1f4e78",
     "orientation": "portrait",
-    "icons": [{
-        "src": "https://img.icons8.com/clouds/500/000000/map-marker.png",
-        "sizes": "512x512",
-        "type": "image/png",
-        "purpose": "any maskable",
-    }],
+    "lang": "es",
+    "dir": "ltr",
+    "categories": ["business", "productivity"],
+    "icons": [
+        {
+            "src": "https://img.icons8.com/clouds/500/000000/map-marker.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "https://img.icons8.com/clouds/192/000000/map-marker.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
 })
 manifest_b64 = base64.b64encode(pwa_manifest_json.encode()).decode()
 
