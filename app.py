@@ -98,6 +98,18 @@ URL_DB = "https://docs.google.com/spreadsheets/d/14_fewol5DiFXoiO102wviiWR08Lw3P
 HOJA_PRINCIPAL = "Sheet1"
 HOJA_PAPELERA = "Trash"
 
+# --- OPTIMIZACIÓN DE MEMORIA Y CACHÉ MÓVIL ---
+@st.cache_resource(ttl=3600)
+def get_gsheets_connection():
+    """Mantiene la conexión a Google Sheets en memoria sin reconectar en cada toque."""
+    return st.connection("gsheets", type=GSheetsConnection)
+
+@st.cache_data(ttl=300, show_spinner="Cargando datos para móvil...")
+def load_cached_data(worksheet_name):
+    """Carga y cachea las hojas de cálculo para reducir consumo de datos en campo."""
+    conn = get_gsheets_connection()
+    return conn.read(spreadsheet=URL_DB, worksheet=worksheet_name, ttl="5m")
+
 # --- 1.5 CATÁLOGO MAESTRO ACTUALIZADO ---
 CATALOGO_MAESTRO = {
     "ADOLFO LOPEZ MATEOS": ['PARQUES NACIONALES I', 'MIGUEL HIDALGO  (CORRALITOS)', 'PARQUES NACIONALES  II'],
