@@ -21,6 +21,49 @@ USUARIOS_OFICIALES_DEFAULT = [
     "DAP 3",
 ] + [f"Brigada {i}" for i in range(1, 18)] + [f"Especial {i}" for i in range(1, 4)]
 
+
+# 🎨 Inyección CSS para Optimización Móvil y Tablets
+def inyectar_css_movil():
+    st.markdown(
+        """
+        <style>
+        /* Ajustar padding principal para aprovechar el ancho en móviles */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        
+        /* Optimizar botones para toque táctil (mínimo recomendado 44px) */
+        .stButton button, .stDownloadButton button, .stLinkButton a {
+            min-height: 44px !important;
+            border-radius: 8px !important;
+            font-size: 0.95rem !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        /* Reducir espacio entre elementos en dispositivos pequeños */
+        @media (max-width: 768px) {
+            .stChatMessage {
+                padding: 0.5rem !important;
+                margin-bottom: 0.5rem !important;
+            }
+            .stExpander {
+                margin-bottom: 0.5rem !important;
+            }
+            h1 { font-size: 1.6rem !important; }
+            h2 { font-size: 1.3rem !important; }
+            h3 { font-size: 1.1rem !important; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # 1. Conexión Segura a Supabase
 @st.cache_resource
 def get_supabase_client() -> Client:
@@ -108,7 +151,7 @@ def obtener_canales_db(supabase_client) -> list:
     return canales_predeterminados
 
 
-# Consultar usuarios oficialmente registrados en la tabla 'usuarios'
+# Consultar usuarios oficialmente registrados
 def obtener_usuarios_registrados(supabase_client) -> list:
     try:
         res = (
@@ -125,7 +168,7 @@ def obtener_usuarios_registrados(supabase_client) -> list:
     return USUARIOS_OFICIALES_DEFAULT
 
 
-# Motor de Menciones Inteligentes (Insensible a Mayúsculas/Minúsculas y Coincidencia por Prefijo)
+# Motor de Menciones Inteligentes
 def evaluar_mencion_inteligente(mensaje: str, usuario_destinatario: str) -> bool:
     if not mensaje or not usuario_destinatario:
         return False
@@ -143,7 +186,7 @@ def evaluar_mencion_inteligente(mensaje: str, usuario_destinatario: str) -> bool
 
 
 # -----------------------------------------------------------------------------
-# HISTORIAL DE MENSAJES AUTO-SINCRONIZADO
+# HISTORIAL DE MENSAJES AUTO-SINCRONIZADO (OPTIMIZADO PARA MÓVIL)
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=2)
 def render_historial_fragment(
@@ -257,20 +300,21 @@ def render_historial_fragment(
     )
     if solo_menciones:
         st.caption(
-            f"🔔 **Muro de Menciones para @{usuario_actual}** • En vivo (`{hora_actual}`)"
+            f"🔔 **Muro de Menciones (@{usuario_actual})** • `{hora_actual}`"
         )
     elif canal == "privado":
         st.caption(
-            f"🔒 **Chat Privado con {destinatario}** • En vivo (`{hora_actual}`)"
+            f"🔒 **Chat Privado con {destinatario}** • `{hora_actual}`"
         )
     else:
         st.caption(
-            f"📢 **Canal #{canal.upper()}** • Sincronizado en Vivo (`{hora_actual}`)"
+            f"📢 **Canal #{canal.upper()}** • En Vivo (`{hora_actual}`)"
         )
 
     mensajes = cargar_historial()
 
-    chat_container = st.container(height=480)
+    # Altura optimizada para pantallas pequeñas
+    chat_container = st.container(height=450)
     with chat_container:
         if mensajes:
             for msg_idx, fila in enumerate(mensajes):
@@ -364,35 +408,24 @@ def render_historial_fragment(
 
                             st.markdown("---")
                             if ext in ["png", "jpg", "jpeg", "webp", "gif"]:
-                                col_thumb, col_actions = st.columns([1, 2])
-
-                                with col_thumb:
-                                    st.image(url_adjunto, width=180)
-
-                                with col_actions:
-                                    st.link_button(
-                                        "🌐 Abrir en pestaña",
-                                        url_adjunto,
-                                        use_container_width=True,
-                                    )
-                                    with st.expander(
-                                        "🔍 Descargar / Vista previa"
-                                    ):
-                                        file_bytes = obtener_bytes_adjunto(
-                                            url_adjunto
-                                        )
-                                        if file_bytes:
-                                            st.download_button(
-                                                label="📥 Descargar al equipo",
-                                                data=file_bytes,
-                                                file_name=nombre_archivo,
-                                                mime=mime_actual,
-                                                use_container_width=True,
-                                                key=f"dl_btn_{msg_idx}_{file_idx}_{canal}",
-                                            )
-                                        st.image(
-                                            url_adjunto,
+                                # Ajuste responsivo de imagen sin ancho fijo rígido
+                                st.image(url_adjunto, use_container_width=True)
+                                
+                                st.link_button(
+                                    "🌐 Abrir imagen",
+                                    url_adjunto,
+                                    use_container_width=True,
+                                )
+                                with st.expander("🔍 Opciones de descarga"):
+                                    file_bytes = obtener_bytes_adjunto(url_adjunto)
+                                    if file_bytes:
+                                        st.download_button(
+                                            label="📥 Descargar imagen",
+                                            data=file_bytes,
+                                            file_name=nombre_archivo,
+                                            mime=mime_actual,
                                             use_container_width=True,
+                                            key=f"dl_btn_{msg_idx}_{file_idx}_{canal}",
                                         )
                             else:
                                 icon_doc = "📄"
@@ -406,40 +439,33 @@ def render_historial_fragment(
                                     icon_doc = "📕"
 
                                 st.markdown(
-                                    f"{icon_doc} **Archivo adjunto:** `{nombre_archivo}`"
+                                    f"{icon_doc} **Adjunto:** `{nombre_archivo}`"
                                 )
-                                col_btn1, col_btn2 = st.columns(2)
-                                with col_btn1:
-                                    file_bytes = obtener_bytes_adjunto(
-                                        url_adjunto
-                                    )
-                                    if file_bytes:
-                                        st.download_button(
-                                            label="📥 Descargar archivo",
-                                            data=file_bytes,
-                                            file_name=nombre_archivo,
-                                            mime=mime_actual,
-                                            use_container_width=True,
-                                            key=f"dl_btn_file_{msg_idx}_{file_idx}_{canal}",
-                                        )
-                                with col_btn2:
-                                    st.link_button(
-                                        "🌐 Abrir en pestaña",
-                                        url_adjunto,
+                                file_bytes = obtener_bytes_adjunto(url_adjunto)
+                                if file_bytes:
+                                    st.download_button(
+                                        label="📥 Descargar archivo",
+                                        data=file_bytes,
+                                        file_name=nombre_archivo,
+                                        mime=mime_actual,
                                         use_container_width=True,
+                                        key=f"dl_btn_file_{msg_idx}_{file_idx}_{canal}",
                                     )
+                                st.link_button(
+                                    "🌐 Abrir en vista previa",
+                                    url_adjunto,
+                                    use_container_width=True,
+                                )
         else:
             st.info("No se encontraron mensajes.")
 
 
 # -----------------------------------------------------------------------------
-# REPOSITORIO DE ARCHIVOS PÚBLICOS (SÓLO CANALES PÚBLICOS)
+# REPOSITORIO PÚBLICO (OPTIMIZADO PARA PANTALLAS TÁCTILES)
 # -----------------------------------------------------------------------------
 def render_panel_archivos_publicos(supabase_client):
     st.subheader("📁 Repositorio de Archivos Públicos")
-    st.caption(
-        "Archivos compartidos en los canales de trabajo (Excluye chats 1 a 1)."
-    )
+    st.caption("Archivos compartidos en los canales de trabajo.")
 
     try:
         res = (
@@ -456,7 +482,7 @@ def render_panel_archivos_publicos(supabase_client):
         return
 
     if not data:
-        st.info("📂 No hay archivos públicos en los canales de trabajo.")
+        st.info("📂 No hay archivos públicos registrados.")
         return
 
     archivos_lista = []
@@ -476,19 +502,15 @@ def render_panel_archivos_publicos(supabase_client):
                     "created_at": m.get("created_at", ""),
                 })
 
-    col_f1, col_f2, col_f3, col_f4 = st.columns([2, 2, 2, 2])
-    with col_f1:
+    # EN MÓVIL: Filtros dentro de Expander para ahorrar espacio vertical
+    with st.expander("🔍 Filtros y Búsqueda de Archivos", expanded=False):
         kw_file = st.text_input(
-            "🔍 Buscar nombre / folio:", placeholder="Ej. AIRIS-1234"
+            "Buscar por nombre o folio:", placeholder="Ej. AIRIS-1234"
         )
-    with col_f2:
         canales_disponibles = ["Todos"] + sorted(
             list({a["canal"].upper() for a in archivos_lista})
         )
-        canal_filtro = st.selectbox(
-            "Filtrar por Canal:", canales_disponibles
-        )
-    with col_f3:
+        canal_filtro = st.selectbox("Canal:", canales_disponibles)
         tipo_filtro = st.selectbox("Tipo de Archivo:", [
             "Todos",
             "📷 Imágenes",
@@ -496,7 +518,6 @@ def render_panel_archivos_publicos(supabase_client):
             "📊 Excel",
             "📝 Word",
         ])
-    with col_f4:
         chk_fecha_pub = st.checkbox("📅 Filtrar por fecha", key="chk_f_repo_pub")
         fecha_pub_sel = None
         if chk_fecha_pub:
@@ -506,32 +527,21 @@ def render_panel_archivos_publicos(supabase_client):
     if kw_file.strip():
         kw = kw_file.strip().lower()
         filtrados = [
-            a
-            for a in filtrados
+            a for a in filtrados
             if kw in a["nombre"].lower() or kw in a["mensaje"].lower()
         ]
 
     if canal_filtro != "Todos":
-        filtrados = [
-            a for a in filtrados if a["canal"].upper() == canal_filtro
-        ]
+        filtrados = [a for a in filtrados if a["canal"].upper() == canal_filtro]
 
     if tipo_filtro.startswith("📷"):
-        filtrados = [
-            a
-            for a in filtrados
-            if a["extension"] in ["png", "jpg", "jpeg", "webp", "gif"]
-        ]
+        filtrados = [a for a in filtrados if a["extension"] in ["png", "jpg", "jpeg", "webp", "gif"]]
     elif tipo_filtro.startswith("📕"):
         filtrados = [a for a in filtrados if a["extension"] == "pdf"]
     elif tipo_filtro.startswith("📊"):
-        filtrados = [
-            a for a in filtrados if a["extension"] in ["xlsx", "xls"]
-        ]
+        filtrados = [a for a in filtrados if a["extension"] in ["xlsx", "xls"]]
     elif tipo_filtro.startswith("📝"):
-        filtrados = [
-            a for a in filtrados if a["extension"] in ["docx", "doc"]
-        ]
+        filtrados = [a for a in filtrados if a["extension"] in ["docx", "doc"]]
 
     if fecha_pub_sel and filtrados:
         data_f = []
@@ -551,12 +561,12 @@ def render_panel_archivos_publicos(supabase_client):
     st.markdown("---")
 
     for idx, item in enumerate(filtrados):
-        col_icon, col_det, col_acc = st.columns([1, 4, 2])
         ext = item["extension"]
         icon_str = (
-            "📷"
-            if ext in ["png", "jpg", "jpeg", "webp", "gif"]
-            else "📕" if ext == "pdf" else "📊" if ext in ["xlsx", "xls"] else "📄"
+            "📷" if ext in ["png", "jpg", "jpeg", "webp", "gif"]
+            else "📕" if ext == "pdf"
+            else "📊" if ext in ["xlsx", "xls"]
+            else "📄"
         )
 
         raw_time = item.get("created_at", "")
@@ -569,39 +579,37 @@ def render_panel_archivos_publicos(supabase_client):
             except Exception:
                 tstamp_str = str(raw_time)
 
-        with col_icon:
-            st.markdown(f"### {icon_str}")
-        with col_det:
-            st.markdown(f"**Archivo:** `{item['nombre']}`")
+        # Diseño tipo Tarjeta Móvil
+        with st.container():
+            st.markdown(f"### {icon_str} `{item['nombre']}`")
             if item["mensaje"]:
-                st.markdown(f"🏷️ **Folio / Detalles:**\n{item['mensaje']}")
+                st.caption(f"🏷️ **Detalles:** {item['mensaje']}")
             st.caption(
                 f"👤 Por: **{item['emisor']}** | Canal: **#{item['canal'].upper()}** | 📅 `{tstamp_str}`"
             )
-        with col_acc:
-            st.link_button(
-                "🌐 Abrir", item["url"], use_container_width=True
-            )
-            bytes_f = obtener_bytes_adjunto(item["url"])
-            if bytes_f:
-                st.download_button(
-                    label="📥 Descargar",
-                    data=bytes_f,
-                    file_name=item["nombre"],
-                    key=f"repo_pub_dl_{idx}",
-                    use_container_width=True,
-                )
+            
+            col_act1, col_act2 = st.columns(2)
+            with col_act1:
+                st.link_button("🌐 Abrir", item["url"], use_container_width=True)
+            with col_act2:
+                bytes_f = obtener_bytes_adjunto(item["url"])
+                if bytes_f:
+                    st.download_button(
+                        label="📥 Descargar",
+                        data=bytes_f,
+                        file_name=item["nombre"],
+                        key=f"repo_pub_dl_{idx}",
+                        use_container_width=True,
+                    )
         st.markdown("---")
 
 
 # -----------------------------------------------------------------------------
-# REPOSITORIO DE ARCHIVOS PRIVADOS (SÓLO PRIVADOS DEL USUARIO ACTIVO)
+# REPOSITORIO PRIVADO (OPTIMIZADO PARA PANTALLAS TÁCTILES)
 # -----------------------------------------------------------------------------
 def render_panel_archivos_privados(supabase_client, usuario_actual: str):
     st.subheader("🔒 Mis Archivos Privados")
-    st.caption(
-        "Archivos compartidos exclusivamente en tus chats 1 a 1."
-    )
+    st.caption("Archivos compartidos en tus chats 1 a 1.")
 
     try:
         res = (
@@ -618,10 +626,8 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
         return
 
     data_user = [
-        m
-        for m in data
-        if m.get("emisor") == usuario_actual
-        or m.get("destinatario") == usuario_actual
+        m for m in data
+        if m.get("emisor") == usuario_actual or m.get("destinatario") == usuario_actual
     ]
 
     if not data_user:
@@ -650,13 +656,11 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
                     "created_at": m.get("created_at", ""),
                 })
 
-    col_p1, col_p2 = st.columns([3, 2])
-    with col_p1:
+    with st.expander("🔍 Filtros y Búsqueda Privada", expanded=False):
         kw_priv_file = st.text_input(
-            "🔍 Buscar en mis archivos privados:",
+            "Buscar en mis archivos privados:",
             placeholder="Nombre, folio o palabra clave...",
         )
-    with col_p2:
         chk_fecha_priv = st.checkbox("📅 Filtrar por fecha", key="chk_f_repo_priv")
         fecha_priv_sel = None
         if chk_fecha_priv:
@@ -666,8 +670,7 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
     if kw_priv_file.strip():
         kw = kw_priv_file.strip().lower()
         filtrados = [
-            a
-            for a in filtrados
+            a for a in filtrados
             if kw in a["nombre"].lower() or kw in a["mensaje"].lower()
         ]
 
@@ -685,13 +688,10 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
                     pass
         filtrados = data_f
 
-    st.markdown(
-        f"**Archivos privados de {usuario_actual}: `{len(filtrados)}`**"
-    )
+    st.markdown(f"**Archivos privados de {usuario_actual}: `{len(filtrados)}`**")
     st.markdown("---")
 
     for idx, item in enumerate(filtrados):
-        col_icon, col_det, col_acc = st.columns([1, 4, 2])
         raw_time = item.get("created_at", "")
         tstamp_str = ""
         if raw_time:
@@ -702,36 +702,38 @@ def render_panel_archivos_privados(supabase_client, usuario_actual: str):
             except Exception:
                 tstamp_str = str(raw_time)
 
-        with col_icon:
-            st.markdown("### 🔒")
-        with col_det:
-            st.markdown(f"**Archivo:** `{item['nombre']}`")
+        with st.container():
+            st.markdown(f"### 🔒 `{item['nombre']}`")
             if item["mensaje"]:
-                st.markdown(f"🏷️ **Folio / Detalles:**\n{item['mensaje']}")
+                st.caption(f"🏷️ **Detalles:** {item['mensaje']}")
             st.caption(
-                f"De: **{item['emisor']}** | Para/Con: **{item['contacto']}** | 📅 `{tstamp_str}`"
+                f"De: **{item['emisor']}** | Con: **{item['contacto']}** | 📅 `{tstamp_str}`"
             )
-        with col_acc:
-            st.link_button(
-                "🌐 Abrir", item["url"], use_container_width=True
-            )
-            bytes_f = obtener_bytes_adjunto(item["url"])
-            if bytes_f:
-                st.download_button(
-                    label="📥 Descargar",
-                    data=bytes_f,
-                    file_name=item["nombre"],
-                    key=f"repo_priv_dl_{idx}",
-                    use_container_width=True,
-                )
+            
+            col_act1, col_act2 = st.columns(2)
+            with col_act1:
+                st.link_button("🌐 Abrir", item["url"], use_container_width=True)
+            with col_act2:
+                bytes_f = obtener_bytes_adjunto(item["url"])
+                if bytes_f:
+                    st.download_button(
+                        label="📥 Descargar",
+                        data=bytes_f,
+                        file_name=item["nombre"],
+                        key=f"repo_priv_dl_{idx}",
+                        use_container_width=True,
+                    )
         st.markdown("---")
 
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN PRINCIPAL DEL MÓDULO
+# FUNCIÓN PRINCIPAL DEL MÓDULO (OPTIMIZADA PARA MÓVIL Y TABLET)
 # -----------------------------------------------------------------------------
 def render_chat():
-    st.header("💬 SF Pangea Chat - Centro de Comunicación DAP")
+    # Inyectar estilos responsivos globales de la Parte 1
+    inyectar_css_movil()
+
+    st.header("💬 SF Pangea Chat")
 
     supabase = get_supabase_client()
 
@@ -753,7 +755,7 @@ def render_chat():
     if "notified_msg_ids" not in st.session_state:
         st.session_state.notified_msg_ids = set()
 
-    # Inicio de Sesión mediante Selección de Usuario Registrado (Exclusivo o fallback para SF)
+    # Inicio de Sesión mediante Selección de Usuario Registrado
     usuarios_registrados = obtener_usuarios_registrados(supabase)
 
     if not st.session_state.sf_chat_user:
@@ -762,7 +764,9 @@ def render_chat():
             usr_select = st.selectbox(
                 "Usuario Oficial Autorizado:", usuarios_registrados
             )
-            btn_entrar = st.form_submit_button("Ingresar al Chat 🚀")
+            btn_entrar = st.form_submit_button(
+                "Ingresar al Chat 🚀", use_container_width=True
+            )
             if btn_entrar:
                 st.session_state.sf_chat_user = usr_select
                 st.session_state.usuario_nombre = usr_select
@@ -775,26 +779,22 @@ def render_chat():
     usr_actual_clean = st.session_state.sf_chat_user.strip().upper()
     es_admin = usr_actual_clean == "SF"
 
-    # SOLO EL USUARIO 'SF' TIENE ACCESO AL BOTÓN DE SALIR / CAMBIAR DE USUARIO
-    if es_admin:
-        col_status, col_logout = st.columns([4, 1])
-        with col_status:
-            st.caption(
-                f"🟢 Usuario: **{st.session_state.sf_chat_user}** (👑 **ADMINISTRADOR**)"
-            )
-        with col_logout:
-            if st.button("Salir / Cambiar", key="sf_chat_btn_logout"):
+    # Encabezado de Usuario y Logout
+    col_status, col_logout = st.columns([3, 1.2])
+    with col_status:
+        rol_badge = "👑 ADMIN" if es_admin else "👤 COLABORADOR"
+        st.caption(f"🟢 **{st.session_state.sf_chat_user}** (`{rol_badge}`)")
+    with col_logout:
+        if es_admin:
+            if st.button("Salir 🚪", key="sf_chat_btn_logout", use_container_width=True):
                 st.session_state.sf_chat_user = ""
                 st.session_state.usuario_nombre = ""
                 st.session_state.chat_manual_logout = True
                 if "session_user" in st.query_params:
                     del st.query_params["session_user"]
                 st.rerun()
-    else:
-        st.caption(
-            f"🟢 Usuario: **{st.session_state.sf_chat_user}** (👤 **COLABORADOR**)"
-        )
 
+    # Navegación Optimizada para Móviles (Menú desplegable táctil)
     modos = [
         "📢 Canales Públicos",
         "🔒 Chat 1 a 1",
@@ -805,47 +805,44 @@ def render_chat():
     if es_admin:
         modos.append("⚙️ Panel Admin")
 
-    modo_chat = st.radio(
-        "Navegación:",
+    modo_chat = st.selectbox(
+        "Navegación por el Chat:",
         modos,
-        horizontal=True,
         key="sf_chat_modo_principal",
         label_visibility="collapsed",
     )
+
+    st.markdown("---")
 
     # --- MODO 1: CANALES PÚBLICOS ---
     if modo_chat == "📢 Canales Públicos":
         canales_disponibles = obtener_canales_db(supabase)
         canales_labels = [c.capitalize() for c in canales_disponibles]
 
-        canal_seleccionado = st.radio(
-            "Canal activo:",
+        # Selector de canal compacto en lugar de radio horizontal gigante
+        canal_seleccionado = st.selectbox(
+            "Seleccionar Canal:",
             canales_labels,
-            horizontal=True,
             key="sf_chat_radio_canal",
-            label_visibility="collapsed",
         )
         canal_activo = canal_seleccionado.lower()
 
-        col_search, col_filter, col_clear = st.columns([3, 1, 1])
+        # Barra de búsqueda y controles responsivos
+        col_search, col_filter, col_clear = st.columns([2.5, 1, 1])
         f_fecha_c, f_h_ini_c, f_h_fin_c = None, None, None
 
         with col_search:
             kw_canal = st.text_input(
                 "Buscar",
                 key="kw_canal",
-                placeholder="🔍 Buscar palabra clave o folio...",
+                placeholder="🔍 Palabras o folios...",
                 label_visibility="collapsed",
             )
         with col_filter:
-            with st.popover("📅 Filtros"):
-                if st.checkbox("Activar filtro de fecha", key="chk_f_canales"):
-                    f_fecha_c = st.date_input(
-                        "Selecciona día:", key="date_canales"
-                    )
-                    if st.checkbox(
-                        "Especificar rango de horas", key="chk_h_canales"
-                    ):
+            with st.popover("📅"):
+                if st.checkbox("Filtro fecha", key="chk_f_canales"):
+                    f_fecha_c = st.date_input("Día:", key="date_canales")
+                    if st.checkbox("Rango horas", key="chk_h_canales"):
                         f_h_ini_c = st.time_input(
                             "Desde:",
                             datetime.strptime("00:00", "%H:%M").time(),
@@ -859,16 +856,14 @@ def render_chat():
 
         with col_clear:
             if es_admin:
-                with st.popover("🧹 Vaciar"):
-                    st.warning(
-                        f"Se eliminarán todos los mensajes del canal #{canal_activo.upper()}."
-                    )
-                    if st.checkbox("⚠️ Confirmar borrado", key="chk_del_c"):
-                        if st.button("Eliminar Historial 🗑️", type="primary"):
+                with st.popover("🧹"):
+                    st.warning(f"Borrar mensajes de #{canal_activo.upper()}.")
+                    if st.checkbox("Confirmar borrado", key="chk_del_c"):
+                        if st.button("Vaciar 🗑️", type="primary", use_container_width=True):
                             supabase.table("mensajes").delete().eq(
                                 "canal", canal_activo
                             ).execute()
-                            st.success("Canal vaciado con éxito.")
+                            st.success("Canal vaciado.")
                             st.rerun()
 
         render_historial_fragment(
@@ -881,29 +876,19 @@ def render_chat():
         )
 
         count = st.session_state.upload_counter
-        with st.popover("📎 Adjuntar evidencias a #" + canal_activo.upper()):
+        with st.popover("📎 Adjuntar evidencias a #" + canal_activo.upper(), use_container_width=True):
             archivos_adjuntos = st.file_uploader(
                 "Selecciona archivos",
                 type=[
-                    "png",
-                    "jpg",
-                    "jpeg",
-                    "webp",
-                    "gif",
-                    "pdf",
-                    "xlsx",
-                    "xls",
-                    "docx",
-                    "doc",
-                    "pptx",
-                    "ppt",
+                    "png", "jpg", "jpeg", "webp", "gif", "pdf",
+                    "xlsx", "xls", "docx", "doc", "pptx", "ppt",
                 ],
                 accept_multiple_files=True,
                 key=f"sf_chat_uploader_canales_{count}",
             )
             if archivos_adjuntos:
                 folio_input = st.text_input(
-                    "Número de Folio / Ticket / AIRIS *",
+                    "Folio / Ticket / AIRIS *",
                     key=f"sf_chat_folio_canales_{count}",
                     placeholder="Ej. AIRIS-12345",
                 )
@@ -917,14 +902,11 @@ def render_chat():
                     use_container_width=True,
                 ):
                     if not folio_input.strip():
-                        st.error(
-                            "⚠️ Debes ingresar el Folio / Ticket / AIRIS."
-                        )
+                        st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
                     else:
                         urls = [
                             subir_adjunto_supabase(f, supabase)
-                            for f in archivos_adjuntos
-                            if f
+                            for f in archivos_adjuntos if f
                         ]
                         urls_validas = [u for u in urls if u]
                         if urls_validas:
@@ -961,28 +943,24 @@ def render_chat():
         ]
         if colegas:
             destinatario_activo = st.selectbox(
-                "Colega:", colegas, key="sf_chat_select_privado"
+                "Seleccionar Colega:", colegas, key="sf_chat_select_privado"
             )
 
-            col_search_p, col_filter_p, col_clear_p = st.columns([3, 1, 1])
+            col_search_p, col_filter_p, col_clear_p = st.columns([2.5, 1, 1])
             f_fecha_p, f_h_ini_p, f_h_fin_p = None, None, None
 
             with col_search_p:
                 kw_priv = st.text_input(
                     "Buscar",
                     key="kw_priv",
-                    placeholder="🔍 Buscar palabra clave...",
+                    placeholder="🔍 Buscar texto...",
                     label_visibility="collapsed",
                 )
             with col_filter_p:
-                with st.popover("📅 Filtros"):
-                    if st.checkbox("Activar filtro de fecha", key="chk_f_privado"):
-                        f_fecha_p = st.date_input(
-                            "Selecciona día:", key="date_privado"
-                        )
-                        if st.checkbox(
-                            "Especificar rango de horas", key="chk_h_privado"
-                        ):
+                with st.popover("📅"):
+                    if st.checkbox("Filtro fecha", key="chk_f_privado"):
+                        f_fecha_p = st.date_input("Día:", key="date_privado")
+                        if st.checkbox("Rango horas", key="chk_h_privado"):
                             f_h_ini_p = st.time_input(
                                 "Desde:",
                                 datetime.strptime("00:00", "%H:%M").time(),
@@ -996,12 +974,10 @@ def render_chat():
 
             with col_clear_p:
                 if es_admin:
-                    with st.popover("🧹 Vaciar"):
-                        st.warning(
-                            f"Borrar conversación privada entre tú y {destinatario_activo}."
-                        )
-                        if st.checkbox("⚠️ Confirmar borrado", key="chk_del_priv"):
-                            if st.button("Eliminar Chat 🗑️", type="primary"):
+                    with st.popover("🧹"):
+                        st.warning(f"Borrar chat con {destinatario_activo}.")
+                        if st.checkbox("Confirmar borrado", key="chk_del_priv"):
+                            if st.button("Eliminar 🗑️", type="primary", use_container_width=True):
                                 supabase.table("mensajes").delete().eq(
                                     "canal", "privado"
                                 ).or_(
@@ -1022,30 +998,21 @@ def render_chat():
 
             count = st.session_state.upload_counter
             with st.popover(
-                f"📎 Adjuntar archivo privado para {destinatario_activo}"
+                f"📎 Adjuntar archivo para {destinatario_activo}",
+                use_container_width=True
             ):
                 archivos_privados = st.file_uploader(
                     "Selecciona archivos",
                     type=[
-                        "png",
-                        "jpg",
-                        "jpeg",
-                        "webp",
-                        "gif",
-                        "pdf",
-                        "xlsx",
-                        "xls",
-                        "docx",
-                        "doc",
-                        "pptx",
-                        "ppt",
+                        "png", "jpg", "jpeg", "webp", "gif", "pdf",
+                        "xlsx", "xls", "docx", "doc", "pptx", "ppt",
                     ],
                     accept_multiple_files=True,
                     key=f"sf_chat_uploader_priv_{count}",
                 )
                 if archivos_privados:
                     folio_priv = st.text_input(
-                        "Número de Folio / Ticket / AIRIS *",
+                        "Folio / Ticket / AIRIS *",
                         key=f"sf_chat_folio_priv_{count}",
                     )
                     coment_priv = st.text_area(
@@ -1058,14 +1025,11 @@ def render_chat():
                         use_container_width=True,
                     ):
                         if not folio_priv.strip():
-                            st.error(
-                                "⚠️ Debes ingresar el Folio / Ticket / AIRIS."
-                            )
+                            st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
                         else:
                             urls = [
                                 subir_adjunto_supabase(f, supabase)
-                                for f in archivos_privados
-                                if f
+                                for f in archivos_privados if f
                             ]
                             urls_validas = [u for u in urls if u]
                             if urls_validas:
@@ -1083,7 +1047,7 @@ def render_chat():
                                 st.rerun()
 
             prompt_privado = st.chat_input(
-                f"Mensaje privado directo para {destinatario_activo}..."
+                f"Mensaje privado para {destinatario_activo}..."
             )
             if prompt_privado:
                 supabase.table("mensajes").insert({
@@ -1106,18 +1070,14 @@ def render_chat():
             kw_menc = st.text_input(
                 "Buscar",
                 key="kw_menc",
-                placeholder="🔍 Buscar en mis menciones...",
+                placeholder="🔍 Buscar menciones...",
                 label_visibility="collapsed",
             )
         with col_filter_m:
-            with st.popover("📅 Filtros"):
-                if st.checkbox("Activar filtro de fecha", key="chk_f_menciones"):
-                    f_fecha_m = st.date_input(
-                        "Selecciona día:", key="date_menciones"
-                    )
-                    if st.checkbox(
-                        "Especificar rango de horas", key="chk_h_menciones"
-                    ):
+            with st.popover("📅"):
+                if st.checkbox("Filtro fecha", key="chk_f_menciones"):
+                    f_fecha_m = st.date_input("Día:", key="date_menciones")
+                    if st.checkbox("Rango horas", key="chk_h_menciones"):
                         f_h_ini_m = st.time_input(
                             "Desde:",
                             datetime.strptime("00:00", "%H:%M").time(),
@@ -1149,13 +1109,12 @@ def render_chat():
     # --- MODO 6: PANEL ADMIN (SOLO SUPER ADMIN 'SF') ---
     elif modo_chat == "⚙️ Panel Admin" and es_admin:
         st.subheader("⚙️ Panel de Administración Global")
-        st.caption("Administra los usuarios autorizados, canales y borrado del sistema.")
+        st.caption("Gestiona usuarios, canales y mantenimiento.")
 
-        col_adm_u1, col_adm_u2 = st.columns(2)
-
-        with col_adm_u1:
-            st.markdown("### 👤 Alta de Usuarios")
-            nuevo_usr = st.text_input("Nombre de usuario:", placeholder="Ej. Juan_Perez")
+        # Estructura adaptativa para smartphones y tablets
+        with st.container():
+            st.markdown("### 👤 Gestión de Usuarios")
+            nuevo_usr = st.text_input("Nuevo usuario:", placeholder="Ej. Juan_Perez")
             if st.button("Registrar Usuario ➕", use_container_width=True):
                 u_clean = nuevo_usr.strip()
                 if u_clean:
@@ -1168,10 +1127,8 @@ def render_chat():
                 else:
                     st.warning("Nombre de usuario no válido.")
 
-        with col_adm_u2:
-            st.markdown("### 🗑️ Baja de Usuarios")
             usr_borrar = st.selectbox(
-                "Selecciona usuario a eliminar:",
+                "Usuario a eliminar:",
                 [u for u in usuarios_registrados if u.upper() != "SF"]
             )
             if st.button("Eliminar Usuario ❌", use_container_width=True):
@@ -1183,11 +1140,10 @@ def render_chat():
                     st.error(f"Error al eliminar: {e}")
 
         st.markdown("---")
-        col_adm_c1, col_adm_c2 = st.columns(2)
 
-        with col_adm_c1:
-            st.markdown("### ➕ Crear Canal")
-            nuevo_canal = st.text_input("Nombre de canal:", placeholder="Ej. Electrica")
+        with st.container():
+            st.markdown("### 📢 Gestión de Canales")
+            nuevo_canal = st.text_input("Nuevo canal:", placeholder="Ej. Electrica")
             if st.button("Crear Canal 🚀", use_container_width=True):
                 c_clean = re.sub(r"[^a-zA-Z0-9_]", "", nuevo_canal.strip().lower())
                 if c_clean:
@@ -1198,23 +1154,21 @@ def render_chat():
                     except Exception as e:
                         st.error(f"Error al crear canal: {e}")
 
-        with col_adm_c2:
-            st.markdown("### 🗑️ Eliminar Canal")
             canales_existentes = obtener_canales_db(supabase)
-            canal_borrar = st.selectbox("Selecciona canal a eliminar:", canales_existentes, key="sb_borrar_canal")
+            canal_borrar = st.selectbox("Canal a eliminar:", canales_existentes, key="sb_borrar_canal")
             if st.button("Eliminar Canal ❌", use_container_width=True):
                 try:
                     supabase.table("canales").delete().eq("nombre", canal_borrar.lower()).execute()
                     supabase.table("mensajes").delete().eq("canal", canal_borrar.lower()).execute()
-                    st.success(f"Canal #{canal_borrar.upper()} y sus mensajes fueron eliminados.")
+                    st.success(f"Canal #{canal_borrar.upper()} eliminado.")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al eliminar canal: {e}")
 
         st.markdown("---")
-        st.markdown("### 🔥 Purgar Todo el Chat")
-        if st.checkbox("⚠️ Confirmar borrado completo de la base de datos", key="chk_wipe_all"):
-            if st.button("BORRAR TODOS LOS MENSAJES", type="primary", use_container_width=True):
+        st.markdown("### 🔥 Mantenimiento General")
+        if st.checkbox("⚠️ Confirmar borrado completo de mensajes", key="chk_wipe_all"):
+            if st.button("BORRAR TODOS LOS MENSAJES 🗑️", type="primary", use_container_width=True):
                 try:
                     supabase.table("mensajes").delete().neq("id", 0).execute()
                     st.success("Toda la base de datos de mensajes ha sido vaciada.")
