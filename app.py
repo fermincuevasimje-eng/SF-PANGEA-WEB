@@ -2339,7 +2339,7 @@ else:
                     file_ext = file_memb.name.split(".")[-1].lower()
                     img_mime = f"image/{file_ext}"
                 else:
-                    st.info("💡 Sube un banner horizontal (proporción óptima: 178mm x 25mm).")
+                    st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
 
             # --- FILTRO DE FUERZA BRUTA: PROCESAMIENTO ESTRICTO EN MAYÚSCULAS ---
             solicita = solicita_raw.upper().strip()
