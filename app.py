@@ -2070,13 +2070,10 @@ else:
                                 first_ccp = False
                     if minutario:
                         min_lines = minutario.split('\n')
-                        first_min = True
                         for m_line in min_lines:
                             if m_line.strip():
-                                prefix = "Archivo/minutario: " if first_min else "                  "
-                                txt_min = f"{prefix}{m_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
+                                txt_min = m_line.strip().encode('latin-1', 'replace').decode('latin-1')
                                 pdf.cell(0, 3.8, txt=txt_min, ln=True)
-                                first_min = False
                                 
                     pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
                     col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
@@ -2122,18 +2119,33 @@ else:
                     r_fm.bold = True
                     
                     p_ccp_doc = doc_of.add_paragraph()
-                    p_ccp_doc.paragraph_format.space_before = Pt(24)
-                    r_ccp = p_ccp_doc.add_run(f"C.c.p. {ccp}\n")
-                    r_ccp.font.size = Pt(8.5)
+                    p_ccp_doc.paragraph_format.space_before = Pt(18)
+                    p_ccp_doc.paragraph_format.line_spacing = 1.15
+                    
+                    if ccp:
+                        ccp_lines = ccp.split('\n')
+                        first_ccp = True
+                        for c_line in ccp_lines:
+                            if c_line.strip():
+                                prefix = "C.c.p. " if first_ccp else "       "
+                                r_ccp = p_ccp_doc.add_run(f"{prefix}{c_line.strip()}\n")
+                                r_ccp.font.size = Pt(8.5)
+                                first_ccp = False
+                                
                     if minutario:
-                        r_min = p_ccp_doc.add_run(f"Archivo/minutario: {minutario}")
-                        r_min.font.size = Pt(8.5)
+                        min_lines = minutario.split('\n')
+                        for m_line in min_lines:
+                            if m_line.strip():
+                                r_min = p_ccp_doc.add_run(f"{m_line.strip()}\n")
+                                r_min.font.size = Pt(8.5)
                         
                     stream_docx = io.BytesIO()
                     doc_of.save(stream_docx)
                     docx_bytes = stream_docx.getvalue()
                     
                     col_docx.download_button(label="📝 DESCARGAR WORD (.DOCX)", data=docx_bytes, file_name=f"Oficio_{n_oficio.replace('/','-')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                except ImportError:
+                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
                 except ImportError:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
 # ==================================================================================
