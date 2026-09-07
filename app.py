@@ -1902,7 +1902,7 @@ else:
                     st.markdown("**📏 Ajuste Manual de Altura y Espaciado**")
                     col_sp1, col_sp2 = st.columns(2)
                     espacio_firma = col_sp1.slider("Espacio para Firma (mm):", min_value=5, max_value=40, value=int(data_previa.get("espacio_firma", 15)), key=f"sp_firm_{pk}")
-                    pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -40)), key=f"sp_ccp_{pk}")
+                    pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -28)), key=f"sp_ccp_{pk}")
                 # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (TRIPLE MODO MASTER) ---
                 opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
                 tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
@@ -1912,27 +1912,13 @@ else:
                 img_of_mime = "image/png"
                 file_of_ext = "png"
                 
-                if tipo_membrete == "Imagen Personalizada (Subir Banner)":
-    col_up_head, col_up_foot = st.columns(2)
-    
-    with col_up_head:
-        file_memb = st.file_uploader("1. Subir Encabezado (arriba.png):", type=["png", "jpg", "jpeg"], key=f"file_memb_{pk_j}")
-        if file_memb is not None:
-            img_membrete_bytes = file_memb.getvalue()
-            img_membrete_b64 = base64.b64encode(img_membrete_bytes).decode('utf-8')
-            file_ext = file_memb.name.split(".")[-1].lower()
-            img_mime = f"image/{file_ext}"
-            
-    with col_up_foot:
-        file_pie = st.file_uploader("2. Subir Pie de Página (abajo.png):", type=["png", "jpg", "jpeg"], key=f"file_pie_{pk_j}")
-        if file_pie is not None:
-            img_pie_bytes = file_pie.getvalue()
-            img_pie_b64 = base64.b64encode(img_pie_bytes).decode('utf-8')
-            file_pie_ext = file_pie.name.split(".")[-1].lower()
-            img_pie_mime = f"image/{file_pie_ext}"
-            
-    if file_memb is None or file_pie is None:
-        st.info("💡 Sube ambas imágenes (encabezado y pie) para completar la configuración.")
+                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
+                    file_of_memb = st.file_uploader("Subir Logotipo o Banner Horizontal para Oficios:", type=["png", "jpg", "jpeg"], key=f"file_memb_of_{pk}")
+                    if file_of_memb is not None:
+                        img_of_bytes = file_of_memb.getvalue()
+                        img_of_b64 = base64.b64encode(img_of_bytes).decode('utf-8')
+                        file_of_ext = file_of_memb.name.split(".")[-1].lower()
+                        img_of_mime = f"image/{file_of_ext}"
                     else:
                         st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
 
@@ -2024,12 +2010,12 @@ else:
                 # --- GENERADOR DE DOCUMENTO PDF (FPDF AJUSTADO) ---
                 if motor_pdf_listo:
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
-                    pdf.set_margins(25, 20, 25.9)  # Ancho útil útil fijado en 165mm
-                    pdf.set_auto_page_break(auto=True, margin=25) 
+                    pdf.set_margins(30, 20, 20)
+                    pdf.set_auto_page_break(auto=True, margin=15) 
                     pdf.add_page()
                     
                     if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
-                        pdf.ln(15)
+                        pdf.ln(10)
                     elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
                         import tempfile
                         import os
@@ -2038,8 +2024,8 @@ else:
                             tmp_of.write(img_of_bytes)
                             tmp_path_of = tmp_of.name
                         try:
-                            pdf.image(tmp_path_of, x=25, y=12, w=165.0, h=25.0)
-                            pdf.set_y(40)
+                            pdf.image(tmp_path_of, x=30, y=12, w=165.9)
+                            pdf.set_y(38)
                         finally:
                             try: os.unlink(tmp_path_of)
                             except: pass
@@ -2165,6 +2151,10 @@ else:
                     docx_bytes = stream_docx.getvalue()
                     
                     col_docx.download_button(label="📝 DESCARGAR WORD (.DOCX)", data=docx_bytes, file_name=f"Oficio_{n_oficio.replace('/','-')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                except ImportError:
+                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
+                except ImportError:
+                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
                 except ImportError:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
 # ==================================================================================
@@ -2346,26 +2336,15 @@ else:
             file_ext = "png"
             
             if tipo_membrete == "Imagen Personalizada (Subir Banner)":
-        col_up_head, col_up_foot = st.columns(2)
-        
-        with col_up_head:
-            file_memb = st.file_uploader("1. Subir Encabezado (arriba.png):", type=["png", "jpg", "jpeg"], key=f"file_memb_{pk_j}")
-            if file_memb is not None:
-                img_membrete_bytes = file_memb.getvalue()
-                img_membrete_b64 = base64.b64encode(img_membrete_bytes).decode('utf-8')
-                file_ext = file_memb.name.split(".")[-1].lower()
-                img_mime = f"image/{file_ext}"
-                
-        with col_up_foot:
-            file_pie = st.file_uploader("2. Subir Pie de Página (abajo.png):", type=["png", "jpg", "jpeg"], key=f"file_pie_{pk_j}")
-            if file_pie is not None:
-                img_pie_bytes = file_pie.getvalue()
-                img_pie_b64 = base64.b64encode(img_pie_bytes).decode('utf-8')
-                file_pie_ext = file_pie.name.split(".")[-1].lower()
-                img_pie_mime = f"image/{file_pie_ext}"
-                
-        if file_memb is None or file_pie is None:
-            st.info("💡 Sube ambas imágenes (encabezado y pie) para completar la configuración.")
+                file_memb = st.file_uploader("Subir Logotipo o Banner Horizontal:", type=["png", "jpg", "jpeg"], key=f"file_memb_{pk_j}")
+                if file_memb is not None:
+                    img_membrete_bytes = file_memb.getvalue()
+                    img_membrete_b64 = base64.b64encode(img_membrete_bytes).decode('utf-8')
+                    file_ext = file_memb.name.split(".")[-1].lower()
+                    img_mime = f"image/{file_ext}"
+                else:
+                    st.info("💡 Sube un banner horizontal (proporción óptima: 178mm x 25mm).")
+
             # --- FILTRO DE FUERZA BRUTA: PROCESAMIENTO ESTRICTO EN MAYÚSCULAS ---
             solicita = solicita_raw.upper().strip()
             adscrito = adscrito_raw.upper().strip()
@@ -2457,7 +2436,7 @@ else:
                 html_header_layer = """<div style="height: 85px;"></div>"""
 
             html_formato = f"""
-            <div style="background: white; color: black; padding: 25px 30px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; max-width: 680px; margin: 0 auto; box-sizing: border-box;">
+            <div style="background: white; color: black; padding: 25px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; width: 100%; box-sizing: border-box;">
                 <!-- CAPA HTML 1: MEMBRETE DINÁMICO REFACTORIZADO -->
                 {html_header_layer}
                 
@@ -2598,11 +2577,11 @@ else:
 
             # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA) ---
             if motor_pdf_listo:
-                X_START = 25.0  # Margen izquierdo fijado en 25mm
-                W_TOTAL = 165.0  # Ancho útil congelado a 165mm
+                X_START = 24.0  # Control rígido lateral izquierdo
+                W_TOTAL = 178.0  # Ancho de celdas estandarizado
                 
                 pdf_j = FPDF(orientation='P', unit='mm', format='Letter')
-                pdf_j.set_margins(X_START, 20, 25.9)
+                pdf_j.set_margins(X_START, 26, 12)
                 pdf_j.set_auto_page_break(auto=False)
                 pdf_j.add_page()
                 
@@ -2633,11 +2612,11 @@ else:
                     
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.set_xy(X_START + 45, 20)
-                    pdf_j.cell(85, 4, txt="DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS", ln=False, align='C')
+                    pdf_j.cell(95, 4, txt="DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS", ln=False, align='C')
                     
                     pdf_j.set_font("Arial", '', 8)
-                    pdf_j.set_xy(X_START + 130, 20)
-                    pdf_j.cell(35, 4, txt="[ TIMBRE ]", ln=True, align='R')
+                    pdf_j.set_xy(X_START + 140, 20)
+                    pdf_j.cell(38, 4, txt="[ TIMBRE ]", ln=True, align='R')
                     
                     pdf_j.set_font("Arial", 'B', 8)
                     pdf_j.set_xy(X_START, 27)
@@ -2645,7 +2624,7 @@ else:
                     
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.set_xy(X_START + 45, 27)
-                    pdf_j.cell(85, 4, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
+                    pdf_j.cell(95, 4, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
                     
                     pdf_j.set_font("Arial", 'I', 8.5)
                     pdf_j.set_xy(X_START, 35)
@@ -2659,8 +2638,9 @@ else:
                         tmp.write(img_membrete_bytes)
                         tmp_path = tmp.name
                     try:
-                        # Inyección gráfica calibrada a 165mm x 25mm
-                        pdf_j.image(tmp_path, x=X_START, y=12, w=W_TOTAL, h=25.0)
+                        # Inyección gráfica milimétrica en Capa 1 (Y: 15mm)
+                        # Fijamos el ancho exacto al W_TOTAL útil (178mm) para un ajuste perfecto
+                        pdf_j.image(tmp_path, x=X_START, y=15, w=W_TOTAL)
                     finally:
                         try: os.unlink(tmp_path)
                         except: pass
