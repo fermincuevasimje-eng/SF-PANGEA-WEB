@@ -2005,24 +2005,27 @@ else:
                         ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
                         st.success("✅ Bóveda Nube de Oficios Actualizada Exitosamente."); time.sleep(1); st.rerun()
 
+                col_pdf, col_docx = st.columns(2)
+                
+                # --- GENERADOR DE DOCUMENTO PDF (FPDF AJUSTADO) ---
                 if motor_pdf_listo:
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
-                    pdf.set_margins(30, 25, 20)
-                    pdf.set_auto_page_break(auto=True, margin=25) 
+                    pdf.set_margins(30, 20, 20)
+                    pdf.set_auto_page_break(auto=True, margin=15) 
                     pdf.add_page()
                     
                     if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
-                        pdf.ln(15)
+                        pdf.ln(10)
                     elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
                         import tempfile
                         import os
-                        suffix_file_of = f".{file_of_ext}"
+                        suffix_file_of = f".{file_ext}" if 'file_ext' in locals() else f".{file_of_ext}"
                         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix_file_of) as tmp_of:
                             tmp_of.write(img_of_bytes)
                             tmp_path_of = tmp_of.name
                         try:
-                            pdf.image(tmp_path_of, x=30, y=15, w=165.9)
-                            pdf.set_y(42)
+                            pdf.image(tmp_path_of, x=30, y=12, w=165.9)
+                            pdf.set_y(38)
                         finally:
                             try: os.unlink(tmp_path_of)
                             except: pass
@@ -2030,9 +2033,8 @@ else:
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
-                    pdf.ln(15)
+                    pdf.ln(10)
                     
-                    # Iteración renglón por renglón para respetar saltos de línea en Destinatario
                     if dest:
                         for line_d in dest.upper().split('\n'):
                             if line_d.strip():
@@ -2041,16 +2043,21 @@ else:
                         pdf.cell(0, 5, txt="A QUIEN CORRESPONDA", ln=True)
                         
                     pdf.cell(0, 5, txt=cargo.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True)
-                    pdf.ln(15); pdf.set_font("Arial", '', 11)
+                    pdf.ln(10)
+                    pdf.set_font("Arial", '', 11)
                     c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
-                    pdf.multi_cell(0, 7, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
-                    pdf.ln(25); pdf.set_font("Arial", 'B', 11); pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
-                    pdf.ln(20); pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
+                    pdf.multi_cell(0, 6, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                    
+                    pdf.ln(espacio_firma)
+                    pdf.set_font("Arial", 'B', 11)
+                    pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
+                    pdf.ln(15)
+                    pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
                     pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
                     pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
                     
-                    # Iteración renglón por renglón para respetar saltos de línea en C.c.p.
-                    pdf.set_y(-30)
+                    # Anclaje inferior para C.c.p. y Archivo/minutario
+                    pdf.set_y(pos_y_ccp)
                     pdf.set_font("Arial", '', 8)
                     if ccp:
                         ccp_lines = ccp.split('\n')
@@ -2059,13 +2066,76 @@ else:
                             if c_line.strip():
                                 prefix = "C.c.p. " if first_ccp else "       "
                                 txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
-                                pdf.cell(0, 4, txt=txt_ccp, ln=True)
+                                pdf.cell(0, 3.8, txt=txt_ccp, ln=True)
                                 first_ccp = False
-                    
+                    if minutario:
+                        min_lines = minutario.split('\n')
+                        first_min = True
+                        for m_line in min_lines:
+                            if m_line.strip():
+                                prefix = "Archivo/minutario: " if first_min else "                  "
+                                txt_min = f"{prefix}{m_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
+                                pdf.cell(0, 3.8, txt=txt_min, ln=True)
+                                first_min = False
+                                
                     pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
-                    st.download_button(label="🚀 DESCARGAR OFICIO PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
+                    col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
-                    st.error("❌ Función PDF no disponible.")
+                    col_pdf.error("❌ PDF no disponible.")
+
+                # --- GENERADOR NATIVO DE WORD (.DOCX) ---
+                try:
+                    import docx
+                    from docx.shared import Pt, Inches
+                    from docx.enum.text import WD_ALIGN_PARAGRAPH
+                    import io
+                    
+                    doc_of = docx.Document()
+                    for sec in doc_of.sections:
+                        sec.top_margin = Inches(0.8)
+                        sec.bottom_margin = Inches(0.8)
+                        sec.left_margin = Inches(1.0)
+                        sec.right_margin = Inches(0.8)
+                        
+                    p_top = doc_of.add_paragraph()
+                    p_top.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    r_top = p_top.add_run(f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}\nOficio No: {n_oficio}")
+                    r_top.bold = True
+                    
+                    p_d = doc_of.add_paragraph()
+                    p_d.paragraph_format.space_before = Pt(12)
+                    p_d.paragraph_format.space_after = Pt(12)
+                    r_d = p_d.add_run(f"{dest.upper()}\n{cargo.upper()}")
+                    r_d.bold = True
+                    
+                    c_word_txt = cuerpo_txt.replace("[FOLIO]", f_ref)
+                    p_c = doc_of.add_paragraph(c_word_txt)
+                    p_c.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    p_c.paragraph_format.space_before = Pt(12)
+                    p_c.paragraph_format.space_after = Pt(espacio_firma * 2)
+                    
+                    p_f = doc_of.add_paragraph()
+                    p_f.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    r_at = p_f.add_run("A T E N T A M E N T E\n\n\n__________________________\n")
+                    r_at.bold = True
+                    r_fm = p_f.add_run(f"{firm.upper()}\n{cargo_firm.upper()}")
+                    r_fm.bold = True
+                    
+                    p_ccp_doc = doc_of.add_paragraph()
+                    p_ccp_doc.paragraph_format.space_before = Pt(24)
+                    r_ccp = p_ccp_doc.add_run(f"C.c.p. {ccp}\n")
+                    r_ccp.font.size = Pt(8.5)
+                    if minutario:
+                        r_min = p_ccp_doc.add_run(f"Archivo/minutario: {minutario}")
+                        r_min.font.size = Pt(8.5)
+                        
+                    stream_docx = io.BytesIO()
+                    doc_of.save(stream_docx)
+                    docx_bytes = stream_docx.getvalue()
+                    
+                    col_docx.download_button(label="📝 DESCARGAR WORD (.DOCX)", data=docx_bytes, file_name=f"Oficio_{n_oficio.replace('/','-')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                except ImportError:
+                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
 # ==================================================================================
 # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
 # ==================================================================================
