@@ -1929,6 +1929,7 @@ else:
                 # Conversión estricta de saltos de línea a etiquetas HTML <br>
                 dest_html = dest.upper().replace('\n', '<br>') if dest else "A QUIEN CORRESPONDA"
                 ccp_html = ccp.replace('\n', '<br>') if ccp else ""
+                minutario_html = minutario.replace('\n', '<br>') if minutario else ""
                 
                 # --- SINCRO ESPEJO EN VISTA PREVIA HTML (CAPA OFICIOS SANITIZADA) ---
                 if tipo_membrete_of == "Sistema (Texto Directo)":
@@ -1945,15 +1946,19 @@ else:
                     html_header_of = """<div style="height: 80px;"></div>"""
                     e_sup = "20px"
 
+                sec_minutario_html = f"""<div style="font-size: 10px; margin-top: 4px;"><b>Archivo/minutario:</b><br>{minutario_html}</div>""" if minutario_html else ""
+
                 html_oficio_render = f"""
-                <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.6; min-height: 550px; box-sizing: border-box;">
+                <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.5; min-height: 550px; box-sizing: border-box;">
                     {html_header_of}
                     <div style="height: {e_sup};"></div>
                     <div style="text-align: right; font-weight: bold;">Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}<br>Oficio: {n_oficio}</div><br>
                     <div style="text-align: left; font-weight: bold;">{dest_html}<br>{cargo.upper()}</div><br>
-                    <div style="text-align: justify; white-space: pre-line;">{c_final}</div><br><br>
+                    <div style="text-align: justify; white-space: pre-line;">{c_final}</div>
+                    <div style="height: {espacio_firma}px;"></div>
                     <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br>{cargo_firm.upper()}</div>
-                    <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px;">C.c.p. {ccp_html}</div>
+                    <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px;"><b>C.c.p.</b> {ccp_html}</div>
+                    {sec_minutario_html}
                 </div>
                 """
                 
