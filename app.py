@@ -2021,82 +2021,99 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
                 
-                # --- GENERADOR DE DOCUMENTO PDF (FPDF AJUSTADO) ---
-                if motor_pdf_listo:
-                    pdf = FPDF(orientation='P', unit='mm', format='Letter')
-                    pdf.set_margins(30, 20, 20)
-                    pdf.set_auto_page_break(auto=True, margin=15) 
-                    pdf.add_page()
-                    
-                    if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
-                        pdf.ln(10)
-                    elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
-                        import tempfile
-                        import os
-                        suffix_file_of = f".{file_ext}" if 'file_ext' in locals() else f".{file_of_ext}"
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix_file_of) as tmp_of:
-                            tmp_of.write(img_of_bytes)
-                            tmp_path_of = tmp_of.name
-                        try:
-                            pdf.image(tmp_path_of, x=30, y=12, w=165.9)
-                            pdf.set_y(38)
-                        finally:
+                # --- GENERADOR DE DOCUMENTO PDF (BLINDADO CONTRA ERRORES TEMPORALES) ---
+            if motor_pdf_listo:
+                pdf = FPDF(orientation='P', unit='mm', format='Letter')
+                pdf.set_margins(30, 20, 20)
+                pdf.set_auto_page_break(auto=True, margin=15) 
+                pdf.add_page()
+                
+                # Inyección segura de Encabezado si existe
+                if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
+                    pdf.ln(10)
+                elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
+                    import tempfile
+                    import os
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_of_ext}") as tmp_of:
+                        tmp_of.write(img_of_bytes)
+                        tmp_path_of = tmp_of.name
+                    try:
+                        pdf.image(tmp_path_of, x=30, y=12, w=165.9)
+                        pdf.set_y(38)
+                    finally:
+                        if os.path.exists(tmp_path_of):
                             try: os.unlink(tmp_path_of)
                             except: pass
-                    
-                    pdf.set_font("Arial", 'B', 11)
-                    pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
-                    pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
-                    pdf.ln(10)
-                    
-                    if dest:
-                        for line_d in dest.upper().split('\n'):
-                            if line_d.strip():
-                                pdf.cell(0, 5, txt=line_d.strip().encode('latin-1', 'replace').decode('latin-1'), ln=True)
-                    else:
-                        pdf.cell(0, 5, txt="A QUIEN CORRESPONDA", ln=True)
-                        
-                    pdf.cell(0, 5, txt=cargo.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True)
-                    pdf.ln(10)
-                    pdf.set_font("Arial", '', 11)
-                    c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
-                    pdf.multi_cell(0, 6, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
-                    
-                    pdf.ln(espacio_firma)
-                    pdf.set_font("Arial", 'B', 11)
-                    pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
-                    pdf.ln(15)
-                    pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
-                    pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
-                    pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
-                    
-                    # Anclaje inferior para C.c.p. y Archivo/minutario
-                    pdf.set_y(pos_y_ccp)
-                    pdf.set_font("Arial", '', 8)
-                    if ccp:
-                        ccp_lines = ccp.split('\n')
-                        first_ccp = True
-                        for c_line in ccp_lines:
-                            if c_line.strip():
-                                prefix = "C.c.p. " if first_ccp else "       "
-                                txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
-                                pdf.cell(0, 3.8, txt=txt_ccp, ln=True)
-                                first_ccp = False
-                    if minutario:
-                        lbl_min = "Archivo/minutario:".encode('latin-1', 'replace').decode('latin-1')
-                        pdf.set_font("Arial", 'B', 8)
-                        pdf.cell(0, 3.8, txt=lbl_min, ln=True)
-                        pdf.set_font("Arial", '', 8)
-                        min_lines = minutario.split('\n')
-                        for m_line in min_lines:
-                            if m_line.strip():
-                                txt_min = m_line.strip().encode('latin-1', 'replace').decode('latin-1')
-                                pdf.cell(0, 3.8, txt=txt_min, ln=True)
-                                
-                    pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
-                    col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
+                
+                pdf.set_font("Arial", 'B', 11)
+                pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
+                pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
+                pdf.ln(10)
+                
+                # Destinatario multilínea respetando los Enter (\n)
+                pdf.set_font("Arial", 'B', 11)
+                if dest:
+                    for line_d in dest.upper().split('\n'):
+                        if line_d.strip():
+                            pdf.cell(0, 5, txt=line_d.strip().encode('latin-1', 'replace').decode('latin-1'), ln=True)
                 else:
-                    col_pdf.error("❌ PDF no disponible.")
+                    pdf.cell(0, 5, txt="A QUIEN CORRESPONDA", ln=True)
+                    
+                pdf.cell(0, 5, txt=cargo.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True)
+                pdf.ln(10)
+                
+                pdf.set_font("Arial", '', 11)
+                c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
+                pdf.multi_cell(0, 6, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                
+                pdf.ln(espacio_firma)
+                pdf.set_font("Arial", 'B', 11)
+                pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
+                pdf.ln(15)
+                pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
+                pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+                pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+                
+                # Anclaje inferior para C.c.p. y Archivo/minutario
+                pdf.set_y(pos_y_ccp)
+                pdf.set_font("Arial", '', 8)
+                if ccp:
+                    ccp_lines = ccp.split('\n')
+                    first_ccp = True
+                    for c_line in ccp_lines:
+                        if c_line.strip():
+                            prefix = "C.c.p. " if first_ccp else "       "
+                            txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
+                            pdf.cell(0, 3.8, txt=txt_ccp, ln=True)
+                            first_ccp = False
+                if minutario:
+                    lbl_min = "Archivo/minutario:".encode('latin-1', 'replace').decode('latin-1')
+                    pdf.set_font("Arial", 'B', 8)
+                    pdf.cell(0, 3.8, txt=lbl_min, ln=True)
+                    pdf.set_font("Arial", '', 8)
+                    min_lines = minutario.split('\n')
+                    for m_line in min_lines:
+                        if m_line.strip():
+                            txt_min = m_line.strip().encode('latin-1', 'replace').decode('latin-1')
+                            pdf.cell(0, 3.8, txt=txt_min, ln=True)
+
+                # Inyección segura de Pie de Página inferior si existe
+                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_pie_bytes is not None:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_pie_ext}") as tmp_pie:
+                        tmp_pie.write(img_pie_bytes)
+                        tmp_path_pie = tmp_pie.name
+                    try:
+                        # Coloca la imagen de pie en la parte inferior (coordenada Y = 250mm aprox)
+                        pdf.image(tmp_path_pie, x=30, y=250, w=165.9)
+                    finally:
+                        if os.path.exists(tmp_path_pie):
+                            try: os.unlink(tmp_path_pie)
+                            except: pass
+                            
+                pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
+                col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
+            else:
+                col_pdf.error("❌ PDF no disponible.")
 
                 # --- GENERADOR NATIVO DE WORD (.DOCX) ---
                 try:
