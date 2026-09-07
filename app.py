@@ -1896,7 +1896,7 @@ else:
                     firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"), key=f"firma_{pk}")
                     cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"), key=f"cargo_f_{pk}")
                     ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Ing. Gustavo Anaya Maya - Director General de Servicios Públicos\nEOC\nLFHC"), height=65, key=f"ccp_{pk}", kwargs={"spellcheck": "true"})
-                    minutario = st.text_area("Archivo/minutario:", value=data_previa.get("minutario", "Minutario / Archivo de la Dirección"), height=65, key=f"minutario_{pk}", kwargs={"spellcheck": "true"})
+                    minutario = st.text_area("Archivo/minutario:", value=data_previa.get("minutario", "Archivo/minutario."), height=65, key=f"minutario_{pk}", kwargs={"spellcheck": "true"})
 
                 with st.container(border=True):
                     st.markdown("**📏 Ajuste Manual de Altura y Espaciado**")
