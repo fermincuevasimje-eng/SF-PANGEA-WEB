@@ -2432,7 +2432,7 @@ else:
                 html_header_layer = """<div style="height: 85px;"></div>"""
 
             html_formato = f"""
-            <div style="background: white; color: black; padding: 25px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; width: 100%; box-sizing: border-box;">
+            <div style="background: white; color: black; padding: 25px 30px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; max-width: 680px; margin: 0 auto; box-sizing: border-box;">
                 <!-- CAPA HTML 1: MEMBRETE DINÁMICO REFACTORIZADO -->
                 {html_header_layer}
                 
