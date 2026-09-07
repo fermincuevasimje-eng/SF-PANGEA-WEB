@@ -2383,7 +2383,7 @@ else:
                         img_pie_mime = f"image/{file_pie_ext}"
                         
                 if file_memb is None or file_pie is None:
-                    st.info("💡 Sube ambas imágenes (encabezado y pie) para completar la configuración.")
+                    st.info("💡 Sube ambas imágenes (encabezado y pie) para completar la configuración visual.")
 
             # --- FILTRO DE FUERZA BRUTA: PROCESAMIENTO ESTRICTO EN MAYÚSCULAS ---
             solicita = solicita_raw.upper().strip()
