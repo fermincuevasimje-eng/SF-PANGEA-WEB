@@ -1987,7 +1987,8 @@ else:
                             "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
                             "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
                             "firma": firm, "cargo_f": cargo_firm, "ccp": ccp,
-                            "plantilla": tipo_p
+                            "minutario": minutario, "espacio_firma": espacio_firma,
+                            "pos_y_ccp": pos_y_ccp, "plantilla": tipo_p
                         }
                         st.session_state.db_oficios[id_r] = payload_oficio
                         
