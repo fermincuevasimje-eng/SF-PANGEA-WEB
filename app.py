@@ -1918,8 +1918,11 @@ else:
 
             with c_preview:
                 st.markdown("### 👁️ Vista Previa")
-                # Cambiado a etiquetas <b> para compatibilidad nativa con el componente HTML
                 c_final = cuerpo_txt.replace("[FOLIO]", f"<b>{f_ref}</b>" if f_ref else "<b>_______</b>")
+                
+                # Conversión estricta de saltos de línea a etiquetas HTML <br>
+                dest_html = dest.upper().replace('\n', '<br>') if dest else "A QUIEN CORRESPONDA"
+                ccp_html = ccp.replace('\n', '<br>') if ccp else ""
                 
                 # --- SINCRO ESPEJO EN VISTA PREVIA HTML (CAPA OFICIOS SANITIZADA) ---
                 if tipo_membrete_of == "Sistema (Texto Directo)":
@@ -1941,10 +1944,10 @@ else:
                     {html_header_of}
                     <div style="height: {e_sup};"></div>
                     <div style="text-align: right; font-weight: bold;">Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}<br>Oficio: {n_oficio}</div><br>
-                    <div style="text-align: left; font-weight: bold; white-space: pre-line;">{dest.upper()}<br>{cargo.upper()}</div><br>
+                    <div style="text-align: left; font-weight: bold;">{dest_html}<br>{cargo.upper()}</div><br>
                     <div style="text-align: justify; white-space: pre-line;">{c_final}</div><br><br>
                     <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br>{cargo_firm.upper()}</div>
-                    <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px; white-space: pre-line;">C.c.p. {ccp}</div>
+                    <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px;">C.c.p. {ccp_html}</div>
                 </div>
                 """
                 
