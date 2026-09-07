@@ -1895,8 +1895,14 @@ else:
                     cuerpo_txt = st.text_area("Cuerpo:", value=v_cuerpo, height=150, key=f"cuerpo_{pk}_{tipo_p}", kwargs={"spellcheck": "true"})
                     firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"), key=f"firma_{pk}")
                     cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"), key=f"cargo_f_{pk}")
-                    ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Archivo, Minutario."), height=65, key=f"ccp_{pk}", kwargs={"spellcheck": "true"})
+                    ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Ing. Gustavo Anaya Maya - Director General de Servicios Públicos\nEOC\nLFHC"), height=65, key=f"ccp_{pk}", kwargs={"spellcheck": "true"})
+                    minutario = st.text_area("Archivo/minutario:", value=data_previa.get("minutario", "Minutario / Archivo de la Dirección"), height=65, key=f"minutario_{pk}", kwargs={"spellcheck": "true"})
 
+                with st.container(border=True):
+                    st.markdown("**📏 Ajuste Manual de Altura y Espaciado**")
+                    col_sp1, col_sp2 = st.columns(2)
+                    espacio_firma = col_sp1.slider("Espacio para Firma (mm):", min_value=5, max_value=40, value=int(data_previa.get("espacio_firma", 15)), key=f"sp_firm_{pk}")
+                    pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -28)), key=f"sp_ccp_{pk}")
                 # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (TRIPLE MODO MASTER) ---
                 opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
                 tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
