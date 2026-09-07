@@ -2573,11 +2573,11 @@ else:
 
             # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA) ---
             if motor_pdf_listo:
-                X_START = 24.0  # Control rígido lateral izquierdo
-                W_TOTAL = 178.0  # Ancho de celdas estandarizado
+                X_START = 25.0  # Margen izquierdo fijado en 25mm
+                W_TOTAL = 165.0  # Ancho útil congelado a 165mm
                 
                 pdf_j = FPDF(orientation='P', unit='mm', format='Letter')
-                pdf_j.set_margins(X_START, 26, 12)
+                pdf_j.set_margins(X_START, 20, 25.9)
                 pdf_j.set_auto_page_break(auto=False)
                 pdf_j.add_page()
                 
@@ -2608,11 +2608,11 @@ else:
                     
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.set_xy(X_START + 45, 20)
-                    pdf_j.cell(95, 4, txt="DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS", ln=False, align='C')
+                    pdf_j.cell(85, 4, txt="DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS", ln=False, align='C')
                     
                     pdf_j.set_font("Arial", '', 8)
-                    pdf_j.set_xy(X_START + 140, 20)
-                    pdf_j.cell(38, 4, txt="[ TIMBRE ]", ln=True, align='R')
+                    pdf_j.set_xy(X_START + 130, 20)
+                    pdf_j.cell(35, 4, txt="[ TIMBRE ]", ln=True, align='R')
                     
                     pdf_j.set_font("Arial", 'B', 8)
                     pdf_j.set_xy(X_START, 27)
@@ -2620,7 +2620,7 @@ else:
                     
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.set_xy(X_START + 45, 27)
-                    pdf_j.cell(95, 4, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
+                    pdf_j.cell(85, 4, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
                     
                     pdf_j.set_font("Arial", 'I', 8.5)
                     pdf_j.set_xy(X_START, 35)
@@ -2634,9 +2634,8 @@ else:
                         tmp.write(img_membrete_bytes)
                         tmp_path = tmp.name
                     try:
-                        # Inyección gráfica milimétrica en Capa 1 (Y: 15mm)
-                        # Fijamos el ancho exacto al W_TOTAL útil (178mm) para un ajuste perfecto
-                        pdf_j.image(tmp_path, x=X_START, y=15, w=W_TOTAL)
+                        # Inyección gráfica calibrada a 165mm x 25mm
+                        pdf_j.image(tmp_path, x=X_START, y=12, w=W_TOTAL, h=25.0)
                     finally:
                         try: os.unlink(tmp_path)
                         except: pass
