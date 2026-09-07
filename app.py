@@ -1902,39 +1902,25 @@ else:
                     st.markdown("**📏 Ajuste Manual de Altura y Espaciado**")
                     col_sp1, col_sp2 = st.columns(2)
                     espacio_firma = col_sp1.slider("Espacio para Firma (mm):", min_value=5, max_value=40, value=int(data_previa.get("espacio_firma", 15)), key=f"sp_firm_{pk}")
-                    pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -40)), key=f"sp_ccp_{pk}")
-                # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (DUAL IMAGEN: ENCABEZADO Y PIE) ---
-            opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
-            tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
-            
-            img_of_b64 = None
-            img_of_bytes = None
-            img_of_mime = "image/png"
-            file_of_ext = "png"
-            
-            img_pie_b64 = None
-            img_pie_bytes = None
-            img_pie_mime = "image/png"
-            file_pie_ext = "png"
-            
-            if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
-                col_up_head_of, col_up_foot_of = st.columns(2)
-                with col_up_head_of:
-                    file_of_memb = st.file_uploader("1. Encabezado (arriba.png):", type=["png", "jpg", "jpeg"], key=f"file_memb_of_{pk}")
+                    pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -28)), key=f"sp_ccp_{pk}")
+                # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (TRIPLE MODO MASTER) ---
+                opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
+                tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
+                
+                img_of_b64 = None
+                img_of_bytes = None
+                img_of_mime = "image/png"
+                file_of_ext = "png"
+                
+                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
+                    file_of_memb = st.file_uploader("Subir Logotipo o Banner Horizontal para Oficios:", type=["png", "jpg", "jpeg"], key=f"file_memb_of_{pk}")
                     if file_of_memb is not None:
                         img_of_bytes = file_of_memb.getvalue()
                         img_of_b64 = base64.b64encode(img_of_bytes).decode('utf-8')
                         file_of_ext = file_of_memb.name.split(".")[-1].lower()
                         img_of_mime = f"image/{file_of_ext}"
-                with col_up_foot_of:
-                    file_of_pie = st.file_uploader("2. Pie de Página (abajo.png):", type=["png", "jpg", "jpeg"], key=f"file_pie_of_{pk}")
-                    if file_of_pie is not None:
-                        img_pie_bytes = file_of_pie.getvalue()
-                        img_pie_b64 = base64.b64encode(img_pie_bytes).decode('utf-8')
-                        file_pie_ext = file_of_pie.name.split(".")[-1].lower()
-                        img_pie_mime = f"image/{file_pie_ext}"
-                if file_of_memb is None or file_of_pie is None:
-                    st.info("💡 Sube ambas imágenes (encabezado y pie de página) para una visualización correcta.")
+                    else:
+                        st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
 
             with c_preview:
                 st.markdown("### 👁️ Vista Previa")
@@ -2021,99 +2007,82 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
                 
-                # --- GENERADOR DE DOCUMENTO PDF (BLINDADO CONTRA ERRORES TEMPORALES) ---
-            if motor_pdf_listo:
-                pdf = FPDF(orientation='P', unit='mm', format='Letter')
-                pdf.set_margins(30, 20, 20)
-                pdf.set_auto_page_break(auto=True, margin=15) 
-                pdf.add_page()
-                
-                # Inyección segura de Encabezado si existe
-                if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
-                    pdf.ln(10)
-                elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
-                    import tempfile
-                    import os
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_of_ext}") as tmp_of:
-                        tmp_of.write(img_of_bytes)
-                        tmp_path_of = tmp_of.name
-                    try:
-                        pdf.image(tmp_path_of, x=30, y=12, w=165.9)
-                        pdf.set_y(38)
-                    finally:
-                        if os.path.exists(tmp_path_of):
+                # --- GENERADOR DE DOCUMENTO PDF (FPDF AJUSTADO) ---
+                if motor_pdf_listo:
+                    pdf = FPDF(orientation='P', unit='mm', format='Letter')
+                    pdf.set_margins(30, 20, 20)
+                    pdf.set_auto_page_break(auto=True, margin=15) 
+                    pdf.add_page()
+                    
+                    if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
+                        pdf.ln(10)
+                    elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
+                        import tempfile
+                        import os
+                        suffix_file_of = f".{file_ext}" if 'file_ext' in locals() else f".{file_of_ext}"
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix_file_of) as tmp_of:
+                            tmp_of.write(img_of_bytes)
+                            tmp_path_of = tmp_of.name
+                        try:
+                            pdf.image(tmp_path_of, x=30, y=12, w=165.9)
+                            pdf.set_y(38)
+                        finally:
                             try: os.unlink(tmp_path_of)
                             except: pass
-                
-                pdf.set_font("Arial", 'B', 11)
-                pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
-                pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
-                pdf.ln(10)
-                
-                # Destinatario multilínea respetando los Enter (\n)
-                pdf.set_font("Arial", 'B', 11)
-                if dest:
-                    for line_d in dest.upper().split('\n'):
-                        if line_d.strip():
-                            pdf.cell(0, 5, txt=line_d.strip().encode('latin-1', 'replace').decode('latin-1'), ln=True)
-                else:
-                    pdf.cell(0, 5, txt="A QUIEN CORRESPONDA", ln=True)
                     
-                pdf.cell(0, 5, txt=cargo.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True)
-                pdf.ln(10)
-                
-                pdf.set_font("Arial", '', 11)
-                c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
-                pdf.multi_cell(0, 6, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
-                
-                pdf.ln(espacio_firma)
-                pdf.set_font("Arial", 'B', 11)
-                pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
-                pdf.ln(15)
-                pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
-                pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
-                pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
-                
-                # Anclaje inferior para C.c.p. y Archivo/minutario
-                pdf.set_y(pos_y_ccp)
-                pdf.set_font("Arial", '', 8)
-                if ccp:
-                    ccp_lines = ccp.split('\n')
-                    first_ccp = True
-                    for c_line in ccp_lines:
-                        if c_line.strip():
-                            prefix = "C.c.p. " if first_ccp else "       "
-                            txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
-                            pdf.cell(0, 3.8, txt=txt_ccp, ln=True)
-                            first_ccp = False
-                if minutario:
-                    lbl_min = "Archivo/minutario:".encode('latin-1', 'replace').decode('latin-1')
-                    pdf.set_font("Arial", 'B', 8)
-                    pdf.cell(0, 3.8, txt=lbl_min, ln=True)
+                    pdf.set_font("Arial", 'B', 11)
+                    pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
+                    pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
+                    pdf.ln(10)
+                    
+                    if dest:
+                        for line_d in dest.upper().split('\n'):
+                            if line_d.strip():
+                                pdf.cell(0, 5, txt=line_d.strip().encode('latin-1', 'replace').decode('latin-1'), ln=True)
+                    else:
+                        pdf.cell(0, 5, txt="A QUIEN CORRESPONDA", ln=True)
+                        
+                    pdf.cell(0, 5, txt=cargo.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True)
+                    pdf.ln(10)
+                    pdf.set_font("Arial", '', 11)
+                    c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
+                    pdf.multi_cell(0, 6, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                    
+                    pdf.ln(espacio_firma)
+                    pdf.set_font("Arial", 'B', 11)
+                    pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
+                    pdf.ln(15)
+                    pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
+                    pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+                    pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+                    
+                    # Anclaje inferior para C.c.p. y Archivo/minutario
+                    pdf.set_y(pos_y_ccp)
                     pdf.set_font("Arial", '', 8)
-                    min_lines = minutario.split('\n')
-                    for m_line in min_lines:
-                        if m_line.strip():
-                            txt_min = m_line.strip().encode('latin-1', 'replace').decode('latin-1')
-                            pdf.cell(0, 3.8, txt=txt_min, ln=True)
-
-                # Inyección segura de Pie de Página inferior si existe
-                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_pie_bytes is not None:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_pie_ext}") as tmp_pie:
-                        tmp_pie.write(img_pie_bytes)
-                        tmp_path_pie = tmp_pie.name
-                    try:
-                        # Coloca la imagen de pie en la parte inferior (coordenada Y = 250mm aprox)
-                        pdf.image(tmp_path_pie, x=30, y=250, w=165.9)
-                    finally:
-                        if os.path.exists(tmp_path_pie):
-                            try: os.unlink(tmp_path_pie)
-                            except: pass
-                            
-                pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
-                col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
-            else:
-                col_pdf.error("❌ PDF no disponible.")
+                    if ccp:
+                        ccp_lines = ccp.split('\n')
+                        first_ccp = True
+                        for c_line in ccp_lines:
+                            if c_line.strip():
+                                prefix = "C.c.p. " if first_ccp else "       "
+                                txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
+                                pdf.cell(0, 3.8, txt=txt_ccp, ln=True)
+                                first_ccp = False
+                    if minutario:
+                        lbl_min = "Archivo/minutario:".encode('latin-1', 'replace').decode('latin-1')
+                        pdf.set_font("Arial", 'B', 8)
+                        pdf.cell(0, 3.8, txt=lbl_min, ln=True)
+                        pdf.set_font("Arial", '', 8)
+                        min_lines = minutario.split('\n')
+                        for m_line in min_lines:
+                            if m_line.strip():
+                                txt_min = m_line.strip().encode('latin-1', 'replace').decode('latin-1')
+                                pdf.cell(0, 3.8, txt=txt_min, ln=True)
+                                
+                    pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
+                    col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
+                else:
+                    col_pdf.error("❌ PDF no disponible.")
 
                 # --- GENERADOR NATIVO DE WORD (.DOCX) ---
                 try:
@@ -2184,7 +2153,10 @@ else:
                     col_docx.download_button(label="📝 DESCARGAR WORD (.DOCX)", data=docx_bytes, file_name=f"Oficio_{n_oficio.replace('/','-')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
                 except ImportError:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
-                
+                except ImportError:
+                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
+                except ImportError:
+                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
 # ==================================================================================
 # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
 # ==================================================================================
@@ -2364,26 +2336,14 @@ else:
             file_ext = "png"
             
             if tipo_membrete == "Imagen Personalizada (Subir Banner)":
-                col_up_head, col_up_foot = st.columns(2)
-                
-                with col_up_head:
-                    file_memb = st.file_uploader("1. Subir Encabezado (arriba.png):", type=["png", "jpg", "jpeg"], key=f"file_memb_{pk_j}")
-                    if file_memb is not None:
-                        img_membrete_bytes = file_memb.getvalue()
-                        img_membrete_b64 = base64.b64encode(img_membrete_bytes).decode('utf-8')
-                        file_ext = file_memb.name.split(".")[-1].lower()
-                        img_mime = f"image/{file_ext}"
-                        
-                with col_up_foot:
-                    file_pie = st.file_uploader("2. Subir Pie de Página (abajo.png):", type=["png", "jpg", "jpeg"], key=f"file_pie_{pk_j}")
-                    if file_pie is not None:
-                        img_pie_bytes = file_pie.getvalue()
-                        img_pie_b64 = base64.b64encode(img_pie_bytes).decode('utf-8')
-                        file_pie_ext = file_pie.name.split(".")[-1].lower()
-                        img_pie_mime = f"image/{file_pie_ext}"
-                        
-                if file_memb is None or file_pie is None:
-                    st.info("💡 Sube ambas imágenes (encabezado y pie) para completar la configuración visual.")
+                file_memb = st.file_uploader("Subir Logotipo o Banner Horizontal:", type=["png", "jpg", "jpeg"], key=f"file_memb_{pk_j}")
+                if file_memb is not None:
+                    img_membrete_bytes = file_memb.getvalue()
+                    img_membrete_b64 = base64.b64encode(img_membrete_bytes).decode('utf-8')
+                    file_ext = file_memb.name.split(".")[-1].lower()
+                    img_mime = f"image/{file_ext}"
+                else:
+                    st.info("💡 Sube un banner horizontal (proporción óptima: 178mm x 25mm).")
 
             # --- FILTRO DE FUERZA BRUTA: PROCESAMIENTO ESTRICTO EN MAYÚSCULAS ---
             solicita = solicita_raw.upper().strip()
