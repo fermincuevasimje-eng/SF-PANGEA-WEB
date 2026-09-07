@@ -2010,12 +2010,12 @@ else:
                 # --- GENERADOR DE DOCUMENTO PDF (FPDF AJUSTADO) ---
                 if motor_pdf_listo:
                     pdf = FPDF(orientation='P', unit='mm', format='Letter')
-                    pdf.set_margins(30, 20, 20)
-                    pdf.set_auto_page_break(auto=True, margin=15) 
+                    pdf.set_margins(25, 20, 25.9)  # Ancho útil útil fijado en 165mm
+                    pdf.set_auto_page_break(auto=True, margin=25) 
                     pdf.add_page()
                     
                     if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
-                        pdf.ln(10)
+                        pdf.ln(15)
                     elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
                         import tempfile
                         import os
@@ -2024,8 +2024,8 @@ else:
                             tmp_of.write(img_of_bytes)
                             tmp_path_of = tmp_of.name
                         try:
-                            pdf.image(tmp_path_of, x=30, y=12, w=165.9)
-                            pdf.set_y(38)
+                            pdf.image(tmp_path_of, x=25, y=12, w=165.0, h=25.0)
+                            pdf.set_y(40)
                         finally:
                             try: os.unlink(tmp_path_of)
                             except: pass
@@ -2151,10 +2151,6 @@ else:
                     docx_bytes = stream_docx.getvalue()
                     
                     col_docx.download_button(label="📝 DESCARGAR WORD (.DOCX)", data=docx_bytes, file_name=f"Oficio_{n_oficio.replace('/','-')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
-                except ImportError:
-                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
-                except ImportError:
-                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
                 except ImportError:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
 # ==================================================================================
