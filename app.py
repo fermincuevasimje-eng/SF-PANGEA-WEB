@@ -2153,10 +2153,7 @@ else:
                     col_docx.download_button(label="📝 DESCARGAR WORD (.DOCX)", data=docx_bytes, file_name=f"Oficio_{n_oficio.replace('/','-')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
                 except ImportError:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
-                except ImportError:
-                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
-                except ImportError:
-                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
+                
 # ==================================================================================
 # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
 # ==================================================================================
