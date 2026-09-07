@@ -1912,13 +1912,27 @@ else:
                 img_of_mime = "image/png"
                 file_of_ext = "png"
                 
-                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
-                    file_of_memb = st.file_uploader("Subir Logotipo o Banner Horizontal para Oficios:", type=["png", "jpg", "jpeg"], key=f"file_memb_of_{pk}")
-                    if file_of_memb is not None:
-                        img_of_bytes = file_of_memb.getvalue()
-                        img_of_b64 = base64.b64encode(img_of_bytes).decode('utf-8')
-                        file_of_ext = file_of_memb.name.split(".")[-1].lower()
-                        img_of_mime = f"image/{file_of_ext}"
+                if tipo_membrete == "Imagen Personalizada (Subir Banner)":
+    col_up_head, col_up_foot = st.columns(2)
+    
+    with col_up_head:
+        file_memb = st.file_uploader("1. Subir Encabezado (arriba.png):", type=["png", "jpg", "jpeg"], key=f"file_memb_{pk_j}")
+        if file_memb is not None:
+            img_membrete_bytes = file_memb.getvalue()
+            img_membrete_b64 = base64.b64encode(img_membrete_bytes).decode('utf-8')
+            file_ext = file_memb.name.split(".")[-1].lower()
+            img_mime = f"image/{file_ext}"
+            
+    with col_up_foot:
+        file_pie = st.file_uploader("2. Subir Pie de Página (abajo.png):", type=["png", "jpg", "jpeg"], key=f"file_pie_{pk_j}")
+        if file_pie is not None:
+            img_pie_bytes = file_pie.getvalue()
+            img_pie_b64 = base64.b64encode(img_pie_bytes).decode('utf-8')
+            file_pie_ext = file_pie.name.split(".")[-1].lower()
+            img_pie_mime = f"image/{file_pie_ext}"
+            
+    if file_memb is None or file_pie is None:
+        st.info("💡 Sube ambas imágenes (encabezado y pie) para completar la configuración.")
                     else:
                         st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
 
