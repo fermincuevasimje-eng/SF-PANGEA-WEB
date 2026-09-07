@@ -1903,24 +1903,38 @@ else:
                     col_sp1, col_sp2 = st.columns(2)
                     espacio_firma = col_sp1.slider("Espacio para Firma (mm):", min_value=5, max_value=40, value=int(data_previa.get("espacio_firma", 15)), key=f"sp_firm_{pk}")
                     pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -40)), key=f"sp_ccp_{pk}")
-                # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (TRIPLE MODO MASTER) ---
-                opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
-                tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
-                
-                img_of_b64 = None
-                img_of_bytes = None
-                img_of_mime = "image/png"
-                file_of_ext = "png"
-                
-                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
-                    file_of_memb = st.file_uploader("Subir Logotipo o Banner Horizontal para Oficios:", type=["png", "jpg", "jpeg"], key=f"file_memb_of_{pk}")
+                # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (DUAL IMAGEN: ENCABEZADO Y PIE) ---
+            opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
+            tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
+            
+            img_of_b64 = None
+            img_of_bytes = None
+            img_of_mime = "image/png"
+            file_of_ext = "png"
+            
+            img_pie_b64 = None
+            img_pie_bytes = None
+            img_pie_mime = "image/png"
+            file_pie_ext = "png"
+            
+            if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
+                col_up_head_of, col_up_foot_of = st.columns(2)
+                with col_up_head_of:
+                    file_of_memb = st.file_uploader("1. Encabezado (arriba.png):", type=["png", "jpg", "jpeg"], key=f"file_memb_of_{pk}")
                     if file_of_memb is not None:
                         img_of_bytes = file_of_memb.getvalue()
                         img_of_b64 = base64.b64encode(img_of_bytes).decode('utf-8')
                         file_of_ext = file_of_memb.name.split(".")[-1].lower()
                         img_of_mime = f"image/{file_of_ext}"
-                    else:
-                        st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
+                with col_up_foot_of:
+                    file_of_pie = st.file_uploader("2. Pie de Página (abajo.png):", type=["png", "jpg", "jpeg"], key=f"file_pie_of_{pk}")
+                    if file_of_pie is not None:
+                        img_pie_bytes = file_of_pie.getvalue()
+                        img_pie_b64 = base64.b64encode(img_pie_bytes).decode('utf-8')
+                        file_pie_ext = file_of_pie.name.split(".")[-1].lower()
+                        img_pie_mime = f"image/{file_pie_ext}"
+                if file_of_memb is None or file_of_pie is None:
+                    st.info("💡 Sube ambas imágenes (encabezado y pie de página) para una visualización correcta.")
 
             with c_preview:
                 st.markdown("### 👁️ Vista Previa")
