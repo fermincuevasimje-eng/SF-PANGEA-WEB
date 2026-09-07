@@ -7,3 +7,4 @@ openpyxl
 st-gsheets-connection
 fpdf
 supabase
+python-docx
