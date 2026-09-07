@@ -2018,16 +2018,37 @@ else:
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
-                    pdf.ln(15); pdf.cell(0, 5, txt=dest.upper() if dest else "A QUIEN CORRESPONDA", ln=True)
-                    pdf.cell(0, 5, txt=cargo.upper(), ln=True)
+                    pdf.ln(15)
+                    
+                    # Iteración renglón por renglón para respetar saltos de línea en Destinatario
+                    if dest:
+                        for line_d in dest.upper().split('\n'):
+                            if line_d.strip():
+                                pdf.cell(0, 5, txt=line_d.strip().encode('latin-1', 'replace').decode('latin-1'), ln=True)
+                    else:
+                        pdf.cell(0, 5, txt="A QUIEN CORRESPONDA", ln=True)
+                        
+                    pdf.cell(0, 5, txt=cargo.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True)
                     pdf.ln(15); pdf.set_font("Arial", '', 11)
                     c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
                     pdf.multi_cell(0, 7, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
                     pdf.ln(25); pdf.set_font("Arial", 'B', 11); pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
                     pdf.ln(20); pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
-                    pdf.cell(0, 5, txt=firm.upper(), ln=True, align='C')
-                    pdf.cell(0, 5, txt=cargo_firm.upper(), ln=True, align='C')
-                    pdf.set_y(-30); pdf.set_font("Arial", '', 8); pdf.cell(0, 5, txt=f"C.c.p. {ccp}", ln=True)
+                    pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+                    pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+                    
+                    # Iteración renglón por renglón para respetar saltos de línea en C.c.p.
+                    pdf.set_y(-30)
+                    pdf.set_font("Arial", '', 8)
+                    if ccp:
+                        ccp_lines = ccp.split('\n')
+                        first_ccp = True
+                        for c_line in ccp_lines:
+                            if c_line.strip():
+                                prefix = "C.c.p. " if first_ccp else "       "
+                                txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
+                                pdf.cell(0, 4, txt=txt_ccp, ln=True)
+                                first_ccp = False
                     
                     pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
                     st.download_button(label="🚀 DESCARGAR OFICIO PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
