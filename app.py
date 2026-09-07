@@ -1896,7 +1896,7 @@ else:
                     firm = st.text_input("Firma (Nombre):", value=data_previa.get("firma", "NOMBRE DEL DIRECTOR"), key=f"firma_{pk}")
                     cargo_firm = st.text_input("Cargo del Firmante:", value=data_previa.get("cargo_f", "DIRECTOR DE ALUMBRADO PÚBLICO"), key=f"cargo_f_{pk}")
                     ccp = st.text_area("C.c.p.:", value=data_previa.get("ccp", "Ing. Gustavo Anaya Maya - Director General de Servicios Públicos\nEOC\nLFHC"), height=65, key=f"ccp_{pk}", kwargs={"spellcheck": "true"})
-                    minutario = st.text_area("Archivo/minutario:", value=data_previa.get("minutario", "Archivo/minutario."), height=65, key=f"minutario_{pk}", kwargs={"spellcheck": "true"})
+                    minutario = st.text_area("Archivo/minutario:", value=data_previa.get("minutario", "LPSB/ajgf"), height=65, key=f"minutario_{pk}", kwargs={"spellcheck": "true"})
 
                 with st.container(border=True):
                     st.markdown("**📏 Ajuste Manual de Altura y Espaciado**")
@@ -1946,7 +1946,7 @@ else:
                     html_header_of = """<div style="height: 80px;"></div>"""
                     e_sup = "20px"
 
-                sec_minutario_html = f"""<div style="font-size: 10px; margin-top: 2px;">{minutario_html}</div>""" if minutario_html else ""
+                sec_minutario_html = f"""<div style="font-size: 10px; margin-top: 4px;"><b>Archivo/minutario:</b><br>{minutario_html}</div>""" if minutario_html else ""
 
                 html_oficio_render = f"""
                 <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.5; min-height: 550px; box-sizing: border-box;">
@@ -2069,6 +2069,10 @@ else:
                                 pdf.cell(0, 3.8, txt=txt_ccp, ln=True)
                                 first_ccp = False
                     if minutario:
+                        lbl_min = "Archivo/minutario:".encode('latin-1', 'replace').decode('latin-1')
+                        pdf.set_font("Arial", 'B', 8)
+                        pdf.cell(0, 3.8, txt=lbl_min, ln=True)
+                        pdf.set_font("Arial", '', 8)
                         min_lines = minutario.split('\n')
                         for m_line in min_lines:
                             if m_line.strip():
@@ -2133,6 +2137,9 @@ else:
                                 first_ccp = False
                                 
                     if minutario:
+                        r_lbl_min = p_ccp_doc.add_run("Archivo/minutario:\n")
+                        r_lbl_min.font.size = Pt(8.5)
+                        r_lbl_min.bold = True
                         min_lines = minutario.split('\n')
                         for m_line in min_lines:
                             if m_line.strip():
@@ -2144,6 +2151,8 @@ else:
                     docx_bytes = stream_docx.getvalue()
                     
                     col_docx.download_button(label="📝 DESCARGAR WORD (.DOCX)", data=docx_bytes, file_name=f"Oficio_{n_oficio.replace('/','-')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                except ImportError:
+                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
                 except ImportError:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
                 except ImportError:
