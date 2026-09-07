@@ -1902,7 +1902,7 @@ else:
                     st.markdown("**📏 Ajuste Manual de Altura y Espaciado**")
                     col_sp1, col_sp2 = st.columns(2)
                     espacio_firma = col_sp1.slider("Espacio para Firma (mm):", min_value=5, max_value=40, value=int(data_previa.get("espacio_firma", 15)), key=f"sp_firm_{pk}")
-                    pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -28)), key=f"sp_ccp_{pk}")
+                    pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -40)), key=f"sp_ccp_{pk}")
                 # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (TRIPLE MODO MASTER) ---
                 opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
                 tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
