@@ -1946,7 +1946,7 @@ else:
                     html_header_of = """<div style="height: 80px;"></div>"""
                     e_sup = "20px"
 
-                sec_minutario_html = f"""<div style="font-size: 10px; margin-top: 4px;"><b>Archivo/minutario:</b><br>{minutario_html}</div>""" if minutario_html else ""
+                sec_minutario_html = f"""<div style="font-size: 10px; margin-top: 2px;">{minutario_html}</div>""" if minutario_html else ""
 
                 html_oficio_render = f"""
                 <div style="background: white; color: black; padding: 40px; border: 1px solid #ddd; font-family: 'Arial'; line-height: 1.5; min-height: 550px; box-sizing: border-box;">
