@@ -2054,7 +2054,7 @@ else:
                             img_temp.save(tmp_hdr.name, format="JPEG")
                             tmp_hdr_path = tmp_hdr.name
                         try:
-                            pdf.image(tmp_hdr_path, x=13, y=4, w=190)
+                            pdf.image(tmp_hdr_path, x=13, y=4, w=196)
                             pdf.set_y(36)
                         finally:
                             try: os.unlink(tmp_hdr_path)
@@ -2069,7 +2069,7 @@ else:
                             img_temp.save(tmp_ftr.name, format="JPEG")
                             tmp_ftr_path = tmp_ftr.name
                         try:
-                            pdf.image(tmp_ftr_path, x=13, y=page_h - 24, w=190)
+                            pdf.image(tmp_ftr_path, x=13, y=page_h - 24, w=196)
                         finally:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
@@ -2712,7 +2712,7 @@ else:
                         img_temp.save(tmp_j_hdr.name, format="JPEG")
                         tmp_j_hdr_path = tmp_j_hdr.name
                     try:
-                        pdf_j.image(tmp_j_hdr_path, x=13, y=4, w=190)
+                        pdf_j.image(tmp_j_hdr_path, x=13, y=4, w=196)
                     finally:
                         try: os.unlink(tmp_j_hdr_path)
                         except: pass
@@ -2726,7 +2726,7 @@ else:
                         img_temp.save(tmp_j_ftr.name, format="JPEG")
                         tmp_j_ftr_path = tmp_j_ftr.name
                     try:
-                        pdf_j.image(tmp_j_ftr_path, x=13, y=page_h_j - 24, w=190)
+                        pdf_j.image(tmp_j_ftr_path, x=13, y=page_h_j - 24, w=196)
                     finally:
                         try: os.unlink(tmp_j_ftr_path)
                         except: pass
