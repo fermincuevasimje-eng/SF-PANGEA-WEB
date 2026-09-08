@@ -2705,7 +2705,8 @@ else:
                         img_temp.save(tmp_j_hdr.name, format="JPEG")
                         tmp_j_hdr_path = tmp_j_hdr.name
                     try:
-                        pdf_j.image(tmp_j_hdr_path, x=X_START, y=12, w=W_TOTAL)
+                        # Ajuste: Encabezado pegado arriba (Y=6mm) y más ancho (W=190mm)
+                        pdf_j.image(tmp_j_hdr_path, x=13, y=6, w=190)
                     finally:
                         try: os.unlink(tmp_j_hdr_path)
                         except: pass
@@ -2719,7 +2720,8 @@ else:
                         img_temp.save(tmp_j_ftr.name, format="JPEG")
                         tmp_j_ftr_path = tmp_j_ftr.name
                     try:
-                        pdf_j.image(tmp_j_ftr_path, x=X_START, y=page_h_j - 25, w=W_TOTAL)
+                        # Ajuste: Pie pegado al borde inferior (Y=page_h_j-18mm) y más ancho (W=190mm)
+                        pdf_j.image(tmp_j_ftr_path, x=13, y=page_h_j - 18, w=190)
                     finally:
                         try: os.unlink(tmp_j_ftr_path)
                         except: pass
