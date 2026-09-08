@@ -2053,8 +2053,9 @@ else:
                             img_temp.save(tmp_hdr.name, format="JPEG")
                             tmp_hdr_path = tmp_hdr.name
                         try:
-                            pdf.image(tmp_hdr_path, x=30, y=10, w=165.9)
-                            pdf.set_y(36)
+                            # Ajuste: Encabezado pegado arriba (Y=6mm) y más ancho (W=190mm)
+                            pdf.image(tmp_hdr_path, x=13, y=6, w=190)
+                            pdf.set_y(32)
                         finally:
                             try: os.unlink(tmp_hdr_path)
                             except: pass
@@ -2067,11 +2068,11 @@ else:
                             img_temp.save(tmp_ftr.name, format="JPEG")
                             tmp_ftr_path = tmp_ftr.name
                         try:
-                            pdf.image(tmp_ftr_path, x=30, y=page_h - 25, w=165.9)
+                            # Ajuste: Pie pegado al borde inferior (Y=page_h-18mm) y más ancho (W=190mm)
+                            pdf.image(tmp_ftr_path, x=13, y=page_h - 18, w=190)
                         finally:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
-
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
