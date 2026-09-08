@@ -1903,48 +1903,69 @@ else:
                     col_sp1, col_sp2 = st.columns(2)
                     espacio_firma = col_sp1.slider("Espacio para Firma (mm):", min_value=5, max_value=40, value=int(data_previa.get("espacio_firma", 15)), key=f"sp_firm_{pk}")
                     pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -28)), key=f"sp_ccp_{pk}")
-                # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (TRIPLE MODO MASTER) ---
+                # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (PERSISTENTE CON PIE DE PÁGINA) ---
+                if "global_header_b64" not in st.session_state: st.session_state.global_header_b64 = None
+                if "global_footer_b64" not in st.session_state: st.session_state.global_footer_b64 = None
+
                 opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
                 tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
-                
-                img_of_b64 = None
-                img_of_bytes = None
-                img_of_mime = "image/png"
-                file_of_ext = "png"
-                
+                formato_hoja_of = st.selectbox("Tamaño de Hoja Oficio:", ["Carta (Letter)", "Oficio (Legal)"], index=0 if data_previa.get("formato_hoja", "Carta (Letter)") == "Carta (Letter)" else 1, key=f"fmt_hoja_of_{pk}")
+
+                img_of_hdr_b64 = data_previa.get("img_header_b64") or st.session_state.global_header_b64
+                img_of_ftr_b64 = data_previa.get("img_footer_b64") or st.session_state.global_footer_b64
+                img_of_hdr_bytes, img_of_ftr_bytes = None, None
+
                 if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
-                    file_of_memb = st.file_uploader("Subir Logotipo o Banner Horizontal para Oficios:", type=["png", "jpg", "jpeg"], key=f"file_memb_of_{pk}")
-                    if file_of_memb is not None:
-                        img_of_bytes = file_of_memb.getvalue()
-                        img_of_b64 = base64.b64encode(img_of_bytes).decode('utf-8')
-                        file_of_ext = file_of_memb.name.split(".")[-1].lower()
-                        img_of_mime = f"image/{file_of_ext}"
-                    else:
-                        st.info("💡 Sube un banner horizontal (proporción óptima: 165mm x 25mm).")
+                    col_up_h, col_up_f = st.columns(2)
+                    with col_up_h:
+                        file_hdr_of = st.file_uploader("1. Encabezado / Banner Superior:", type=["png", "jpg", "jpeg"], key=f"file_hdr_of_{pk}")
+                        if file_hdr_of is not None:
+                            img_of_hdr_bytes = file_hdr_of.getvalue()
+                            img_of_hdr_b64 = base64.b64encode(img_of_hdr_bytes).decode('utf-8')
+                            st.session_state.global_header_b64 = img_of_hdr_b64
+                        elif img_of_hdr_b64:
+                            try: img_of_hdr_bytes = base64.b64decode(img_of_hdr_b64)
+                            except: pass
+
+                    with col_up_f:
+                        file_ftr_of = st.file_uploader("2. Pie de Página / Banner Inferior:", type=["png", "jpg", "jpeg"], key=f"file_ftr_of_{pk}")
+                        if file_ftr_of is not None:
+                            img_of_ftr_bytes = file_ftr_of.getvalue()
+                            img_of_ftr_b64 = base64.b64encode(img_of_ftr_bytes).decode('utf-8')
+                            st.session_state.global_footer_b64 = img_of_ftr_b64
+                        elif img_of_ftr_b64:
+                            try: img_of_ftr_bytes = base64.b64decode(img_of_ftr_b64)
+                            except: pass
 
             with c_preview:
                 st.markdown("### 👁️ Vista Previa")
                 c_final = cuerpo_txt.replace("[FOLIO]", f"<b>{f_ref}</b>" if f_ref else "<b>_______</b>")
-                
-                # Conversión estricta de saltos de línea a etiquetas HTML <br>
+
                 dest_html = dest.upper().replace('\n', '<br>') if dest else "A QUIEN CORRESPONDA"
                 ccp_html = ccp.replace('\n', '<br>') if ccp else ""
                 minutario_html = minutario.replace('\n', '<br>') if minutario else ""
-                
-                # --- SINCRO ESPEJO EN VISTA PREVIA HTML (CAPA OFICIOS SANITIZADA) ---
+
                 if tipo_membrete_of == "Sistema (Texto Directo)":
                     html_header_of = ""
                     e_sup = "20px"
-                elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_b64 is not None:
+                elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_hdr_b64:
                     html_header_of = f"""
                     <div style="width: 100%; text-align: center; margin-bottom: 15px;">
-                        <img src="data:{img_of_mime};base64,{img_of_b64}" style="width: 100%; max-height: 80px; object-fit: contain;">
+                        <img src="data:image/png;base64,{img_of_hdr_b64}" style="width: 100%; max-height: 90px; object-fit: contain;">
                     </div>
                     """
                     e_sup = "0px"
                 else:
                     html_header_of = """<div style="height: 80px;"></div>"""
                     e_sup = "20px"
+
+                html_footer_of = ""
+                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_ftr_b64:
+                    html_footer_of = f"""
+                    <div style="width: 100%; text-align: center; margin-top: 30px;">
+                        <img src="data:image/png;base64,{img_of_ftr_b64}" style="width: 100%; max-height: 70px; object-fit: contain;">
+                    </div>
+                    """
 
                 sec_minutario_html = f"""<div style="font-size: 10px; margin-top: 4px;"><b>Archivo/minutario:</b><br>{minutario_html}</div>""" if minutario_html else ""
 
@@ -1959,16 +1980,15 @@ else:
                     <div style="text-align: center;"><b>A T E N T A M E N T E</b><br><br><br>__________________________<br><b>{firm.upper()}</b><br>{cargo_firm.upper()}</div>
                     <div style="font-size: 10px; border-top: 1px solid #eee; margin-top: 20px;"><b>C.c.p.</b> {ccp_html}</div>
                     {sec_minutario_html}
+                    {html_footer_of}
                 </div>
                 """
-                
-                # Inyección limpia encapsulada para evitar el escape de strings en Streamlit
-                st.components.v1.html(html_oficio_render, height=650, scrolling=True)
 
+                st.components.v1.html(html_oficio_render, height=650, scrolling=True)
                 st.divider()
-                
+
                 ejecutar_guardado = False
-                
+
                 if modo_of == "📂 Consultar Bóveda":
                     seguro_actualizar = st.checkbox("🔐 Confirmar cambios y actualización del oficio histórico", key="chk_seguro_actualizar_ofc")
                     if st.button("🔄 ACTUALIZAR REGISTRO EXISTENTE", use_container_width=True, disabled=not seguro_actualizar, type="primary"):
@@ -1976,78 +1996,94 @@ else:
                 else:
                     if st.button("💾 GUARDAR NUEVO OFICIO", use_container_width=True, type="primary"):
                         ejecutar_guardado = True
-                        
+
                 if ejecutar_guardado:
                     id_r = n_oficio.replace("/", "-")
-                    
+
                     if modo_of == "✨ Crear Nuevo" and id_r in st.session_state.db_oficios:
                         st.error(f"⚠️ Error: El oficio '{n_oficio}' ya existe en el registro histórico de la Dirección. Por favor verifique el número.")
                     else:
                         payload_oficio = {
-                            "num": n_oficio, "fecha": str(f_oficio), "dest": dest, 
-                            "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt, 
+                            "num": n_oficio, "fecha": str(f_oficio), "dest": dest,
+                            "cargo": cargo, "folio": f_ref, "cuerpo": cuerpo_txt,
                             "firma": firm, "cargo_f": cargo_firm, "ccp": ccp,
                             "minutario": minutario, "espacio_firma": espacio_firma,
-                            "pos_y_ccp": pos_y_ccp, "plantilla": tipo_p
+                            "pos_y_ccp": pos_y_ccp, "plantilla": tipo_p,
+                            "formato_hoja": formato_hoja_of,
+                            "img_header_b64": img_of_hdr_b64,
+                            "img_footer_b64": img_of_ftr_b64
                         }
                         st.session_state.db_oficios[id_r] = payload_oficio
-                        
+
                         tz_mx = timezone(timedelta(hours=-6))
                         ahora = datetime.now(tz_mx)
                         id_reg = f"SF4-OFC-{ahora.strftime('%Y%m%d-%H%M%S')}"
                         fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
-                        
+
                         try:
                             cell = ws.find(id_r, in_column=3)
                             if cell: ws.delete_rows(cell.row)
                         except: pass
-                        
+
                         ws.append_row([id_reg, fecha_mx, id_r, f_ref, json.dumps(payload_oficio), ""])
                         st.success("✅ Bóveda Nube de Oficios Actualizada Exitosamente."); time.sleep(1); st.rerun()
 
                 col_pdf, col_docx = st.columns(2)
-                
-                # --- GENERADOR DE DOCUMENTO PDF (FPDF AJUSTADO) ---
+
+                # --- GENERADOR DE DOCUMENTO PDF (FPDF AJUSTADO CARTA / OFICIO) ---
                 if motor_pdf_listo:
-                    pdf = FPDF(orientation='P', unit='mm', format='Letter')
+                    fmt_pdf = 'Letter' if "Carta" in formato_hoja_of else 'Legal'
+                    page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
+
+                    pdf = FPDF(orientation='P', unit='mm', format=fmt_pdf)
                     pdf.set_margins(30, 20, 20)
-                    pdf.set_auto_page_break(auto=True, margin=15) 
+                    pdf.set_auto_page_break(auto=True, margin=15)
                     pdf.add_page()
-                    
-                    if tipo_membrete_of == "Hoja Física (Espacio para Membrete)": 
+
+                    import tempfile
+                    import os
+
+                    if tipo_membrete_of == "Hoja Física (Espacio para Membrete)":
                         pdf.ln(10)
-                    elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_bytes is not None:
-                        import tempfile
-                        import os
-                        suffix_file_of = f".{file_ext}" if 'file_ext' in locals() else f".{file_of_ext}"
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix_file_of) as tmp_of:
-                            tmp_of.write(img_of_bytes)
-                            tmp_path_of = tmp_of.name
+                    elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_hdr_bytes is not None:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_hdr:
+                            tmp_hdr.write(img_of_hdr_bytes)
+                            tmp_hdr_path = tmp_hdr.name
                         try:
-                            pdf.image(tmp_path_of, x=30, y=12, w=165.9)
-                            pdf.set_y(38)
+                            pdf.image(tmp_hdr_path, x=30, y=10, w=165.9)
+                            pdf.set_y(36)
                         finally:
-                            try: os.unlink(tmp_path_of)
+                            try: os.unlink(tmp_hdr_path)
                             except: pass
-                    
+
+                    if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_ftr_bytes is not None:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_ftr:
+                            tmp_ftr.write(img_of_ftr_bytes)
+                            tmp_ftr_path = tmp_ftr.name
+                        try:
+                            pdf.image(tmp_ftr_path, x=30, y=page_h - 25, w=165.9)
+                        finally:
+                            try: os.unlink(tmp_ftr_path)
+                            except: pass
+
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
                     pdf.ln(10)
-                    
+
                     if dest:
                         for line_d in dest.upper().split('\n'):
                             if line_d.strip():
                                 pdf.cell(0, 5, txt=line_d.strip().encode('latin-1', 'replace').decode('latin-1'), ln=True)
                     else:
                         pdf.cell(0, 5, txt="A QUIEN CORRESPONDA", ln=True)
-                        
+
                     pdf.cell(0, 5, txt=cargo.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True)
                     pdf.ln(10)
                     pdf.set_font("Arial", '', 11)
                     c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
                     pdf.multi_cell(0, 6, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
-                    
+
                     pdf.ln(espacio_firma)
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
@@ -2055,8 +2091,7 @@ else:
                     pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
                     pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
                     pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
-                    
-                    # Anclaje inferior para C.c.p. y Archivo/minutario
+
                     pdf.set_y(pos_y_ccp)
                     pdf.set_font("Arial", '', 8)
                     if ccp:
@@ -2064,7 +2099,7 @@ else:
                         first_ccp = True
                         for c_line in ccp_lines:
                             if c_line.strip():
-                                prefix = "C.c.p. " if first_ccp else "       "
+                                prefix = "C.c.p. " if first_ccp else "        "
                                 txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
                                 pdf.cell(0, 3.8, txt=txt_ccp, ln=True)
                                 first_ccp = False
@@ -2078,7 +2113,7 @@ else:
                             if m_line.strip():
                                 txt_min = m_line.strip().encode('latin-1', 'replace').decode('latin-1')
                                 pdf.cell(0, 3.8, txt=txt_min, ln=True)
-                                
+
                     pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
                     col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
@@ -2090,52 +2125,52 @@ else:
                     from docx.shared import Pt, Inches
                     from docx.enum.text import WD_ALIGN_PARAGRAPH
                     import io
-                    
+
                     doc_of = docx.Document()
                     for sec in doc_of.sections:
                         sec.top_margin = Inches(0.8)
                         sec.bottom_margin = Inches(0.8)
                         sec.left_margin = Inches(1.0)
                         sec.right_margin = Inches(0.8)
-                        
+
                     p_top = doc_of.add_paragraph()
                     p_top.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                     r_top = p_top.add_run(f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}\nOficio No: {n_oficio}")
                     r_top.bold = True
-                    
+
                     p_d = doc_of.add_paragraph()
                     p_d.paragraph_format.space_before = Pt(12)
                     p_d.paragraph_format.space_after = Pt(12)
                     r_d = p_d.add_run(f"{dest.upper()}\n{cargo.upper()}")
                     r_d.bold = True
-                    
+
                     c_word_txt = cuerpo_txt.replace("[FOLIO]", f_ref)
                     p_c = doc_of.add_paragraph(c_word_txt)
                     p_c.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                     p_c.paragraph_format.space_before = Pt(12)
                     p_c.paragraph_format.space_after = Pt(espacio_firma * 2)
-                    
+
                     p_f = doc_of.add_paragraph()
                     p_f.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     r_at = p_f.add_run("A T E N T A M E N T E\n\n\n__________________________\n")
                     r_at.bold = True
                     r_fm = p_f.add_run(f"{firm.upper()}\n{cargo_firm.upper()}")
                     r_fm.bold = True
-                    
+
                     p_ccp_doc = doc_of.add_paragraph()
                     p_ccp_doc.paragraph_format.space_before = Pt(18)
                     p_ccp_doc.paragraph_format.line_spacing = 1.15
-                    
+
                     if ccp:
                         ccp_lines = ccp.split('\n')
                         first_ccp = True
                         for c_line in ccp_lines:
                             if c_line.strip():
-                                prefix = "C.c.p. " if first_ccp else "       "
+                                prefix = "C.c.p. " if first_ccp else "        "
                                 r_ccp = p_ccp_doc.add_run(f"{prefix}{c_line.strip()}\n")
                                 r_ccp.font.size = Pt(8.5)
                                 first_ccp = False
-                                
+
                     if minutario:
                         r_lbl_min = p_ccp_doc.add_run("Archivo/minutario:\n")
                         r_lbl_min.font.size = Pt(8.5)
@@ -2145,18 +2180,15 @@ else:
                             if m_line.strip():
                                 r_min = p_ccp_doc.add_run(f"{m_line.strip()}\n")
                                 r_min.font.size = Pt(8.5)
-                        
+
                     stream_docx = io.BytesIO()
                     doc_of.save(stream_docx)
                     docx_bytes = stream_docx.getvalue()
-                    
+
                     col_docx.download_button(label="📝 DESCARGAR WORD (.DOCX)", data=docx_bytes, file_name=f"Oficio_{n_oficio.replace('/','-')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
                 except ImportError:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
-                except ImportError:
-                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
-                except ImportError:
-                    col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
+            
 # ==================================================================================
 # 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
 # ==================================================================================
