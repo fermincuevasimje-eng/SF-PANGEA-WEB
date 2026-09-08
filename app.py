@@ -2648,14 +2648,14 @@ else:
 
             # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA CARTA / OFICIO) ---
             if motor_pdf_listo:
-                X_START = 27.0
-                W_TOTAL = 162.0
+                X_START = 29.0
+                W_TOTAL = 168.0
 
                 fmt_pdf_j = 'Letter' if "Carta" in formato_hoja_j else 'Legal'
                 page_h_j = 279.4 if fmt_pdf_j == 'Letter' else 355.6
 
                 pdf_j = FPDF(orientation='P', unit='mm', format=fmt_pdf_j)
-                pdf_j.set_margins(30, 26, 30)
+                pdf_j.set_margins(33, 26, 14)
                 pdf_j.set_auto_page_break(auto=False)
                 pdf_j.add_page()
 
@@ -2712,7 +2712,6 @@ else:
                         img_temp.save(tmp_j_hdr.name, format="JPEG")
                         tmp_j_hdr_path = tmp_j_hdr.name
                     try:
-                        # Ajuste: Encabezado pegado arriba (Y=6mm) y más ancho (W=190mm)
                         pdf_j.image(tmp_j_hdr_path, x=13, y=4, w=190)
                     finally:
                         try: os.unlink(tmp_j_hdr_path)
@@ -2727,13 +2726,13 @@ else:
                         img_temp.save(tmp_j_ftr.name, format="JPEG")
                         tmp_j_ftr_path = tmp_j_ftr.name
                     try:
-                        # Ajuste: Pie pegado al borde inferior (Y=page_h_j-18mm) y más ancho (W=190mm)
-                        pdf_j.image(tmp_j_ftr_path, x=13, y=page_h_j - 26, w=196)
+                        pdf_j.image(tmp_j_ftr_path, x=13, y=page_h_j - 24, w=190)
                     finally:
                         try: os.unlink(tmp_j_ftr_path)
                         except: pass
+
                 # 3. CUERPO DE LA JUSTIFICACIÓN
-                Y_START_BODY = 46.0
+                Y_START_BODY = 44.0
 
                 pdf_j.set_font("Arial", 'B', 11)
                 pdf_j.set_xy(X_START, Y_START_BODY)
@@ -2743,51 +2742,51 @@ else:
                 pdf_j.set_xy(X_START, Y_START_BODY + 8)
                 pdf_j.cell(22, 7, txt="SOLICITA: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(105, 7, txt=solicita_enc, border='B', ln=False)
+                pdf_j.cell(98, 7, txt=solicita_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.cell(18, 7, txt=" FECHA: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(33, 7, txt=f_doc_str, border='B', ln=True, align='C')
+                pdf_j.cell(30, 7, txt=f_doc_str, border='B', ln=True, align='C')
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 16)
                 pdf_j.cell(26, 7, txt="JUSTIFICAR: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(152, 7, txt=just_line_enc, border='B', ln=True)
+                pdf_j.cell(142, 7, txt=just_line_enc, border='B', ln=True)
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 24)
                 pdf_j.cell(26, 7, txt="SANCIONAR: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(93, 7, txt=sanc_line_enc, border='B', ln=False)
+                pdf_j.cell(86, 7, txt=sanc_line_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.cell(26, 7, txt=" No. DE EMP.: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(33, 7, txt=num_emp, border='B', ln=True, align='C')
+                pdf_j.cell(30, 7, txt=num_emp, border='B', ln=True, align='C')
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 32)
                 pdf_j.cell(26, 7, txt="ADSCRITO A: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(93, 7, txt=adscrito_enc, border='B', ln=False)
+                pdf_j.cell(86, 7, txt=adscrito_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 8.5)
                 pdf_j.cell(26, 7, txt=" F. REGISTRO: ", border=0, ln=False)
 
                 fill_lista = (f_registro == "LISTA")
                 pdf_j.set_fill_color(188, 188, 188)
-                pdf_j.cell(14, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
+                pdf_j.cell(13, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
                 pdf_j.cell(2, 5.5, txt="", border=0, ln=False)
                 fill_hp = (f_registro == "HAND PUNCH")
-                pdf_j.cell(17, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
+                pdf_j.cell(15, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
 
                 Y_TABLE = Y_START_BODY + 43
                 pdf_j.set_font("Arial", 'B', 9)
                 pdf_j.set_fill_color(225, 225, 225)
                 pdf_j.set_xy(X_START, Y_TABLE)
                 pdf_j.cell(12, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                pdf_j.cell(77, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
+                pdf_j.cell(72, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
                 pdf_j.cell(12, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                pdf_j.cell(77, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
+                pdf_j.cell(72, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
 
                 pdf_j.set_font("Arial", '', 8)
                 current_y = Y_TABLE + 5.5
@@ -2801,9 +2800,9 @@ else:
 
                     pdf_j.set_xy(X_START, current_y)
                     pdf_j.cell(12, 6.2, txt=c1, border=1, ln=False, align='C', fill=fill_l)
-                    pdf_j.cell(77, 6.2, txt=t_n1, border=1, ln=False, fill=fill_l)
+                    pdf_j.cell(72, 6.2, txt=t_n1, border=1, ln=False, fill=fill_l)
                     pdf_j.cell(12, 6.2, txt=c2, border=1, ln=False, align='C', fill=fill_r)
-                    pdf_j.cell(77, 6.2, txt=t_n2, border=1, ln=True, fill=fill_r)
+                    pdf_j.cell(72, 6.2, txt=t_n2, border=1, ln=True, fill=fill_r)
                     current_y += 6.2
 
                 Y_FECHAS = current_y + 3.0
@@ -2815,8 +2814,8 @@ else:
                 pdf_j.set_font("Arial", 'B', 10.5)
                 pdf_j.set_text_color(220, 0, 0)
                 pdf_j.set_xy(X_START, Y_FECHAS + 5.5)
-                pdf_j.cell(89, 9, txt=f_ini_str, border=1, ln=False, align='C')
-                pdf_j.cell(89, 9, txt=f_fin_str, border=1, ln=True, align='C')
+                pdf_j.cell(84, 9, txt=f_ini_str, border=1, ln=False, align='C')
+                pdf_j.cell(84, 9, txt=f_fin_str, border=1, ln=True, align='C')
                 pdf_j.set_text_color(0, 0, 0)
 
                 Y_MOTIVO = Y_FECHAS + 17.5
@@ -2830,7 +2829,7 @@ else:
                 pdf_j.multi_cell(W_TOTAL, 5, txt=motivo_enc, align='C')
 
                 Y_FIRMAS = Y_MOTIVO + 32.0
-                h_grid = 54
+                h_grid = 52
                 w_col = W_TOTAL / 4
 
                 pdf_j.rect(X_START, Y_FIRMAS, W_TOTAL, h_grid)
@@ -2838,8 +2837,8 @@ else:
                 pdf_j.line(X_START + 2*w_col, Y_FIRMAS, X_START + 2*w_col, Y_FIRMAS + h_grid)
                 pdf_j.line(X_START + 3*w_col, Y_FIRMAS, X_START + 3*w_col, Y_FIRMAS + h_grid)
 
-                pdf_j.line(X_START, Y_FIRMAS + 36, X_START + W_TOTAL, Y_FIRMAS + 36)
-                pdf_j.line(X_START, Y_FIRMAS + 45, X_START + W_TOTAL, Y_FIRMAS + 45)
+                pdf_j.line(X_START, Y_FIRMAS + 34, X_START + W_TOTAL, Y_FIRMAS + 34)
+                pdf_j.line(X_START, Y_FIRMAS + 43, X_START + W_TOTAL, Y_FIRMAS + 43)
 
                 pdf_j.set_font("Arial", 'B', 8.5)
                 pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 2)
@@ -2848,27 +2847,27 @@ else:
                 pdf_j.cell(w_col, 4, txt="Vo. Bo.", align='C')
 
                 pdf_j.set_font("Arial", 'B', 8)
-                pdf_j.set_xy(X_START, Y_FIRMAS + 37.5)
+                pdf_j.set_xy(X_START, Y_FIRMAS + 35.5)
                 pdf_j.multi_cell(w_col, 3.2, txt=firma_solicita_enc, align='C')
-                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 37.5)
+                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 35.5)
                 pdf_j.multi_cell(w_col, 3.2, txt=autoriza_n_enc, align='C')
-                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 37.5)
+                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 35.5)
                 pdf_j.multi_cell(w_col, 3.2, txt=revisa_n_enc, align='C')
-                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 37.5)
+                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 35.5)
                 pdf_j.multi_cell(w_col, 3.2, txt=recibe_n_enc, align='C')
 
                 pdf_j.set_font("Arial", 'B', 7.5)
-                pdf_j.set_xy(X_START, Y_FIRMAS + 46.5)
+                pdf_j.set_xy(X_START, Y_FIRMAS + 44.5)
                 pdf_j.multi_cell(w_col, 3, txt="SOLICITANTE", align='C')
-                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 46.5)
+                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 44.5)
                 pdf_j.multi_cell(w_col, 3, txt=autoriza_c_enc, align='C')
-                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 46.5)
+                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 44.5)
                 pdf_j.multi_cell(w_col, 3, txt=revisa_c_enc, align='C')
-                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 46.5)
+                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 44.5)
                 pdf_j.multi_cell(w_col, 3, txt=recibe_c_enc, align='C')
 
                 if tipo_membrete == "Sistema (Texto Genérico)":
-                    pdf_j.set_xy(X_START, Y_FIRMAS + 56)
+                    pdf_j.set_xy(X_START, Y_FIRMAS + 54)
                     pdf_j.set_font("Arial", 'B', 9)
                     pdf_j.cell(W_TOTAL, 4, txt="H. Ayuntamiento de Toluca", ln=True, align='C')
                     pdf_j.set_font("Arial", '', 7.5)
