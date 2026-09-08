@@ -2036,7 +2036,7 @@ else:
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
 
                     pdf = FPDF(orientation='P', unit='mm', format=fmt_pdf)
-                    pdf.set_margins(30, 20, 30)
+                    pdf.set_margins(33, 20, 14)
                     pdf.set_auto_page_break(auto=True, margin=15)
                     pdf.add_page()
 
@@ -2641,8 +2641,8 @@ else:
 
             # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA CARTA / OFICIO) ---
             if motor_pdf_listo:
-                X_START = 24.0
-                W_TOTAL = 178.0
+                X_START = 27.0
+                W_TOTAL = 162.0
 
                 fmt_pdf_j = 'Letter' if "Carta" in formato_hoja_j else 'Legal'
                 page_h_j = 279.4 if fmt_pdf_j == 'Letter' else 355.6
