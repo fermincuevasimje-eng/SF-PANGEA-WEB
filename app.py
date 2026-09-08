@@ -2054,8 +2054,8 @@ else:
                             img_temp.save(tmp_hdr.name, format="JPEG")
                             tmp_hdr_path = tmp_hdr.name
                         try:
-                            pdf.image(tmp_hdr_path, x=13, y=4, w=196)
-                            pdf.set_y(36)
+                            pdf.image(tmp_hdr_path, x=13, y=8, w=196)
+                            pdf.set_y(40)
                         finally:
                             try: os.unlink(tmp_hdr_path)
                             except: pass
@@ -2712,7 +2712,7 @@ else:
                         img_temp.save(tmp_j_hdr.name, format="JPEG")
                         tmp_j_hdr_path = tmp_j_hdr.name
                     try:
-                        pdf_j.image(tmp_j_hdr_path, x=13, y=4, w=196)
+                        pdf_j.image(tmp_j_hdr_path, x=13, y=8, w=196)
                     finally:
                         try: os.unlink(tmp_j_hdr_path)
                         except: pass
@@ -2732,7 +2732,7 @@ else:
                         except: pass
 
                 # 3. CUERPO DE LA JUSTIFICACIÓN
-                Y_START_BODY = 44.0
+                Y_START_BODY = 48.0
 
                 pdf_j.set_font("Arial", 'B', 11)
                 pdf_j.set_xy(X_START, Y_START_BODY)
