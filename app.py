@@ -2046,8 +2046,11 @@ else:
                     if tipo_membrete_of == "Hoja Física (Espacio para Membrete)":
                         pdf.ln(10)
                     elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_hdr_bytes is not None:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_hdr:
-                            tmp_hdr.write(img_of_hdr_bytes)
+                        from PIL import Image
+                        import io
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_hdr:
+                            img_temp = Image.open(io.BytesIO(img_of_hdr_bytes)).convert("RGB")
+                            img_temp.save(tmp_hdr.name, format="JPEG")
                             tmp_hdr_path = tmp_hdr.name
                         try:
                             pdf.image(tmp_hdr_path, x=30, y=10, w=165.9)
@@ -2057,8 +2060,11 @@ else:
                             except: pass
 
                     if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_ftr_bytes is not None:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_ftr:
-                            tmp_ftr.write(img_of_ftr_bytes)
+                        from PIL import Image
+                        import io
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_ftr:
+                            img_temp = Image.open(io.BytesIO(img_of_ftr_bytes)).convert("RGB")
+                            img_temp.save(tmp_ftr.name, format="JPEG")
                             tmp_ftr_path = tmp_ftr.name
                         try:
                             pdf.image(tmp_ftr_path, x=30, y=page_h - 25, w=165.9)
@@ -2691,8 +2697,11 @@ else:
                     pdf_j.cell(W_TOTAL, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
 
                 elif tipo_membrete == "Imagen Personalizada (Subir Banner)" and img_j_hdr_bytes is not None:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_j_hdr:
-                        tmp_j_hdr.write(img_j_hdr_bytes)
+                    from PIL import Image
+                    import io
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_j_hdr:
+                        img_temp = Image.open(io.BytesIO(img_j_hdr_bytes)).convert("RGB")
+                        img_temp.save(tmp_j_hdr.name, format="JPEG")
                         tmp_j_hdr_path = tmp_j_hdr.name
                     try:
                         pdf_j.image(tmp_j_hdr_path, x=X_START, y=12, w=W_TOTAL)
@@ -2702,15 +2711,17 @@ else:
 
                 # 2. PIE DE PÁGINA PDF
                 if tipo_membrete == "Imagen Personalizada (Subir Banner)" and img_j_ftr_bytes is not None:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_j_ftr:
-                        tmp_j_ftr.write(img_j_ftr_bytes)
+                    from PIL import Image
+                    import io
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_j_ftr:
+                        img_temp = Image.open(io.BytesIO(img_j_ftr_bytes)).convert("RGB")
+                        img_temp.save(tmp_j_ftr.name, format="JPEG")
                         tmp_j_ftr_path = tmp_j_ftr.name
                     try:
                         pdf_j.image(tmp_j_ftr_path, x=X_START, y=page_h_j - 25, w=W_TOTAL)
                     finally:
                         try: os.unlink(tmp_j_ftr_path)
                         except: pass
-
                 # 3. CUERPO DE LA JUSTIFICACIÓN
                 Y_START_BODY = 46.0
 
