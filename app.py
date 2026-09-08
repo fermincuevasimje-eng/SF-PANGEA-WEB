@@ -2036,7 +2036,7 @@ else:
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
 
                     pdf = FPDF(orientation='P', unit='mm', format=fmt_pdf)
-                    pdf.set_margins(28, 20, 28)
+                    pdf.set_margins(25, 20, 10)
                     pdf.set_auto_page_break(auto=True, margin=15)
                     pdf.add_page()
 
@@ -2648,7 +2648,7 @@ else:
                 page_h_j = 279.4 if fmt_pdf_j == 'Letter' else 355.6
 
                 pdf_j = FPDF(orientation='P', unit='mm', format=fmt_pdf_j)
-                pdf_j.set_margins(28, 26, 28)
+                pdf_j.set_margins(24, 26, 10)
                 pdf_j.set_auto_page_break(auto=False)
                 pdf_j.add_page()
 
