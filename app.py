@@ -2069,7 +2069,7 @@ else:
                             tmp_ftr_path = tmp_ftr.name
                         try:
                             # Ajuste: Pie pegado al borde inferior (Y=page_h-18mm) y más ancho (W=190mm)
-                            pdf.image(tmp_ftr_path, x=13, y=page_h - 26, w=190)
+                            pdf.image(tmp_ftr_path, x=13, y=page_h - 26, w=194)
                         finally:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
@@ -2721,7 +2721,7 @@ else:
                         tmp_j_ftr_path = tmp_j_ftr.name
                     try:
                         # Ajuste: Pie pegado al borde inferior (Y=page_h_j-18mm) y más ancho (W=190mm)
-                        pdf_j.image(tmp_j_ftr_path, x=13, y=page_h_j - 26, w=190)
+                        pdf_j.image(tmp_j_ftr_path, x=13, y=page_h_j - 26, w=194)
                     finally:
                         try: os.unlink(tmp_j_ftr_path)
                         except: pass
