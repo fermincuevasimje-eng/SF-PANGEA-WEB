@@ -2030,19 +2030,20 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
 
-                # --- GENERADOR DE DOCUMENTO PDF (FPDF AJUSTADO CARTA / OFICIO) ---
+                # --- GENERADOR DE DOCUMENTO PDF (FPDF REPARADO Y CALIBRADO) ---
                 if motor_pdf_listo:
                     fmt_pdf = 'Letter' if "Carta" in formato_hoja_of else 'Legal'
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
 
                     pdf = FPDF(orientation='P', unit='mm', format=fmt_pdf)
                     pdf.set_margins(33, 20, 14)
-                    pdf.set_auto_page_break(auto=True, margin=15)
+                    pdf.set_auto_page_break(auto=False)
                     pdf.add_page()
 
                     import tempfile
                     import os
 
+                    # 1. Encabezado en PDF
                     if tipo_membrete_of == "Hoja Física (Espacio para Membrete)":
                         pdf.ln(10)
                     elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_hdr_bytes is not None:
@@ -2053,13 +2054,13 @@ else:
                             img_temp.save(tmp_hdr.name, format="JPEG")
                             tmp_hdr_path = tmp_hdr.name
                         try:
-                            # Ajuste: Encabezado pegado arriba (Y=6mm) y más ancho (W=190mm)
                             pdf.image(tmp_hdr_path, x=13, y=4, w=190)
-                            pdf.set_y(38)
+                            pdf.set_y(36)
                         finally:
                             try: os.unlink(tmp_hdr_path)
                             except: pass
 
+                    # 2. Pie de Página en PDF (Anclado al fondo de hoja)
                     if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_ftr_bytes is not None:
                         from PIL import Image
                         import io
@@ -2068,15 +2069,16 @@ else:
                             img_temp.save(tmp_ftr.name, format="JPEG")
                             tmp_ftr_path = tmp_ftr.name
                         try:
-                            # Ajuste: Pie pegado al borde inferior (Y=page_h-18mm) y más ancho (W=190mm)
-                            pdf.image(tmp_ftr_path, x=13, y=page_h - 26, w=196)
+                            pdf.image(tmp_ftr_path, x=13, y=page_h - 24, w=190)
                         finally:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
+
+                    # 3. Encabezado de texto y datos
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
-                    pdf.ln(10)
+                    pdf.ln(8)
 
                     if dest:
                         for line_d in dest.upper().split('\n'):
@@ -2086,21 +2088,25 @@ else:
                         pdf.cell(0, 5, txt="A QUIEN CORRESPONDA", ln=True)
 
                     pdf.cell(0, 5, txt=cargo.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True)
-                    pdf.ln(10)
+                    pdf.ln(8)
                     pdf.set_font("Arial", '', 11)
                     c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
-                    pdf.multi_cell(0, 6, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
+                    pdf.multi_cell(0, 5.5, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
 
+                    # 4. Firma
                     pdf.ln(espacio_firma)
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
-                    pdf.ln(15)
+                    pdf.ln(12)
                     pdf.cell(0, 5, txt="__________________________", ln=True, align='C')
                     pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
                     pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
 
-                    pdf.set_y(pos_y_ccp)
+                    # 5. C.c.p. y Archivo/minutario blindados antes del pie de página
+                    y_ccp_calc = page_h + pos_y_ccp if pos_y_ccp < 0 else pos_y_ccp
+                    pdf.set_y(y_ccp_calc)
                     pdf.set_font("Arial", '', 8)
+
                     if ccp:
                         ccp_lines = ccp.split('\n')
                         first_ccp = True
@@ -2108,18 +2114,19 @@ else:
                             if c_line.strip():
                                 prefix = "C.c.p. " if first_ccp else "        "
                                 txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
-                                pdf.cell(0, 3.8, txt=txt_ccp, ln=True)
+                                pdf.cell(0, 3.5, txt=txt_ccp, ln=True)
                                 first_ccp = False
+
                     if minutario:
                         lbl_min = "Archivo/minutario:".encode('latin-1', 'replace').decode('latin-1')
                         pdf.set_font("Arial", 'B', 8)
-                        pdf.cell(0, 3.8, txt=lbl_min, ln=True)
+                        pdf.cell(0, 3.5, txt=lbl_min, ln=True)
                         pdf.set_font("Arial", '', 8)
                         min_lines = minutario.split('\n')
                         for m_line in min_lines:
                             if m_line.strip():
                                 txt_min = m_line.strip().encode('latin-1', 'replace').decode('latin-1')
-                                pdf.cell(0, 3.8, txt=txt_min, ln=True)
+                                pdf.cell(0, 3.5, txt=txt_min, ln=True)
 
                     pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
                     col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
