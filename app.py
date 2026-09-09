@@ -2678,7 +2678,7 @@ else:
                 import tempfile
                 import os
 
-                # 1. ENCABEZADO PDF
+                # 1. ENCABEZADO PDF (Y = 3mm)
                 if tipo_membrete == "Sistema (Texto Genérico)":
                     pdf_j.set_font("Arial", 'B', 18)
                     pdf_j.set_xy(X_START, 20)
@@ -2712,12 +2712,12 @@ else:
                         img_temp.save(tmp_j_hdr.name, format="JPEG")
                         tmp_j_hdr_path = tmp_j_hdr.name
                     try:
-                        pdf_j.image(tmp_j_hdr_path, x=13, y=10, w=196)
+                        pdf_j.image(tmp_j_hdr_path, x=11, y=3, w=194)
                     finally:
                         try: os.unlink(tmp_j_hdr_path)
                         except: pass
 
-                # 2. PIE DE PÁGINA PDF
+                # 2. PIE DE PÁGINA PDF (Y = page_h_j - 21mm)
                 if tipo_membrete == "Imagen Personalizada (Subir Banner)" and img_j_ftr_bytes is not None:
                     from PIL import Image
                     import io
@@ -2726,13 +2726,13 @@ else:
                         img_temp.save(tmp_j_ftr.name, format="JPEG")
                         tmp_j_ftr_path = tmp_j_ftr.name
                     try:
-                        pdf_j.image(tmp_j_ftr_path, x=13, y=page_h_j - 24, w=200)
+                        pdf_j.image(tmp_j_ftr_path, x=11, y=page_h_j - 21, w=194)
                     finally:
                         try: os.unlink(tmp_j_ftr_path)
                         except: pass
 
                 # 3. CUERPO DE LA JUSTIFICACIÓN
-                Y_START_BODY = 50.0
+                Y_START_BODY = 35.0
 
                 pdf_j.set_font("Arial", 'B', 11)
                 pdf_j.set_xy(X_START, Y_START_BODY)
