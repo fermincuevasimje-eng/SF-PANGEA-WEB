@@ -2030,7 +2030,7 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
 
-                # --- GENERADOR DE DOCUMENTO PDF (FPDF REPARADO Y CALIBRADO) ---
+                # --- GENERADOR DE DOCUMENTO PDF (MÁXIMO APROVECHAMIENTO DE HOJA) ---
                 if motor_pdf_listo:
                     fmt_pdf = 'Letter' if "Carta" in formato_hoja_of else 'Legal'
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
@@ -2043,7 +2043,7 @@ else:
                     import tempfile
                     import os
 
-                    # 1. Encabezado en PDF
+                    # 1. Encabezado Pegado al Borde Superior (Y = 3mm)
                     if tipo_membrete_of == "Hoja Física (Espacio para Membrete)":
                         pdf.ln(10)
                     elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_hdr_bytes is not None:
@@ -2054,13 +2054,13 @@ else:
                             img_temp.save(tmp_hdr.name, format="JPEG")
                             tmp_hdr_path = tmp_hdr.name
                         try:
-                            pdf.image(tmp_hdr_path, x=13, y=10, w=196)
-                            pdf.set_y(42)
+                            pdf.image(tmp_hdr_path, x=11, y=3, w=194)
+                            pdf.set_y(28)
                         finally:
                             try: os.unlink(tmp_hdr_path)
                             except: pass
 
-                    # 2. Pie de Página en PDF (Anclado al fondo de hoja)
+                    # 2. Pie de Página Pegado al Borde Inferior (Y = page_h - 21mm)
                     if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_ftr_bytes is not None:
                         from PIL import Image
                         import io
@@ -2069,12 +2069,12 @@ else:
                             img_temp.save(tmp_ftr.name, format="JPEG")
                             tmp_ftr_path = tmp_ftr.name
                         try:
-                            pdf.image(tmp_ftr_path, x=13, y=page_h - 24, w=200)
+                            pdf.image(tmp_ftr_path, x=11, y=page_h - 21, w=194)
                         finally:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
 
-                    # 3. Encabezado de texto y datos
+                    # 3. Encabezado de Texto
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
@@ -2102,8 +2102,8 @@ else:
                     pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
                     pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
 
-                    # 5. C.c.p. y Archivo/minutario blindados antes del pie de página
-                    y_ccp_calc = page_h + pos_y_ccp if pos_y_ccp < 0 else pos_y_ccp
+                    # 5. C.c.p. y Archivo/minutario
+                    y_ccp_calc = page_h - 28
                     pdf.set_y(y_ccp_calc)
                     pdf.set_font("Arial", '', 8)
 
