@@ -1999,7 +1999,10 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
 
-                # --- GENERADOR DE DOCUMENTO PDF (MAPEO EXACTO DE XML DE oficiossf.docx) ---
+                # --- EVALUACIÓN DINÁMICA DE VOLUMEN DE TEXTO ---
+                es_oficio_largo = len(cuerpo_txt) > 700 or cuerpo_txt.count('\n') > 8
+
+                # --- GENERADOR DE DOCUMENTO PDF (ADAPTATIVO Y DINÁMICO) ---
                 if motor_pdf_listo:
                     import tempfile, os, zipfile, re
 
@@ -2008,7 +2011,13 @@ else:
 
                     pdf = FPDF(orientation='P', unit='mm', format=fmt_pdf)
                     pdf.set_margins(25, 20, 25)
-                    pdf.set_auto_page_break(auto=False)
+
+                    # Si el oficio es largo, habilita salto de página automático
+                    if es_oficio_largo:
+                        pdf.set_auto_page_break(auto=True, margin=28)
+                    else:
+                        pdf.set_auto_page_break(auto=False)
+
                     pdf.add_page()
 
                     # Inspección de las relaciones de archivo (.rels) para vincular encabezado y pie reales
@@ -2018,7 +2027,6 @@ else:
                             with zipfile.ZipFile("oficiossf.docx", 'r') as z:
                                 namelist = z.namelist()
                                 
-                                # Extraer imagen de encabezado
                                 hdr_rels = [f for f in namelist if 'header' in f and f.endswith('.rels')]
                                 hdr_img_path = None
                                 if hdr_rels:
@@ -2027,7 +2035,6 @@ else:
                                     if m_hdr:
                                         hdr_img_path = 'word/media/' + m_hdr.group(1)
 
-                                # Extraer imagen de pie de página
                                 ftr_rels = [f for f in namelist if 'footer' in f and f.endswith('.rels')]
                                 ftr_img_path = None
                                 if ftr_rels:
@@ -2036,7 +2043,6 @@ else:
                                     if m_ftr:
                                         ftr_img_path = 'word/media/' + m_ftr.group(1)
 
-                                # Respaldo si no se leen relaciones directas
                                 media_files = sorted([f for f in namelist if f.startswith('word/media/')])
                                 if not hdr_img_path and media_files:
                                     hdr_img_path = media_files[0]
@@ -2050,7 +2056,7 @@ else:
                         except Exception:
                             pass
 
-                    # 1. Encabezado e inyección de Leyenda Institucional 2026
+                    # 1. Encabezado e inyección de Leyenda
                     if "Plantilla" in tipo_membrete_of:
                         if hdr_bytes_tmpl:
                             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_hdr:
@@ -2062,7 +2068,6 @@ else:
                                 try: os.unlink(tmp_hdr_path)
                                 except: pass
 
-                        # Leyenda obligatoria del Estado de México
                         pdf.set_xy(11, 28)
                         pdf.set_font("Arial", 'I', 8.5)
                         pdf.cell(194, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
@@ -2071,6 +2076,7 @@ else:
                         pdf.set_y(25)
 
                     # 2. Pie de página
+                    footer_top_limit = page_h - 22.0
                     if "Plantilla" in tipo_membrete_of and ftr_bytes_tmpl:
                         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_ftr:
                             tmp_ftr.write(ftr_bytes_tmpl)
@@ -2081,7 +2087,7 @@ else:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
 
-                    # 3. Datos del Oficio
+                    # 3. Cuerpo del Oficio
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
@@ -2108,38 +2114,50 @@ else:
                     pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
                     pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
 
-                    # 4. C.c.p. y Archivo/minutario
-                    y_ccp_calc = page_h - 28
-                    pdf.set_y(y_ccp_calc)
+                    # 4. Posicionamiento inteligente de C.c.p. y Archivo/minutario
+                    ccp_lines_list = [c.strip() for c in ccp.split('\n') if c.strip()] if ccp else []
+                    min_lines_list = [m.strip() for m in minutario.split('\n') if m.strip()] if minutario else []
+
+                    line_count = len(ccp_lines_list)
+                    if min_lines_list:
+                        line_count += 1 + len(min_lines_list)
+
+                    line_height = 3.5 # mm por renglón
+                    total_block_h = line_count * line_height
+
+                    if not es_oficio_largo:
+                        # Oficio corto: anclaje invertido desde el pie hacia arriba
+                        y_start_ccp = footer_top_limit - total_block_h - 2.0
+                        pdf.set_y(y_start_ccp)
+                    else:
+                        # Oficio largo: flujo continuo natural tras la firma
+                        pdf.ln(6)
+
                     pdf.set_font("Arial", '', 8)
 
-                    if ccp:
-                        ccp_lines = ccp.split('\n')
+                    if ccp_lines_list:
                         first_ccp = True
-                        for c_line in ccp_lines:
-                            if c_line.strip():
-                                prefix = "C.c.p. " if first_ccp else "        "
-                                txt_ccp = f"{prefix}{c_line.strip()}".encode('latin-1', 'replace').decode('latin-1')
-                                pdf.cell(0, 3.5, txt=txt_ccp, ln=True)
-                                first_ccp = False
+                        for c_line in ccp_lines_list:
+                            prefix = "C.c.p. " if first_ccp else "        "
+                            txt_ccp = f"{prefix}{c_line}".encode('latin-1', 'replace').decode('latin-1')
+                            pdf.cell(0, line_height, txt=txt_ccp, ln=True)
+                            first_ccp = False
 
-                    if minutario:
+                    if min_lines_list:
                         lbl_min = "Archivo/minutario:".encode('latin-1', 'replace').decode('latin-1')
                         pdf.set_font("Arial", 'B', 8)
-                        pdf.cell(0, 3.5, txt=lbl_min, ln=True)
+                        pdf.cell(0, line_height, txt=lbl_min, ln=True)
                         pdf.set_font("Arial", '', 8)
-                        min_lines = minutario.split('\n')
-                        for m_line in min_lines:
-                            if m_line.strip():
-                                txt_min = m_line.strip().encode('latin-1', 'replace').decode('latin-1')
-                                pdf.cell(0, 3.5, txt=txt_min, ln=True)
+                        for m_line in min_lines_list:
+                            txt_min = m_line.encode('latin-1', 'replace').decode('latin-1')
+                            pdf.cell(0, line_height, txt=txt_min, ln=True)
 
                     pdf_data = pdf.output(dest='S').encode('latin-1', 'replace')
                     col_pdf.download_button(label="🚀 DESCARGAR PDF", data=pdf_data, file_name=f"Oficio_{n_oficio.replace('/','-')}.pdf", mime="application/pdf", use_container_width=True)
                 else:
                     col_pdf.error("❌ PDF no disponible.")
 
-                # --- GENERADOR DE WORD (.DOCX CON ESPACIADO DE C.C.P. A 220PT) ---
+                # --- GENERADOR DE WORD (.DOCX ADAPTATIVO CORTO / LARGO) ---
                 try:
                     import docx
                     from docx.shared import Pt, Inches
@@ -2180,9 +2198,11 @@ else:
                     r_fm = p_f.add_run(f"{firm.upper()}\n{cargo_firm.upper()}")
                     r_fm.bold = True
 
-                    # Espaciado de 220pt para colocar C.c.p. pegado al pie de página
+                    # Espaciado adaptativo para C.c.p. en Word
+                    espacio_word_ccp = Pt(24) if es_oficio_largo else Pt(260)
+
                     p_ccp_doc = doc_of.add_paragraph()
-                    p_ccp_doc.paragraph_format.space_before = Pt(220)
+                    p_ccp_doc.paragraph_format.space_before = espacio_word_ccp
                     p_ccp_doc.paragraph_format.line_spacing = 1.15
 
                     if ccp:
