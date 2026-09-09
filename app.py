@@ -2234,7 +2234,7 @@ else:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
             
 # ==================================================================================
-# 📝 AQUÍ TERMINA OFICIOS (TAB_O) Y EMPIEZA INDEPENDIENTE LA NUEVA PESTAÑA (TAB_J)
+# 📝 PESTAÑA DE JUSTIFICACIONES E INCIDENCIAS DE PERSONAL (TAB_J REFACTORIZADO)
 # ==================================================================================
         with tab_j:
             st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
@@ -2253,7 +2253,7 @@ else:
                                     try: st.session_state.db_justificaciones[reg_id] = json.loads(datos_raw)
                                     except: pass
                 except: pass
-    
+
             c_config, c_preview = st.columns([1, 1.1])
 
             with c_config:
@@ -2267,7 +2267,6 @@ else:
                         id_sel_j = st.selectbox("Seleccionar Registro:", list(st.session_state.db_justificaciones.keys())[::-1], key="select_boveda_justificaciones")
                         data_previa_j = st.session_state.db_justificaciones[id_sel_j]
                         
-                        # Tabla resumen de control histórico
                         lista_j_tabla = [{"ID Registro": k, "Empleado": v.get("nombre", "N/A"), "No. Emp": v.get("num_emp", "N/A"), "Concepto": v.get("clave_concepto", "N/A")} for k, v in st.session_state.db_justificaciones.items()]
                         df_j_vista = pd.DataFrame(lista_j_tabla)
                         
@@ -2297,7 +2296,6 @@ else:
                 with st.container(border=True):
                     st.markdown("**📌 Secuencia Oficial de Llenado**")
                     
-                    # 1. Fecha del Documento
                     try:
                         f_doc_raw = data_previa_j.get("fecha_doc")
                         if f_doc_raw and str(f_doc_raw) != "NaT" and str(f_doc_raw).strip() != "":
@@ -2307,27 +2305,20 @@ else:
                     except: def_f_doc = pd.Timestamp.now().date()
                         
                     f_doc = st.date_input("1. Fecha de Emisión del Documento:", value=def_f_doc, key=f"f_doc_{pk_j}")
-                    
-                    # 2. Solicita
                     solicita_raw = st.text_input("2. Solicita (Área o Persona):", value=data_previa_j.get("solicita", ""), key=f"txt_sol_{pk_j}")
                     
-                    # 3. Acción Administrativa
                     accion_idx = ["JUSTIFICAR", "SANCIONAR"].index(data_previa_j.get("accion", "JUSTIFICAR")) if data_previa_j.get("accion") in ["JUSTIFICAR", "SANCIONAR"] else 0
                     accion = st.selectbox("3. Acción Administrativa:", ["JUSTIFICAR", "SANCIONAR"], index=accion_idx, key=f"sel_accion_{pk_j}")
                     
-                    # 4. No. de Empleado y Nombre
                     c_emp1, c_emp2 = st.columns([1, 2])
                     num_emp_raw = c_emp1.text_input("4. No. de Empleado:", value=data_previa_j.get("num_emp", ""), key=f"txt_num_emp_{pk_j}")
                     nombre_emp_raw = c_emp2.text_input("Nombre Completo del Empleado:", value=data_previa_j.get("nombre", ""), key=f"txt_nom_emp_{pk_j}")
                     
-                    # 5. Adscrito a
                     adscrito_raw = st.text_input("5. Adscrito a (Departamento/Área):", value=data_previa_j.get("adscrito", ""), key=f"txt_ads_{pk_j}")
                     
-                    # 6. F. Registro
                     f_reg_idx = ["LISTA", "HAND PUNCH"].index(data_previa_j.get("f_registro", "LISTA")) if data_previa_j.get("f_registro") in ["LISTA", "HAND PUNCH"] else 0
                     f_registro = st.selectbox("6. F. Registro:", ["LISTA", "HAND PUNCH"], index=f_reg_idx, key=f"sel_f_reg_{pk_j}")
                     
-                    # 7. Clave y Concepto
                     cat_hand_punch = [
                         "3 | FALTA INJUSTIFICADA", "4 | FALTA JUSTIFICADA (TIEMPO X TIEMPO)", 
                         "9 | LICENCIA CON GOCE DE SUELDO", "10 | LICENCIA SIN GOCE DE SUELDO", 
@@ -2340,9 +2331,8 @@ else:
                     ]
                     concept_def = data_previa_j.get("clave_concepto", cat_hand_punch[0])
                     concept_idx = cat_hand_punch.index(concept_def) if concept_def in cat_hand_punch else 0
-                    clave_concepto = st.selectbox("7. Clave y Concepto (Escribe clave o texto para buscar):", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
+                    clave_concepto = st.selectbox("7. Clave y Concepto:", cat_hand_punch, index=concept_idx, key=f"sel_concept_{pk_j}")
 
-                    # 8. Modalidad de Fechas
                     tipo_fecha_j = st.radio("8. Modalidad de Fecha de la Incidencia:", ["Día Único", "Rango de Fechas"], index=0 if data_previa_j.get("tipo_fecha", "Día Único") == "Día Único" else 1, horizontal=True, key=f"radio_tipo_f_{pk_j}")
                     
                     try:
@@ -2371,14 +2361,11 @@ else:
 
                 with st.container(border=True):
                     st.markdown("**📝 Sección de Cierre Técnico**")
-                    # 9. Motivo
                     motivo_raw = st.text_area("9. Motivo de la Incidencia / Justificación:", value=data_previa_j.get("motivo", ""), height=100, key=f"area_mot_{pk_j}")
                     
-                    st.markdown("**✏️ Bloques de Validación y Firmas (Selección de Cargo)**")
-                    # 10. Solicitante
+                    st.markdown("**✏️ Bloques de Validación y Firmas**")
                     firma_solicita_raw = st.text_input("10. Solicitante (Nombre):", value=data_previa_j.get("firma_solicita", ""), key=f"txt_firm_sol_{pk_j}")
                     
-                    # 11. Autoriza (Nombre y Selección de Cargo)
                     c_aut1, c_aut2 = st.columns(2)
                     autoriza_n_raw = c_aut1.text_input("11. Autoriza (Nombre):", value=data_previa_j.get("autoriza_n", ""), key=f"txt_aut_{pk_j}")
                     aut_opts = ["Vo. Bo. DIRECTOR DE ALUMBRADO PÚBLICO", "Vo. Bo. DIRECTORA DE ALUMBRADO PÚBLICO"]
@@ -2386,7 +2373,6 @@ else:
                     idx_aut = aut_opts.index(prev_aut) if prev_aut in aut_opts else 0
                     autoriza_c_raw = c_aut2.selectbox("Cargo Autoriza:", aut_opts, index=idx_aut, key=f"sel_aut_c_{pk_j}")
                     
-                    # 12. Vo. Bo. / Revisa (Nombre y Selección de Cargo)
                     c_vob1, c_vob2 = st.columns(2)
                     revisa_n_raw = c_vob1.text_input("12. Vo. Bo. / Revisa (Nombre):", value=data_previa_j.get("revisa_n", ""), key=f"txt_rev_{pk_j}")
                     rev_opts = ["DELEGADO ADMINISTRATIVO", "DELEGADA ADMINISTRATIVA"]
@@ -2394,7 +2380,6 @@ else:
                     idx_rev = rev_opts.index(prev_rev) if prev_rev in rev_opts else 1
                     revisa_c_raw = c_vob2.selectbox("Cargo Revisa:", rev_opts, index=idx_rev, key=f"sel_rev_c_{pk_j}")
                     
-                    # 13. Recursos Humanos (Nombre y Selección de Cargo)
                     c_rh1, c_rh2 = st.columns(2)
                     recibe_n_raw = c_rh1.text_input("13. Recursos Humanos (Nombre):", value=data_previa_j.get("recibe_n", ""), key=f"txt_rec_{pk_j}")
                     rec_opts = ["DIRECTOR DE RECURSOS HUMANOS", "DIRECTORA DE RECURSOS HUMANOS"]
@@ -2402,39 +2387,20 @@ else:
                     idx_rec = rec_opts.index(prev_rec) if prev_rec in rec_opts else 1
                     recibe_c_raw = c_rh2.selectbox("Cargo RRHH:", rec_opts, index=idx_rec, key=f"sel_rec_c_{pk_j}")
 
-# --- CONTROL DE ENCABEZADO Y MEMBRETE (PERSISTENTE CON PIE DE PÁGINA Y TAMAÑO DE HOJA) ---
-            if "global_header_b64" not in st.session_state: st.session_state.global_header_b64 = None
-            if "global_footer_b64" not in st.session_state: st.session_state.global_footer_b64 = None
-
-            opciones_memb = ["Sistema (Texto Genérico)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Ocultar Encabezado)"]
+            opciones_memb = ["🏛️ Plantilla Institucional (oficiossf.docx)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Ocultar Encabezado)"]
             tipo_membrete = st.selectbox("Configuración de Encabezado / Membrete:", opciones_memb, index=0, key=f"tipo_memb_{pk_j}")
             formato_hoja_j = st.selectbox("Tamaño de Hoja Justificación:", ["Carta (Letter)", "Oficio (Legal)"], index=0 if data_previa_j.get("formato_hoja", "Carta (Letter)") == "Carta (Letter)" else 1, key=f"fmt_hoja_j_{pk_j}")
 
-            img_j_hdr_b64 = data_previa_j.get("img_header_b64") or st.session_state.global_header_b64
-            img_j_ftr_b64 = data_previa_j.get("img_footer_b64") or st.session_state.global_footer_b64
             img_j_hdr_bytes, img_j_ftr_bytes = None, None
 
             if tipo_membrete == "Imagen Personalizada (Subir Banner)":
                 col_up_jh, col_up_jf = st.columns(2)
                 with col_up_jh:
-                    file_hdr_j = st.file_uploader("1. Encabezado / Banner Superior:", type=["png", "jpg", "jpeg"], key=f"file_hdr_j_{pk_j}")
-                    if file_hdr_j is not None:
-                        img_j_hdr_bytes = file_hdr_j.getvalue()
-                        img_j_hdr_b64 = base64.b64encode(img_j_hdr_bytes).decode('utf-8')
-                        st.session_state.global_header_b64 = img_j_hdr_b64
-                    elif img_j_hdr_b64:
-                        try: img_j_hdr_bytes = base64.b64decode(img_j_hdr_b64)
-                        except: pass
-
+                    file_hdr_j = st.file_uploader("1. Encabezado Superior:", type=["png", "jpg", "jpeg"], key=f"file_hdr_j_{pk_j}")
+                    if file_hdr_j is not None: img_j_hdr_bytes = file_hdr_j.getvalue()
                 with col_up_jf:
-                    file_ftr_j = st.file_uploader("2. Pie de Página / Banner Inferior:", type=["png", "jpg", "jpeg"], key=f"file_ftr_j_{pk_j}")
-                    if file_ftr_j is not None:
-                        img_j_ftr_bytes = file_ftr_j.getvalue()
-                        img_j_ftr_b64 = base64.b64encode(img_j_ftr_bytes).decode('utf-8')
-                        st.session_state.global_footer_b64 = img_j_ftr_b64
-                    elif img_j_ftr_b64:
-                        try: img_j_ftr_bytes = base64.b64decode(img_j_ftr_b64)
-                        except: pass
+                    file_ftr_j = st.file_uploader("2. Pie Inferior:", type=["png", "jpg", "jpeg"], key=f"file_ftr_j_{pk_j}")
+                    if file_ftr_j is not None: img_j_ftr_bytes = file_ftr_j.getvalue()
 
             solicita = solicita_raw.upper().strip()
             adscrito = adscrito_raw.upper().strip()
@@ -2450,242 +2416,208 @@ else:
             recibe_n = recibe_n_raw.upper().strip()
             recibe_c = recibe_c_raw.upper().strip()
 
-        with c_preview:
-            st.markdown("### 👁️ Vista Previa del Formato")
+            with c_preview:
+                st.markdown("### 👁️ Vista Previa del Formato")
 
-            meses_mx = {1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL", 5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO", 9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"}
-            f_doc_str = f"{f_doc.day}/{meses_mx[f_doc.month]}/{f_doc.year}"
-            f_ini_str = f"DEL {f_inicio.day} DE {meses_mx[f_inicio.month]} DEL {f_inicio.year}"
-            f_fin_str = f"AL {f_fin.day} DE {meses_mx[f_fin.month]} DEL {f_fin.year}"
+                meses_mx = {1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL", 5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO", 9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"}
+                f_doc_str = f"{f_doc.day}/{meses_mx[f_doc.month]}/{f_doc.year}"
+                f_ini_str = f"DEL {f_inicio.day} DE {meses_mx[f_inicio.month]} DEL {f_inicio.year}"
+                f_fin_str = f"AL {f_fin.day} DE {meses_mx[f_fin.month]} DEL {f_fin.year}"
 
-            cod_sel = clave_concepto.split(" | ")[0].strip()
+                cod_sel = clave_concepto.split(" | ")[0].strip()
 
-            if accion == "JUSTIFICAR":
-                just_line = f"[{cod_sel}] A: {nombre_emp}"
-                sanc_line = ""
-            else:
-                just_line = ""
-                sanc_line = f"[{cod_sel}] A: {nombre_emp}"
+                if accion == "JUSTIFICAR":
+                    just_line = f"[{cod_sel}] A: {nombre_emp}"
+                    sanc_line = ""
+                else:
+                    just_line = ""
+                    sanc_line = f"[{cod_sel}] A: {nombre_emp}"
 
-            bg_reg_lista = "background: #bcbcbc; font-weight: bold;" if f_registro == "LISTA" else ""
-            bg_reg_hp = "background: #bcbcbc; font-weight: bold;" if f_registro == "HAND PUNCH" else ""
+                bg_reg_lista = "background: #bcbcbc; font-weight: bold;" if f_registro == "LISTA" else ""
+                bg_reg_hp = "background: #bcbcbc; font-weight: bold;" if f_registro == "HAND PUNCH" else ""
 
-            conceptos_grid = [
-                ("3", "FALTA INJUSTIFICADA", "17", "LICENCIA POR GRAVIDEZ"),
-                ("4", "FALTA JUSTIFICADA (TIEMPO X TIEMPO)", "18", "HORA DE LACTANCIA"),
-                ("9", "LICENCIA CON GOCE DE SUELDO", "19", "LICENCIA POR FALLECIMIENTO DE FAMILIAR"),
-                ("10", "LICENCIA SIN GOCE DE SUELDO", "20", "LICENCIA POR NACIMIENTO"),
-                ("11", "VACACIONES", "23", "OMISIÓN DE CHECADA"),
-                ("12", "INCAPACIDAD", "24", "DÍA ECONÓMICO (SINDICALIZADO)"),
-                ("14", "COMISIÓN", "34", "CUMPLEAÑOS (SINDICALIZADO)"),
-                ("16", "LICENCIA POR MATRIMONIO(SINDICALIZADO)", "CM", "CUIDADOS MÉDICOS")
-            ]
+                conceptos_grid = [
+                    ("3", "FALTA INJUSTIFICADA", "17", "LICENCIA POR GRAVIDEZ"),
+                    ("4", "FALTA JUSTIFICADA (TIEMPO X TIEMPO)", "18", "HORA DE LACTANCIA"),
+                    ("9", "LICENCIA CON GOCE DE SUELDO", "19", "LICENCIA POR FALLECIMIENTO DE FAMILIAR"),
+                    ("10", "LICENCIA SIN GOCE DE SUELDO", "20", "LICENCIA POR NACIMIENTO"),
+                    ("11", "VACACIONES", "23", "OMISIÓN DE CHECADA"),
+                    ("12", "INCAPACIDAD", "24", "DÍA ECONÓMICO (SINDICALIZADO)"),
+                    ("14", "COMISIÓN", "34", "CUMPLEAÑOS (SINDICALIZADO)"),
+                    ("16", "LICENCIA POR MATRIMONIO(SINDICALIZADO)", "CM", "CUIDADOS MÉDICOS")
+                ]
 
-            tabla_html_conceptos = ""
-            for c1, n1, c2, n2 in conceptos_grid:
-                style_c1 = "background: #bcbcbc; font-weight: bold;" if cod_sel == c1 else ""
-                style_c2 = "background: #bcbcbc; font-weight: bold;" if cod_sel == c2 else ""
+                tabla_html_conceptos = ""
+                for c1, n1, c2, n2 in conceptos_grid:
+                    style_c1 = "background: #bcbcbc; font-weight: bold;" if cod_sel == c1 else ""
+                    style_c2 = "background: #bcbcbc; font-weight: bold;" if cod_sel == c2 else ""
 
-                tabla_html_conceptos += f"""
-                <tr>
-                    <td style="border: 1px solid black; text-align: center; width: 8%; font-size: 10px; {style_c1}">{c1}</td>
-                    <td style="border: 1px solid black; padding-left: 5px; width: 42%; font-size: 9px; {style_c1}">{n1}</td>
-                    <td style="border: 1px solid black; text-align: center; width: 8%; font-size: 10px; {style_c2}">{c2}</td>
-                    <td style="border: 1px solid black; padding-left: 5px; width: 42%; font-size: 9px; {style_c2}">{n2}</td>
-                </tr>
-                """
-
-            if tipo_membrete == "Sistema (Texto Genérico)":
-                html_header_layer = f"""
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px;">
+                    tabla_html_conceptos += f"""
                     <tr>
-                        <td style="width: 25%; font-size: 22px; font-family: 'Arial Black', Gadget, sans-serif; font-weight: 900; vertical-align: top; line-height: 0.9;">
-                            Toluca<br><span style="font-size: 9px; font-family: Arial; letter-spacing: 3px; font-weight: bold;">CAPITAL</span>
-                            <div style="font-size: 6px; letter-spacing: 0.5px; font-weight: normal; margin-top: 2px; color:#555;">DE OPORTUNIDADES Y PROGRESO</div>
-                        </td>
-                        <td style="text-align: center; width: 55%; vertical-align: top; font-size: 11px; font-weight: bold; font-family: Arial;">
-                            DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS<br>
-                            DIRECCIÓN DE ALUMBRADO PÚBLICO<br><br>
-                            <span style="font-size: 9.5px; font-weight: normal; font-style: italic;">"2026. Año del Humanismo Mexicano en el Estado de México"</span>
-                        </td>
-                        <td style="width: 20%; text-align: right; vertical-align: top; font-size: 8px; color: #777;">
-                            <div style="border: 1px dashed #999; padding: 5px; text-align: center; height: 35px;">ESCUDO TIMBRE</div>
-                        </td>
+                        <td style="border: 1px solid black; text-align: center; width: 7%; font-size: 10px; {style_c1}">{c1}</td>
+                        <td style="border: 1px solid black; padding-left: 5px; width: 43%; font-size: 9px; {style_c1}">{n1}</td>
+                        <td style="border: 1px solid black; text-align: center; width: 7%; font-size: 10px; {style_c2}">{c2}</td>
+                        <td style="border: 1px solid black; padding-left: 5px; width: 43%; font-size: 9px; {style_c2}">{n2}</td>
                     </tr>
-                </table>
-                """
-                html_footer_layer = f"""
-                <div style="border-top: 1px solid black; text-align: center; font-size: 10px; font-weight: bold; padding-top: 3px; margin-top: 10px;">
-                    H. Ayuntamiento de Toluca
-                </div>
-                <div style="text-align: center; font-size: 8px; color: #444; margin-top: 2px;">
-                    Rafael Alducin s/n esquina Primero de Mayo, Col. Reforma y Ferrocarriles | Tel: 7223171747
-                </div>
-                <div style="background: black; height: 10px; width: 100%; margin-top: 6px;"></div>
-                """
-            elif tipo_membrete == "Imagen Personalizada (Subir Banner)" and img_j_hdr_b64:
-                html_header_layer = f"""
-                <div style="width: 100%; text-align: center; margin-bottom: 5px;">
-                    <img src="data:image/png;base64,{img_j_hdr_b64}" style="width: 100%; max-height: 85px; object-fit: contain;">
-                </div>
-                """
-                if img_j_ftr_b64:
-                    html_footer_layer = f"""
-                    <div style="width: 100%; text-align: center; margin-top: 15px;">
-                        <img src="data:image/png;base64,{img_j_ftr_b64}" style="width: 100%; max-height: 65px; object-fit: contain;">
-                    </div>
                     """
-                else:
-                    html_footer_layer = ""
-            else:
-                html_header_layer = """<div style="height: 85px;"></div>"""
-                html_footer_layer = ""
 
-            html_formato = f"""
-            <div style="background: white; color: black; padding: 25px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; width: 100%; box-sizing: border-box;">
-                {html_header_layer}
-                
-                <div style="text-align: center; font-weight: bold; font-size: 13px; margin-top: 10px; margin-bottom: 15px; letter-spacing: 0.5px;">FORMATO ÚNICO DE JUSTIFICACIÓN</div>
-                
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px;">
-                    <tr>
-                        <td style="font-weight: bold; width: 12%; padding: 4px 0;">SOLICITA:</td>
-                        <td style="border-bottom: 1px solid black; color: blue; width: 53%; padding: 4px 0;">{solicita}</td>
-                        <td style="font-weight: bold; width: 10%; text-align: right; padding: 4px 0;">FECHA:</td>
-                        <td style="border-bottom: 1px solid black; color: blue; text-align: center; width: 25%; padding: 4px 0;">{f_doc_str}</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold; padding: 4px 0;">JUSTIFICAR:</td>
-                        <td style="border-bottom: 1px solid black; color: blue; padding: 4px 0;" colspan="3">{just_line}</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold; padding: 4px 0;">SANCIONAR:</td>
-                        <td style="border-bottom: 1px solid black; color: blue; padding: 4px 0;">{sanc_line}</td>
-                        <td style="font-weight: bold; text-align: right; padding: 4px 0;">No. DE EMP.:</td>
-                        <td style="border-bottom: 1px solid black; color: blue; text-align: center; padding: 4px 0;">{num_emp}</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold; padding: 4px 0;">ADSCRITO A:</td>
-                        <td style="border-bottom: 1px solid black; color: blue; padding: 4px 0;">{adscrito}</td>
-                        <td style="font-weight: bold; text-align: right; padding: 4px 0;" colspan="2">
-                            F. REGISTRO &nbsp;
-                            <span style="border: 1px solid black; padding: 1px 4px; margin-right: 3px; {bg_reg_lista}">LISTA</span>
-                            <span style="border: 1px solid black; padding: 1px 4px; {bg_reg_hp}">HAND PUNCH</span>
-                        </td>
-                    </tr>
-                </table>
-                
-                <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 8px;">
-                    <thead>
-                        <tr style="background: #e1e1e1; font-weight: bold; font-size: 10px; text-align: center;">
-                            <td style="border: 1px solid black; padding: 4px; width: 8%;">CLAVE</td>
-                            <td style="border: 1px solid black; padding: 4px; width: 42%;">CONCEPTO</td>
-                            <td style="border: 1px solid black; padding: 4px; width: 8%;">CLAVE</td>
-                            <td style="border: 1px solid black; padding: 4px; width: 42%;">CONCEPTO</td>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {tabla_html_conceptos}
-                    </tbody>
-                </table>
-                
-                <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 11px; margin-bottom: 10px; text-align: center;">
-                    <tr>
-                        <td style="font-weight: bold; text-align: left; padding: 4px; border-bottom: 1px solid black; background: #f5f5f5;" colspan="2">&nbsp;FECHA:</td>
-                    </tr>
-                    <tr>
-                        <td style="width: 50%; padding: 8px; border-right: 1px solid black; color: red; font-weight: bold; font-size: 11.5px;">{f_ini_str}</td>
-                        <td style="width: 50%; padding: 8px; color: red; font-weight: bold; font-size: 11.5px;">{f_fin_str}</td>
-                    </tr>
-                </table>
-                
-                <div style="border: 1px solid black; margin-bottom: 15px; font-size: 11px;">
-                    <div style="font-weight: bold; text-align: center; background: #e1e1e1; padding: 3px; border-bottom: 1px solid black; letter-spacing: 1px;">MOTIVO</div>
-                    <div style="padding: 10px; text-align: center; min-height: 40px; font-weight: bold; line-height: 1.4; color: #333;">
-                        {motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO."}
-                    </div>
+                html_header_layer = """
+                <div style="text-align: center; border-bottom: 2px solid #800020; padding-bottom: 6px; margin-bottom: 12px;">
+                    <span style="font-size: 11px; font-weight: bold; color: #444;">DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS | DIRECCIÓN DE ALUMBRADO PÚBLICO</span><br>
+                    <span style="font-size: 9px; font-style: italic; color: #666;">"2026. Año del Humanismo Mexicano en el Estado de México"</span>
                 </div>
-                
-                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 9.5px; margin-top: 25px; margin-bottom: 15px;">
-                    <tr>
-                        <td style="width: 23%; vertical-align: bottom; padding: 0 5px;">
-                            <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{firma_solicita}</div>
-                            <div style="margin-top: 4px; font-weight: bold; font-size: 9px; height: 24px; display: flex; align-items: center; justify-content: center;">SOLICITANTE</div>
-                        </td>
-                        <td style="width: 23%; vertical-align: bottom; padding: 0 5px;">
-                            <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{autoriza_n}</div>
-                            <div style="margin-top: 4px; font-weight: bold; font-size: 9px; height: 24px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{autoriza_c}</div>
-                        </td>
-                        <td style="width: 23%; vertical-align: bottom; padding: 0 5px;">
-                            <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{revisa_n}</div>
-                            <div style="margin-top: 4px; font-weight: bold; font-size: 9px; height: 24px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{revisa_c}</div>
-                        </td>
-                        <td style="width: 23%; vertical-align: bottom; padding: 0 5px;">
-                            <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{recibe_n}</div>
-                            <div style="margin-top: 4px; font-weight: bold; font-size: 9px; height: 24px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{recibe_c}</div>
-                        </td>
-                    </tr>
-                </table>
-                
-                {html_footer_layer}
-            </div>
-            """
+                """
+                html_footer_layer = """
+                <div style="border-top: 1px solid #ccc; text-align: center; font-size: 9px; color: #666; margin-top: 20px; padding-top: 4px;">
+                    H. Ayuntamiento de Toluca | Rafael Alducin s/n esq. 1ro de Mayo, Col. Reforma y Ferrocarriles
+                </div>
+                """
 
-            st.components.v1.html(html_formato, height=800, scrolling=True)
-            st.divider()
+                html_formato = f"""
+                <div style="background: white; color: black; padding: 25px; border: 1px solid #aaa; font-family: 'Arial', sans-serif; line-height: 1.3; width: 100%; box-sizing: border-box;">
+                    {html_header_layer}
+                    
+                    <div style="text-align: center; font-weight: bold; font-size: 13px; margin-top: 5px; margin-bottom: 12px; letter-spacing: 0.5px;">FORMATO ÚNICO DE JUSTIFICACIÓN</div>
+                    
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px;">
+                        <tr>
+                            <td style="font-weight: bold; width: 12%; padding: 4px 0;">SOLICITA:</td>
+                            <td style="border-bottom: 1px solid black; color: blue; width: 53%; padding: 4px 0;">{solicita}</td>
+                            <td style="font-weight: bold; width: 10%; text-align: right; padding: 4px 0;">FECHA:</td>
+                            <td style="border-bottom: 1px solid black; color: blue; text-align: center; width: 25%; padding: 4px 0;">{f_doc_str}</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold; padding: 4px 0;">JUSTIFICAR:</td>
+                            <td style="border-bottom: 1px solid black; color: blue; padding: 4px 0;" colspan="3">{just_line}</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold; padding: 4px 0;">SANCIONAR:</td>
+                            <td style="border-bottom: 1px solid black; color: blue; padding: 4px 0;">{sanc_line}</td>
+                            <td style="font-weight: bold; text-align: right; padding: 4px 0;">No. DE EMP.:</td>
+                            <td style="border-bottom: 1px solid black; color: blue; text-align: center; padding: 4px 0;">{num_emp}</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold; padding: 4px 0;">ADSCRITO A:</td>
+                            <td style="border-bottom: 1px solid black; color: blue; padding: 4px 0;">{adscrito}</td>
+                            <td style="font-weight: bold; text-align: right; padding: 4px 0;" colspan="2">
+                                F. REGISTRO &nbsp;
+                                <span style="border: 1px solid black; padding: 1px 4px; margin-right: 3px; {bg_reg_lista}">LISTA</span>
+                                <span style="border: 1px solid black; padding: 1px 4px; {bg_reg_hp}">HAND PUNCH</span>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 8px;">
+                        <thead>
+                            <tr style="background: #e1e1e1; font-weight: bold; font-size: 10px; text-align: center;">
+                                <td style="border: 1px solid black; padding: 4px; width: 7%;">CLAVE</td>
+                                <td style="border: 1px solid black; padding: 4px; width: 43%;">CONCEPTO</td>
+                                <td style="border: 1px solid black; padding: 4px; width: 7%;">CLAVE</td>
+                                <td style="border: 1px solid black; padding: 4px; width: 43%;">CONCEPTO</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {tabla_html_conceptos}
+                        </tbody>
+                    </table>
+                    
+                    <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 11px; margin-bottom: 10px; text-align: center;">
+                        <tr>
+                            <td style="font-weight: bold; text-align: left; padding: 4px; border-bottom: 1px solid black; background: #f5f5f5;" colspan="2">&nbsp;FECHA:</td>
+                        </tr>
+                        <tr>
+                            <td style="width: 50%; padding: 6px; border-right: 1px solid black; color: red; font-weight: bold; font-size: 11px;">{f_ini_str}</td>
+                            <td style="width: 50%; padding: 6px; color: red; font-weight: bold; font-size: 11px;">{f_fin_str}</td>
+                        </tr>
+                    </table>
+                    
+                    <div style="border: 1px solid black; margin-bottom: 12px; font-size: 11px;">
+                        <div style="font-weight: bold; text-align: center; background: #e1e1e1; padding: 3px; border-bottom: 1px solid black; letter-spacing: 1px;">MOTIVO</div>
+                        <div style="padding: 8px; text-align: center; min-height: 35px; font-weight: bold; line-height: 1.3; color: #333;">
+                            {motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO."}
+                        </div>
+                    </div>
+                    
+                    <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 9px; margin-top: 15px; margin-bottom: 10px;">
+                        <tr>
+                            <td style="width: 25%; vertical-align: bottom; padding: 0 4px;">
+                                <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{firma_solicita}</div>
+                                <div style="margin-top: 4px; font-weight: bold; height: 20px; display: flex; align-items: center; justify-content: center;">SOLICITANTE</div>
+                            </td>
+                            <td style="width: 25%; vertical-align: bottom; padding: 0 4px;">
+                                <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{autoriza_n}</div>
+                                <div style="margin-top: 4px; font-weight: bold; height: 20px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{autoriza_c}</div>
+                            </td>
+                            <td style="width: 25%; vertical-align: bottom; padding: 0 4px;">
+                                <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{revisa_n}</div>
+                                <div style="margin-top: 4px; font-weight: bold; height: 20px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{revisa_c}</div>
+                            </td>
+                            <td style="width: 25%; vertical-align: bottom; padding: 0 4px;">
+                                <div style="border-bottom: 1px solid black; padding-bottom: 3px; font-weight: bold; color: blue;">{recibe_n}</div>
+                                <div style="margin-top: 4px; font-weight: bold; height: 20px; display: flex; align-items: center; justify-content: center; line-height: 1.1;">{recibe_c}</div>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    {html_footer_layer}
+                </div>
+                """
 
-            ejecutar_guardado_j = False
-            if modo_j == "📂 Consultar Bóveda":
-                seguro_actualizar_j = st.checkbox("🔐 Confirmar actualización del formato guardado", key="chk_seguro_actualizar_incidencias")
-                if st.button("🔄 ACTUALIZAR JUSTIFICACIÓN HISTÓRICA", use_container_width=True, disabled=not seguro_actualizar_j, type="primary"):
-                    ejecutar_guardado_j = True
-            else:
-                if st.button("💾 GUARDAR NUEVA JUSTIFICACIÓN", use_container_width=True, type="primary"):
-                    ejecutar_guardado_j = True
+                st.components.v1.html(html_formato, height=800, scrolling=True)
+                st.divider()
 
-            if ejecutar_guardado_j:
-                tz_mx = timezone(timedelta(hours=-6))
-                ahora = datetime.now(tz_mx)
-
-                if modo_j == "✨ Crear Nuevo":
-                    id_reg_j = f"SF4-JST-{ahora.strftime('%Y%m%d-%H%M%S')}"
+                ejecutar_guardado_j = False
+                if modo_j == "📂 Consultar Bóveda":
+                    seguro_actualizar_j = st.checkbox("🔐 Confirmar actualización del formato guardado", key="chk_seguro_actualizar_incidencias")
+                    if st.button("🔄 ACTUALIZAR JUSTIFICACIÓN HISTÓRICA", use_container_width=True, disabled=not seguro_actualizar_j, type="primary"):
+                        ejecutar_guardado_j = True
                 else:
-                    id_reg_j = id_sel_j
+                    if st.button("💾 GUARDAR NUEVA JUSTIFICACIÓN", use_container_width=True, type="primary"):
+                        ejecutar_guardado_j = True
 
-                fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
+                if ejecutar_guardado_j:
+                    tz_mx = timezone(timedelta(hours=-6))
+                    ahora = datetime.now(tz_mx)
 
-                payload_j = {
-                    "f_registro": f_registro, "accion": accion, "solicita": solicita,
-                    "adscrito": adscrito, "nombre": nombre_emp, "num_emp": num_emp,
-                    "tipo_fecha": tipo_fecha_j, "fecha_inicio": str(f_inicio), "fecha_fin": str(f_fin),
-                    "clave_concepto": clave_concepto, "motivo": motivo, "revisa_n": revisa_n,
-                    "autoriza_n": autoriza_n, "recibe_n": recibe_n, "fecha_doc": str(f_doc),
-                    "firma_solicita": firma_solicita, "autoriza_c": autoriza_c, "revisa_c": revisa_c, "recibe_c": recibe_c,
-                    "formato_hoja": formato_hoja_j,
-                    "img_header_b64": img_j_hdr_b64,
-                    "img_footer_b64": img_j_ftr_b64
-                }
+                    if modo_j == "✨ Crear Nuevo":
+                        id_reg_j = f"SF4-JST-{ahora.strftime('%Y%m%d-%H%M%S')}"
+                    else:
+                        id_reg_j = id_sel_j
 
-                st.session_state.db_justificaciones[id_reg_j] = payload_j
+                    fecha_mx = ahora.strftime("%d/%m/%Y %H:%M:%S")
 
-                try:
-                    cell = ws.find(id_reg_j, in_column=1)
-                    if cell: ws.delete_rows(cell.row)
-                except: pass
+                    payload_j = {
+                        "f_registro": f_registro, "accion": accion, "solicita": solicita,
+                        "adscrito": adscrito, "nombre": nombre_emp, "num_emp": num_emp,
+                        "tipo_fecha": tipo_fecha_j, "fecha_inicio": str(f_inicio), "fecha_fin": str(f_fin),
+                        "clave_concepto": clave_concepto, "motivo": motivo, "revisa_n": revisa_n,
+                        "autoriza_n": autoriza_n, "recibe_n": recibe_n, "fecha_doc": str(f_doc),
+                        "firma_solicita": firma_solicita, "autoriza_c": autoriza_c, "revisa_c": revisa_c, "recibe_c": recibe_c,
+                        "formato_hoja": formato_hoja_j
+                    }
 
-                ws.append_row([id_reg_j, fecha_mx, nombre_emp, num_emp, json.dumps(payload_j), ""])
-                st.success("✅ Formato Único de Justificación Sincronizado en la Nube."); time.sleep(1); st.rerun()
+                    st.session_state.db_justificaciones[id_reg_j] = payload_j
 
-            # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA CARTA / OFICIO) ---
+                    try:
+                        cell = ws.find(id_reg_j, in_column=1)
+                        if cell: ws.delete_rows(cell.row)
+                    except: pass
+
+                    ws.append_row([id_reg_j, fecha_mx, nombre_emp, num_emp, json.dumps(payload_j), ""])
+                    st.success("✅ Formato Único de Justificación Sincronizado en la Nube."); time.sleep(1); st.rerun()
+
+            # --- GENERADOR DE DOCUMENTO PDF (SIMETRÍA EXACTA A X=11mm, W=194mm) ---
             if motor_pdf_listo:
-                X_START = 18.0
-                W_TOTAL = 180.0
+                import tempfile, os, zipfile, re
+
+                X_START = 11.0
+                W_TOTAL = 194.0
 
                 fmt_pdf_j = 'Letter' if "Carta" in formato_hoja_j else 'Legal'
                 page_h_j = 279.4 if fmt_pdf_j == 'Letter' else 355.6
 
                 pdf_j = FPDF(orientation='P', unit='mm', format=fmt_pdf_j)
-                pdf_j.set_margins(18, 26, 18)
+                pdf_j.set_margins(11, 20, 11)
                 pdf_j.set_auto_page_break(auto=False)
                 pdf_j.add_page()
 
@@ -2705,64 +2637,57 @@ else:
                 revisa_c_enc = revisa_c.encode('latin-1', 'replace').decode('latin-1')
                 recibe_c_enc = recibe_c.encode('latin-1', 'replace').decode('latin-1')
 
-                import tempfile
-                import os
+                # Extracción de membrete desde oficiossf.docx o banners personalizados
+                hdr_j_bytes, ftr_j_bytes = img_j_hdr_bytes, img_j_ftr_bytes
 
-                # 1. ENCABEZADO PDF (Y = 3mm)
-                if tipo_membrete == "Sistema (Texto Genérico)":
-                    pdf_j.set_font("Arial", 'B', 18)
-                    pdf_j.set_xy(X_START, 20)
-                    pdf_j.cell(45, 6, txt="Toluca", ln=False)
+                if "Plantilla" in tipo_membrete and os.path.exists("oficiossf.docx"):
+                    try:
+                        with zipfile.ZipFile("oficiossf.docx", 'r') as z:
+                            namelist = z.namelist()
+                            hdr_rels = [f for f in namelist if 'header' in f and f.endswith('.rels')]
+                            if hdr_rels:
+                                rel_xml = z.read(hdr_rels[0]).decode('utf-8', errors='ignore')
+                                m_hdr = re.search(r'Target=["\'](?:.*?/)?media/([^"\']+)["\']', rel_xml)
+                                if m_hdr and ('word/media/' + m_hdr.group(1)) in namelist:
+                                    hdr_j_bytes = z.read('word/media/' + m_hdr.group(1))
 
-                    pdf_j.set_font("Arial", 'B', 9)
-                    pdf_j.set_xy(X_START + 45, 20)
-                    pdf_j.cell(95, 4, txt="DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS", ln=False, align='C')
+                            ftr_rels = [f for f in namelist if 'footer' in f and f.endswith('.rels')]
+                            if ftr_rels:
+                                rel_xml_f = z.read(ftr_rels[0]).decode('utf-8', errors='ignore')
+                                m_ftr = re.search(r'Target=["\'](?:.*?/)?media/([^"\']+)["\']', rel_xml_f)
+                                if m_ftr and ('word/media/' + m_ftr.group(1)) in namelist:
+                                    ftr_j_bytes = z.read('word/media/' + m_ftr.group(1))
+                    except Exception: pass
 
-                    pdf_j.set_font("Arial", '', 8)
-                    pdf_j.set_xy(X_START + 140, 20)
-                    pdf_j.cell(38, 4, txt="[ TIMBRE ]", ln=True, align='R')
+                # 1. Dibujar Encabezado
+                if "Ocultar" not in tipo_membrete:
+                    if hdr_j_bytes:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_jh:
+                            tmp_jh.write(hdr_j_bytes)
+                            tmp_jh_path = tmp_jh.name
+                        try:
+                            pdf_j.image(tmp_jh_path, x=11, y=3, w=194)
+                        finally:
+                            try: os.unlink(tmp_jh_path)
+                            except: pass
 
-                    pdf_j.set_font("Arial", 'B', 8)
-                    pdf_j.set_xy(X_START, 27)
-                    pdf_j.cell(45, 4, txt="CAPITAL DE OPORTUNIDADES", ln=False)
-
-                    pdf_j.set_font("Arial", 'B', 9)
-                    pdf_j.set_xy(X_START + 45, 27)
-                    pdf_j.cell(95, 4, txt="DIRECCIÓN DE ALUMBRADO PÚBLICO", ln=True, align='C')
-
+                    pdf_j.set_xy(11, 28)
                     pdf_j.set_font("Arial", 'I', 8.5)
-                    pdf_j.set_xy(X_START, 35)
-                    pdf_j.cell(W_TOTAL, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
+                    pdf_j.cell(194, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
 
-                elif tipo_membrete == "Imagen Personalizada (Subir Banner)" and img_j_hdr_bytes is not None:
-                    from PIL import Image
-                    import io
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_j_hdr:
-                        img_temp = Image.open(io.BytesIO(img_j_hdr_bytes)).convert("RGB")
-                        img_temp.save(tmp_j_hdr.name, format="JPEG")
-                        tmp_j_hdr_path = tmp_j_hdr.name
+                # 2. Dibujar Pie de Página
+                if "Ocultar" not in tipo_membrete and ftr_j_bytes:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_jf:
+                        tmp_jf.write(ftr_j_bytes)
+                        tmp_jf_path = tmp_jf.name
                     try:
-                        pdf_j.image(tmp_j_hdr_path, x=15, y=3, w=186)
+                        pdf_j.image(tmp_jf_path, x=11, y=page_h_j - 21, w=194)
                     finally:
-                        try: os.unlink(tmp_j_hdr_path)
+                        try: os.unlink(tmp_jf_path)
                         except: pass
 
-                # 2. PIE DE PÁGINA PDF (Y = page_h_j - 21mm)
-                if tipo_membrete == "Imagen Personalizada (Subir Banner)" and img_j_ftr_bytes is not None:
-                    from PIL import Image
-                    import io
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_j_ftr:
-                        img_temp = Image.open(io.BytesIO(img_j_ftr_bytes)).convert("RGB")
-                        img_temp.save(tmp_j_ftr.name, format="JPEG")
-                        tmp_j_ftr_path = tmp_j_ftr.name
-                    try:
-                        pdf_j.image(tmp_j_ftr_path, x=15, y=page_h_j - 21, w=186)
-                    finally:
-                        try: os.unlink(tmp_j_ftr_path)
-                        except: pass
-
-                # 3. CUERPO DE LA JUSTIFICACIÓN (Se incrementa inicio a 42mm)
-                Y_START_BODY = 42.0
+                # 3. CUERPO DE LA JUSTIFICACIÓN
+                Y_START_BODY = 36.0
 
                 pdf_j.set_font("Arial", 'B', 11)
                 pdf_j.set_xy(X_START, Y_START_BODY)
@@ -2772,51 +2697,52 @@ else:
                 pdf_j.set_xy(X_START, Y_START_BODY + 8)
                 pdf_j.cell(22, 7, txt="SOLICITA: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(98, 7, txt=solicita_enc, border='B', ln=False)
+                pdf_j.cell(108, 7, txt=solicita_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.cell(18, 7, txt=" FECHA: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(30, 7, txt=f_doc_str, border='B', ln=True, align='C')
+                pdf_j.cell(46, 7, txt=f_doc_str, border='B', ln=True, align='C')
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 16)
                 pdf_j.cell(26, 7, txt="JUSTIFICAR: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(142, 7, txt=just_line_enc, border='B', ln=True)
+                pdf_j.cell(168, 7, txt=just_line_enc, border='B', ln=True)
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 24)
                 pdf_j.cell(26, 7, txt="SANCIONAR: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(86, 7, txt=sanc_line_enc, border='B', ln=False)
+                pdf_j.cell(100, 7, txt=sanc_line_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 10)
-                pdf_j.cell(26, 7, txt=" No. DE EMP.: ", border=0, ln=False)
+                pdf_j.cell(28, 7, txt=" No. DE EMP.: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(30, 7, txt=num_emp, border='B', ln=True, align='C')
+                pdf_j.cell(40, 7, txt=num_emp, border='B', ln=True, align='C')
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 32)
                 pdf_j.cell(26, 7, txt="ADSCRITO A: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(86, 7, txt=adscrito_enc, border='B', ln=False)
+                pdf_j.cell(100, 7, txt=adscrito_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 8.5)
                 pdf_j.cell(26, 7, txt=" F. REGISTRO: ", border=0, ln=False)
 
                 fill_lista = (f_registro == "LISTA")
                 pdf_j.set_fill_color(188, 188, 188)
-                pdf_j.cell(13, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
+                pdf_j.cell(18, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
                 pdf_j.cell(2, 5.5, txt="", border=0, ln=False)
                 fill_hp = (f_registro == "HAND PUNCH")
-                pdf_j.cell(15, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
+                pdf_j.cell(22, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
 
-                Y_TABLE = Y_START_BODY + 43
+                # Tabla de Conceptos (Suma exacta = 194 mm)
+                Y_TABLE = Y_START_BODY + 42
                 pdf_j.set_font("Arial", 'B', 9)
                 pdf_j.set_fill_color(225, 225, 225)
                 pdf_j.set_xy(X_START, Y_TABLE)
-                pdf_j.cell(12, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                pdf_j.cell(72, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
-                pdf_j.cell(12, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                pdf_j.cell(72, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
+                pdf_j.cell(14, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
+                pdf_j.cell(83, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
+                pdf_j.cell(14, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
+                pdf_j.cell(83, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
 
                 pdf_j.set_font("Arial", '', 8)
                 current_y = Y_TABLE + 5.5
@@ -2829,11 +2755,11 @@ else:
                     t_n2 = f" {n2}".encode('latin-1', 'replace').decode('latin-1')
 
                     pdf_j.set_xy(X_START, current_y)
-                    pdf_j.cell(12, 6.2, txt=c1, border=1, ln=False, align='C', fill=fill_l)
-                    pdf_j.cell(72, 6.2, txt=t_n1, border=1, ln=False, fill=fill_l)
-                    pdf_j.cell(12, 6.2, txt=c2, border=1, ln=False, align='C', fill=fill_r)
-                    pdf_j.cell(72, 6.2, txt=t_n2, border=1, ln=True, fill=fill_r)
-                    current_y += 6.2
+                    pdf_j.cell(14, 6.0, txt=c1, border=1, ln=False, align='C', fill=fill_l)
+                    pdf_j.cell(83, 6.0, txt=t_n1, border=1, ln=False, fill=fill_l)
+                    pdf_j.cell(14, 6.0, txt=c2, border=1, ln=False, align='C', fill=fill_r)
+                    pdf_j.cell(83, 6.0, txt=t_n2, border=1, ln=True, fill=fill_r)
+                    current_y += 6.0
 
                 Y_FECHAS = current_y + 3.0
                 pdf_j.set_font("Arial", 'B', 9.5)
@@ -2844,66 +2770,51 @@ else:
                 pdf_j.set_font("Arial", 'B', 10.5)
                 pdf_j.set_text_color(220, 0, 0)
                 pdf_j.set_xy(X_START, Y_FECHAS + 5.5)
-                pdf_j.cell(84, 9, txt=f_ini_str, border=1, ln=False, align='C')
-                pdf_j.cell(84, 9, txt=f_fin_str, border=1, ln=True, align='C')
+                pdf_j.cell(97, 8.5, txt=f_ini_str, border=1, ln=False, align='C')
+                pdf_j.cell(97, 8.5, txt=f_fin_str, border=1, ln=True, align='C')
                 pdf_j.set_text_color(0, 0, 0)
 
-                Y_MOTIVO = Y_FECHAS + 17.5
+                Y_MOTIVO = Y_FECHAS + 17.0
                 pdf_j.set_font("Arial", 'B', 9.5)
                 pdf_j.set_fill_color(225, 225, 225)
                 pdf_j.set_xy(X_START, Y_MOTIVO)
                 pdf_j.cell(W_TOTAL, 5.5, txt="MOTIVO", border=1, ln=True, align='C', fill=True)
 
-                pdf_j.rect(X_START, Y_MOTIVO + 5.5, W_TOTAL, 22)
+                pdf_j.rect(X_START, Y_MOTIVO + 5.5, W_TOTAL, 20)
                 pdf_j.set_xy(X_START, Y_MOTIVO + 7.5)
-                pdf_j.multi_cell(W_TOTAL, 5, txt=motivo_enc, align='C')
+                pdf_j.multi_cell(W_TOTAL, 4.5, txt=motivo_enc, align='C')
 
-                Y_FIRMAS = Y_MOTIVO + 32.0
-                h_grid = 52
-                w_col = W_TOTAL / 4
+                # Retícula de 4 firmas simétricas (48.5 mm por columna)
+                Y_FIRMAS = Y_MOTIVO + 29.5
+                h_grid = 48
+                w_col = W_TOTAL / 4.0
 
                 pdf_j.rect(X_START, Y_FIRMAS, W_TOTAL, h_grid)
                 pdf_j.line(X_START + w_col, Y_FIRMAS, X_START + w_col, Y_FIRMAS + h_grid)
                 pdf_j.line(X_START + 2*w_col, Y_FIRMAS, X_START + 2*w_col, Y_FIRMAS + h_grid)
                 pdf_j.line(X_START + 3*w_col, Y_FIRMAS, X_START + 3*w_col, Y_FIRMAS + h_grid)
 
-                pdf_j.line(X_START, Y_FIRMAS + 34, X_START + W_TOTAL, Y_FIRMAS + 34)
-                pdf_j.line(X_START, Y_FIRMAS + 43, X_START + W_TOTAL, Y_FIRMAS + 43)
-
-                pdf_j.set_font("Arial", 'B', 8.5)
-                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 2)
-                pdf_j.cell(w_col, 4, txt="AUTORIZACIÓN", align='C')
-                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 2)
-                pdf_j.cell(w_col, 4, txt="Vo. Bo.", align='C')
+                pdf_j.line(X_START, Y_FIRMAS + 31, X_START + W_TOTAL, Y_FIRMAS + 31)
 
                 pdf_j.set_font("Arial", 'B', 8)
-                pdf_j.set_xy(X_START, Y_FIRMAS + 35.5)
-                pdf_j.multi_cell(w_col, 3.2, txt=firma_solicita_enc, align='C')
-                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 35.5)
-                pdf_j.multi_cell(w_col, 3.2, txt=autoriza_n_enc, align='C')
-                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 35.5)
-                pdf_j.multi_cell(w_col, 3.2, txt=revisa_n_enc, align='C')
-                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 35.5)
-                pdf_j.multi_cell(w_col, 3.2, txt=recibe_n_enc, align='C')
+                pdf_j.set_xy(X_START, Y_FIRMAS + 32.5)
+                pdf_j.multi_cell(w_col, 3.0, txt=firma_solicita_enc, align='C')
+                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 32.5)
+                pdf_j.multi_cell(w_col, 3.0, txt=autoriza_n_enc, align='C')
+                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 32.5)
+                pdf_j.multi_cell(w_col, 3.0, txt=revisa_n_enc, align='C')
+                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 32.5)
+                pdf_j.multi_cell(w_col, 3.0, txt=recibe_n_enc, align='C')
 
                 pdf_j.set_font("Arial", 'B', 7.5)
-                pdf_j.set_xy(X_START, Y_FIRMAS + 44.5)
-                pdf_j.multi_cell(w_col, 3, txt="SOLICITANTE", align='C')
-                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 44.5)
-                pdf_j.multi_cell(w_col, 3, txt=autoriza_c_enc, align='C')
-                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 44.5)
-                pdf_j.multi_cell(w_col, 3, txt=revisa_c_enc, align='C')
-                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 44.5)
-                pdf_j.multi_cell(w_col, 3, txt=recibe_c_enc, align='C')
-
-                if tipo_membrete == "Sistema (Texto Genérico)":
-                    pdf_j.set_xy(X_START, Y_FIRMAS + 54)
-                    pdf_j.set_font("Arial", 'B', 9)
-                    pdf_j.cell(W_TOTAL, 4, txt="H. Ayuntamiento de Toluca", ln=True, align='C')
-                    pdf_j.set_font("Arial", '', 7.5)
-                    pdf_j.cell(W_TOTAL, 3, txt="Rafael Alducin s/n esquina Primero de Mayo, Col. Reforma y Ferrocarriles | Tel: 7223171747", ln=True, align='C')
-                    pdf_j.set_fill_color(0, 0, 0)
-                    pdf_j.rect(X_START, pdf_j.get_y() + 1.5, W_TOTAL, 2.5, 'F')
+                pdf_j.set_xy(X_START, Y_FIRMAS + 40.5)
+                pdf_j.multi_cell(w_col, 2.8, txt="SOLICITANTE", align='C')
+                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 40.5)
+                pdf_j.multi_cell(w_col, 2.8, txt=autoriza_c_enc, align='C')
+                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 40.5)
+                pdf_j.multi_cell(w_col, 2.8, txt=revisa_c_enc, align='C')
+                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 40.5)
+                pdf_j.multi_cell(w_col, 2.8, txt=recibe_c_enc, align='C')
 
                 pdf_data_j = pdf_j.output(dest='S').encode('latin-1', 'replace')
                 st.download_button(label="🚀 DESCARGAR JUSTIFICACIÓN PDF", data=pdf_data_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True)
