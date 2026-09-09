@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy<2.0.0
+scipy
+simplekml
+openpyxl
+st-gsheets-connection
+fpdf
+supabase
+python-docx

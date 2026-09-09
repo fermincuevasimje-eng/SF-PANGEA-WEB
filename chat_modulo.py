@@ -1,0 +1,1253 @@
+import re
+import time
+import urllib.request
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import streamlit as st
+import streamlit.components.v1 as components
+from supabase import Client, create_client
+
+USUARIOS_OFICIALES_DEFAULT = [
+    "SF",
+    "Director",
+    "GuaDAP",
+    "Edith",
+    "Jefe Mant.",
+    "Jefe Infra.",
+    "Almacén 1",
+    "Almacén 2",
+    "DAP 1",
+    "DAP 2",
+    "DAP 3",
+] + [f"Brigada {i}" for i in range(1, 18)] + [f"Especial {i}" for i in range(1, 4)]
+
+
+# 🎨 Inyección CSS para Optimización Móvil y Tablets
+def inyectar_css_movil():
+    st.markdown(
+        """
+        <style>
+        /* Ajustar padding principal para aprovechar el ancho en móviles */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        
+        /* Optimizar botones para toque táctil (mínimo recomendado 44px) */
+        .stButton button, .stDownloadButton button, .stLinkButton a {
+            min-height: 44px !important;
+            border-radius: 8px !important;
+            font-size: 0.95rem !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        /* Reducir espacio entre elementos en dispositivos pequeños */
+        @media (max-width: 768px) {
+            .stChatMessage {
+                padding: 0.5rem !important;
+                margin-bottom: 0.5rem !important;
+            }
+            .stExpander {
+                margin-bottom: 0.5rem !important;
+            }
+            h1 { font-size: 1.6rem !important; }
+            h2 { font-size: 1.3rem !important; }
+            h3 { font-size: 1.1rem !important; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# 1. Conexión Segura a Supabase
+@st.cache_resource
+def get_supabase_client() -> Client:
+    try:
+        url = st.secrets["supabase"]["SUPABASE_URL"]
+        key = st.secrets["supabase"]["SUPABASE_KEY"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error(f"🔴 Error al cargar credenciales de Supabase: {e}")
+        st.stop()
+
+
+# Sanitización estricta de nombres de archivos
+def sanitizar_nombre_archivo(nombre_original: str) -> str:
+    partes = nombre_original.rsplit(".", 1)
+    nombre_base = partes[0]
+    ext = partes[1] if len(partes) > 1 else ""
+
+    nombre_base_limpio = re.sub(r"[^a-zA-Z0-9_-]", "_", nombre_base)
+    ext_limpia = re.sub(r"[^a-zA-Z0-9]", "", ext)
+
+    if ext_limpia:
+        return f"{nombre_base_limpio}.{ext_limpia}"
+    return nombre_base_limpio
+
+
+# Subir archivo adjunto a Supabase Storage
+def subir_adjunto_supabase(uploaded_file, supabase_client) -> str:
+    try:
+        timestamp = int(time.time() * 1000)
+        nombre_limpio = sanitizar_nombre_archivo(uploaded_file.name)
+        path_destino = f"mensajes/{timestamp}_{nombre_limpio}"
+
+        file_bytes = uploaded_file.getvalue()
+
+        supabase_client.storage.from_("chat-adjuntos").upload(
+            path=path_destino,
+            file=file_bytes,
+            file_options={"content-type": uploaded_file.type},
+        )
+
+        public_url = supabase_client.storage.from_("chat-adjuntos").get_public_url(
+            path_destino
+        )
+        return public_url
+    except Exception as e:
+        st.error(f"🔴 Error al subir el archivo {uploaded_file.name}: {e}")
+        return None
+
+
+# Descargar bytes con caché
+@st.cache_data(ttl=3600, show_spinner=False)
+def obtener_bytes_adjunto(url: str) -> bytes:
+    try:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req) as response:
+            return response.read()
+    except Exception:
+        return None
+
+
+# Consultar canales dinámicos
+def obtener_canales_db(supabase_client) -> list:
+    canales_predeterminados = [
+        "general",
+        "mantenimiento",
+        "infraestructura",
+        "dap",
+        "mapas",
+        "almacen",
+    ]
+    try:
+        res = supabase_client.table("canales").select("nombre").execute()
+        if res.data:
+            canales_db = [
+                row["nombre"].lower()
+                for row in res.data
+                if row.get("nombre")
+            ]
+            return sorted(list(set(canales_predeterminados + canales_db)))
+    except Exception:
+        pass
+    return canales_predeterminados
+
+
+# Consultar usuarios oficialmente registrados
+def obtener_usuarios_registrados(supabase_client) -> list:
+    try:
+        res = (
+            supabase_client.table("usuarios")
+            .select("nombre")
+            .order("nombre")
+            .execute()
+        )
+        if res.data and len(res.data) > 0:
+            db_users = [u["nombre"] for u in res.data if u.get("nombre")]
+            return sorted(list(set(db_users + USUARIOS_OFICIALES_DEFAULT)))
+    except Exception:
+        pass
+    return USUARIOS_OFICIALES_DEFAULT
+
+
+# Motor de Menciones Inteligentes
+def evaluar_mencion_inteligente(mensaje: str, usuario_destinatario: str) -> bool:
+    if not mensaje or not usuario_destinatario:
+        return False
+    target_clean = usuario_destinatario.lower().replace(" ", "").replace(".", "")
+    palabras = mensaje.lower().split()
+
+    for palabra in palabras:
+        if palabra.startswith("@"):
+            tag = palabra[1:].strip(",.!?:;\"'")
+            if len(tag) >= 2:
+                tag_clean = tag.replace(" ", "").replace(".", "")
+                if target_clean.startswith(tag_clean) or tag_clean in target_clean:
+                    return True
+    return False
+
+
+# -----------------------------------------------------------------------------
+# HISTORIAL DE MENSAJES AUTO-SINCRONIZADO (OPTIMIZADO PARA MÓVIL)
+# -----------------------------------------------------------------------------
+@st.fragment(run_every=2)
+def render_historial_fragment(
+    usuario_actual: str,
+    canal: str = "general",
+    destinatario: str = None,
+    solo_menciones: bool = False,
+    fecha_filtro=None,
+    hora_inicio=None,
+    hora_fin=None,
+    texto_busqueda: str = "",
+):
+    supabase = get_supabase_client()
+
+    if "notified_msg_ids" not in st.session_state:
+        st.session_state.notified_msg_ids = set()
+
+    def cargar_historial():
+        try:
+            query = supabase.table("mensajes").select("*")
+
+            if solo_menciones:
+                res = query.order("created_at", desc=True).execute()
+                data = res.data if res.data else []
+                data = [
+                    m
+                    for m in data
+                    if evaluar_mencion_inteligente(m.get("mensaje", ""), usuario_actual)
+                    and m.get("emisor") != usuario_actual
+                ]
+            elif canal == "privado" and destinatario:
+                res = (
+                    query.eq("canal", "privado")
+                    .order("created_at", desc=False)
+                    .execute()
+                )
+                data = res.data if res.data else []
+                data = [
+                    m
+                    for m in data
+                    if (
+                        m.get("emisor") == usuario_actual
+                        and m.get("destinatario") == destinatario
+                    )
+                    or (
+                        m.get("emisor") == destinatario
+                        and m.get("destinatario") == usuario_actual
+                    )
+                ]
+            else:
+                res = (
+                    query.eq("canal", canal)
+                    .order("created_at", desc=False)
+                    .execute()
+                )
+                data = res.data if res.data else []
+
+            if texto_busqueda and data:
+                kw = texto_busqueda.strip().lower()
+                data = [m for m in data if kw in m.get("mensaje", "").lower()]
+
+            if fecha_filtro and data:
+                data_filtrada = []
+                for m in data:
+                    raw_time = m.get("created_at", "")
+                    if raw_time:
+                        try:
+                            dt_utc = datetime.fromisoformat(
+                                raw_time.replace("Z", "+00:00")
+                            )
+                            dt_local = dt_utc.astimezone(
+                                ZoneInfo("America/Mexico_City")
+                            )
+
+                            if dt_local.date() == fecha_filtro:
+                                if hora_inicio and hora_fin:
+                                    if (
+                                        hora_inicio
+                                        <= dt_local.time()
+                                        <= hora_fin
+                                    ):
+                                        data_filtrada.append(m)
+                                else:
+                                    data_filtrada.append(m)
+                        except Exception:
+                            pass
+                return data_filtrada
+
+            return data
+        except Exception as err:
+            st.error(f"🔴 Error al consultar mensajes: {err}")
+            return []
+
+    mime_types = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+        "gif": "image/gif",
+        "pdf": "application/pdf",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "xls": "application/vnd.ms-excel",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "doc": "application/msword",
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "ppt": "application/vnd.ms-powerpoint",
+    }
+
+    hora_actual = datetime.now(ZoneInfo("America/Mexico_City")).strftime(
+        "%H:%M:%S"
+    )
+    if solo_menciones:
+        st.caption(
+            f"🔔 **Muro de Menciones (@{usuario_actual})** • `{hora_actual}`"
+        )
+    elif canal == "privado":
+        st.caption(
+            f"🔒 **Chat Privado con {destinatario}** • `{hora_actual}`"
+        )
+    else:
+        st.caption(
+            f"📢 **Canal #{canal.upper()}** • En Vivo (`{hora_actual}`)"
+        )
+
+    mensajes = cargar_historial()
+
+    # Altura optimizada para pantallas pequeñas
+    chat_container = st.container(height=450)
+    with chat_container:
+        if mensajes:
+            for msg_idx, fila in enumerate(mensajes):
+                usr = fila.get("emisor", "Anónimo")
+                msg = fila.get("mensaje", "")
+                url_adjunto_raw = fila.get("url_adjunto", None)
+                canal_origen = fila.get("canal", "general")
+                msg_unique_id = (
+                    fila.get("id") or f"{usr}_{fila.get('created_at', '')}"
+                )
+
+                raw_time = fila.get("created_at", "")
+                if raw_time:
+                    try:
+                        dt_utc = datetime.fromisoformat(
+                            raw_time.replace("Z", "+00:00")
+                        )
+                        dt_local = dt_utc.astimezone(
+                            ZoneInfo("America/Mexico_City")
+                        )
+                        tstamp = dt_local.strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        tstamp = str(raw_time)
+                else:
+                    tstamp = ""
+
+                es_propio = usr == usuario_actual
+                avatar_icon = "👤" if es_propio else "💬"
+
+                contiene_mencion = (
+                    evaluar_mencion_inteligente(msg, usuario_actual) and not es_propio
+                )
+
+                if (
+                    contiene_mencion
+                    and msg_unique_id not in st.session_state.notified_msg_ids
+                ):
+                    st.session_state.notified_msg_ids.add(msg_unique_id)
+                    st.toast(
+                        f"🔔 ¡{usr} te ha mencionado en #{canal_origen.upper()}!",
+                        icon="💬",
+                    )
+                    components.html(
+                        f"""
+                        <audio autoplay style="display:none;">
+                            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+                        </audio>
+                        <script>
+                        if (Notification.permission === 'granted') {{
+                            new Notification("🔔 SF Pangea Chat", {{
+                                body: "{usr} te ha mencionado en #{canal_origen.upper()}",
+                                icon: "https://cdn-icons-png.flaticon.com/512/732/732200.png"
+                            }});
+                        }} else if (Notification.permission !== 'denied') {{
+                            Notification.requestPermission();
+                        }}
+                        </script>
+                        """,
+                        height=0,
+                        width=0,
+                    )
+
+                with st.chat_message(usr, avatar=avatar_icon):
+                    if contiene_mencion and not solo_menciones:
+                        st.warning(
+                            f"🔔 **¡{usr} te ha mencionado en este mensaje!**"
+                        )
+
+                    if solo_menciones:
+                        st.info(
+                            f"📌 Mencionado en canal: **#{canal_origen.upper()}**"
+                        )
+
+                    st.markdown(f"**{usr}** `<{tstamp}>`\n\n{msg}")
+
+                    if url_adjunto_raw:
+                        lista_urls = url_adjunto_raw.split("|")
+
+                        for file_idx, url_adjunto in enumerate(lista_urls):
+                            ext = (
+                                url_adjunto.split("?")[0]
+                                .split(".")[-1]
+                                .lower()
+                            )
+                            nombre_archivo = (
+                                url_adjunto.split("?")[0].split("/")[-1]
+                            )
+                            mime_actual = mime_types.get(
+                                ext, "application/octet-stream"
+                            )
+
+                            st.markdown("---")
+                            if ext in ["png", "jpg", "jpeg", "webp", "gif"]:
+                                # Ajuste responsivo de imagen sin ancho fijo rígido
+                                st.image(url_adjunto, use_container_width=True)
+                                
+                                st.link_button(
+                                    "🌐 Abrir imagen",
+                                    url_adjunto,
+                                    use_container_width=True,
+                                )
+                                with st.expander("🔍 Opciones de descarga"):
+                                    file_bytes = obtener_bytes_adjunto(url_adjunto)
+                                    if file_bytes:
+                                        st.download_button(
+                                            label="📥 Descargar imagen",
+                                            data=file_bytes,
+                                            file_name=nombre_archivo,
+                                            mime=mime_actual,
+                                            use_container_width=True,
+                                            key=f"dl_btn_{msg_idx}_{file_idx}_{canal}",
+                                        )
+                            else:
+                                icon_doc = "📄"
+                                if ext in ["xlsx", "xls"]:
+                                    icon_doc = "📊"
+                                elif ext in ["docx", "doc"]:
+                                    icon_doc = "📝"
+                                elif ext in ["pptx", "ppt"]:
+                                    icon_doc = "🖥️"
+                                elif ext == "pdf":
+                                    icon_doc = "📕"
+
+                                st.markdown(
+                                    f"{icon_doc} **Adjunto:** `{nombre_archivo}`"
+                                )
+                                file_bytes = obtener_bytes_adjunto(url_adjunto)
+                                if file_bytes:
+                                    st.download_button(
+                                        label="📥 Descargar archivo",
+                                        data=file_bytes,
+                                        file_name=nombre_archivo,
+                                        mime=mime_actual,
+                                        use_container_width=True,
+                                        key=f"dl_btn_file_{msg_idx}_{file_idx}_{canal}",
+                                    )
+                                st.link_button(
+                                    "🌐 Abrir en vista previa",
+                                    url_adjunto,
+                                    use_container_width=True,
+                                )
+        else:
+            st.info("No se encontraron mensajes.")
+
+
+# -----------------------------------------------------------------------------
+# REPOSITORIO PÚBLICO (OPTIMIZADO PARA PANTALLAS TÁCTILES)
+# -----------------------------------------------------------------------------
+def render_panel_archivos_publicos(supabase_client):
+    st.subheader("📁 Repositorio de Archivos Públicos")
+    st.caption("Archivos compartidos en los canales de trabajo.")
+
+    try:
+        res = (
+            supabase_client.table("mensajes")
+            .select("*")
+            .neq("canal", "privado")
+            .not_.is_("url_adjunto", "null")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        data = res.data if res.data else []
+    except Exception as e:
+        st.error(f"🔴 Error al cargar repositorio público: {e}")
+        return
+
+    if not data:
+        st.info("📂 No hay archivos públicos registrados.")
+        return
+
+    archivos_lista = []
+    for m in data:
+        urls = m.get("url_adjunto", "").split("|")
+        for u in urls:
+            if u.strip():
+                ext = u.split("?")[0].split(".")[-1].lower()
+                nombre = u.split("?")[0].split("/")[-1]
+                archivos_lista.append({
+                    "nombre": nombre,
+                    "url": u,
+                    "extension": ext,
+                    "emisor": m.get("emisor", "Anónimo"),
+                    "canal": m.get("canal", "general"),
+                    "mensaje": m.get("mensaje", ""),
+                    "created_at": m.get("created_at", ""),
+                })
+
+    # EN MÓVIL: Filtros dentro de Expander para ahorrar espacio vertical
+    with st.expander("🔍 Filtros y Búsqueda de Archivos", expanded=False):
+        kw_file = st.text_input(
+            "Buscar por nombre o folio:", placeholder="Ej. AIRIS-1234"
+        )
+        canales_disponibles = ["Todos"] + sorted(
+            list({a["canal"].upper() for a in archivos_lista})
+        )
+        canal_filtro = st.selectbox("Canal:", canales_disponibles)
+        tipo_filtro = st.selectbox("Tipo de Archivo:", [
+            "Todos",
+            "📷 Imágenes",
+            "📕 PDFs",
+            "📊 Excel",
+            "📝 Word",
+        ])
+        chk_fecha_pub = st.checkbox("📅 Filtrar por fecha", key="chk_f_repo_pub")
+        fecha_pub_sel = None
+        if chk_fecha_pub:
+            fecha_pub_sel = st.date_input("Selecciona día:", key="date_repo_pub")
+
+    filtrados = archivos_lista
+    if kw_file.strip():
+        kw = kw_file.strip().lower()
+        filtrados = [
+            a for a in filtrados
+            if kw in a["nombre"].lower() or kw in a["mensaje"].lower()
+        ]
+
+    if canal_filtro != "Todos":
+        filtrados = [a for a in filtrados if a["canal"].upper() == canal_filtro]
+
+    if tipo_filtro.startswith("📷"):
+        filtrados = [a for a in filtrados if a["extension"] in ["png", "jpg", "jpeg", "webp", "gif"]]
+    elif tipo_filtro.startswith("📕"):
+        filtrados = [a for a in filtrados if a["extension"] == "pdf"]
+    elif tipo_filtro.startswith("📊"):
+        filtrados = [a for a in filtrados if a["extension"] in ["xlsx", "xls"]]
+    elif tipo_filtro.startswith("📝"):
+        filtrados = [a for a in filtrados if a["extension"] in ["docx", "doc"]]
+
+    if fecha_pub_sel and filtrados:
+        data_f = []
+        for a in filtrados:
+            raw_t = a.get("created_at", "")
+            if raw_t:
+                try:
+                    dt_u = datetime.fromisoformat(raw_t.replace("Z", "+00:00"))
+                    dt_l = dt_u.astimezone(ZoneInfo("America/Mexico_City"))
+                    if dt_l.date() == fecha_pub_sel:
+                        data_f.append(a)
+                except Exception:
+                    pass
+        filtrados = data_f
+
+    st.markdown(f"**Archivos encontrados: `{len(filtrados)}`**")
+    st.markdown("---")
+
+    for idx, item in enumerate(filtrados):
+        ext = item["extension"]
+        icon_str = (
+            "📷" if ext in ["png", "jpg", "jpeg", "webp", "gif"]
+            else "📕" if ext == "pdf"
+            else "📊" if ext in ["xlsx", "xls"]
+            else "📄"
+        )
+
+        raw_time = item.get("created_at", "")
+        tstamp_str = ""
+        if raw_time:
+            try:
+                dt_u = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                dt_l = dt_u.astimezone(ZoneInfo("America/Mexico_City"))
+                tstamp_str = dt_l.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                tstamp_str = str(raw_time)
+
+        # Diseño tipo Tarjeta Móvil
+        with st.container():
+            st.markdown(f"### {icon_str} `{item['nombre']}`")
+            if item["mensaje"]:
+                st.caption(f"🏷️ **Detalles:** {item['mensaje']}")
+            st.caption(
+                f"👤 Por: **{item['emisor']}** | Canal: **#{item['canal'].upper()}** | 📅 `{tstamp_str}`"
+            )
+            
+            col_act1, col_act2 = st.columns(2)
+            with col_act1:
+                st.link_button("🌐 Abrir", item["url"], use_container_width=True)
+            with col_act2:
+                bytes_f = obtener_bytes_adjunto(item["url"])
+                if bytes_f:
+                    st.download_button(
+                        label="📥 Descargar",
+                        data=bytes_f,
+                        file_name=item["nombre"],
+                        key=f"repo_pub_dl_{idx}",
+                        use_container_width=True,
+                    )
+        st.markdown("---")
+
+
+# -----------------------------------------------------------------------------
+# REPOSITORIO PRIVADO (OPTIMIZADO PARA PANTALLAS TÁCTILES)
+# -----------------------------------------------------------------------------
+def render_panel_archivos_privados(supabase_client, usuario_actual: str):
+    st.subheader("🔒 Mis Archivos Privados")
+    st.caption("Archivos compartidos en tus chats 1 a 1.")
+
+    try:
+        res = (
+            supabase_client.table("mensajes")
+            .select("*")
+            .eq("canal", "privado")
+            .not_.is_("url_adjunto", "null")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        data = res.data if res.data else []
+    except Exception as e:
+        st.error(f"🔴 Error al cargar repositorio privado: {e}")
+        return
+
+    data_user = [
+        m for m in data
+        if m.get("emisor") == usuario_actual or m.get("destinatario") == usuario_actual
+    ]
+
+    if not data_user:
+        st.info("🔒 No tienes archivos recibidos o enviados en chats 1 a 1.")
+        return
+
+    archivos_lista = []
+    for m in data_user:
+        urls = m.get("url_adjunto", "").split("|")
+        otro_usr = (
+            m.get("destinatario")
+            if m.get("emisor") == usuario_actual
+            else m.get("emisor")
+        )
+        for u in urls:
+            if u.strip():
+                ext = u.split("?")[0].split(".")[-1].lower()
+                nombre = u.split("?")[0].split("/")[-1]
+                archivos_lista.append({
+                    "nombre": nombre,
+                    "url": u,
+                    "extension": ext,
+                    "emisor": m.get("emisor"),
+                    "contacto": otro_usr,
+                    "mensaje": m.get("mensaje", ""),
+                    "created_at": m.get("created_at", ""),
+                })
+
+    with st.expander("🔍 Filtros y Búsqueda Privada", expanded=False):
+        kw_priv_file = st.text_input(
+            "Buscar en mis archivos privados:",
+            placeholder="Nombre, folio o palabra clave...",
+        )
+        chk_fecha_priv = st.checkbox("📅 Filtrar por fecha", key="chk_f_repo_priv")
+        fecha_priv_sel = None
+        if chk_fecha_priv:
+            fecha_priv_sel = st.date_input("Selecciona día:", key="date_repo_priv")
+
+    filtrados = archivos_lista
+    if kw_priv_file.strip():
+        kw = kw_priv_file.strip().lower()
+        filtrados = [
+            a for a in filtrados
+            if kw in a["nombre"].lower() or kw in a["mensaje"].lower()
+        ]
+
+    if fecha_priv_sel and filtrados:
+        data_f = []
+        for a in filtrados:
+            raw_t = a.get("created_at", "")
+            if raw_t:
+                try:
+                    dt_u = datetime.fromisoformat(raw_t.replace("Z", "+00:00"))
+                    dt_l = dt_u.astimezone(ZoneInfo("America/Mexico_City"))
+                    if dt_l.date() == fecha_priv_sel:
+                        data_f.append(a)
+                except Exception:
+                    pass
+        filtrados = data_f
+
+    st.markdown(f"**Archivos privados de {usuario_actual}: `{len(filtrados)}`**")
+    st.markdown("---")
+
+    for idx, item in enumerate(filtrados):
+        raw_time = item.get("created_at", "")
+        tstamp_str = ""
+        if raw_time:
+            try:
+                dt_u = datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                dt_l = dt_u.astimezone(ZoneInfo("America/Mexico_City"))
+                tstamp_str = dt_l.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                tstamp_str = str(raw_time)
+
+        with st.container():
+            st.markdown(f"### 🔒 `{item['nombre']}`")
+            if item["mensaje"]:
+                st.caption(f"🏷️ **Detalles:** {item['mensaje']}")
+            st.caption(
+                f"De: **{item['emisor']}** | Con: **{item['contacto']}** | 📅 `{tstamp_str}`"
+            )
+            
+            col_act1, col_act2 = st.columns(2)
+            with col_act1:
+                st.link_button("🌐 Abrir", item["url"], use_container_width=True)
+            with col_act2:
+                bytes_f = obtener_bytes_adjunto(item["url"])
+                if bytes_f:
+                    st.download_button(
+                        label="📥 Descargar",
+                        data=bytes_f,
+                        file_name=item["nombre"],
+                        key=f"repo_priv_dl_{idx}",
+                        use_container_width=True,
+                    )
+        st.markdown("---")
+
+
+# -----------------------------------------------------------------------------
+# FUNCIÓN PRINCIPAL DEL MÓDULO (OPTIMIZADA PARA MÓVIL Y TABLET)
+# -----------------------------------------------------------------------------
+def render_chat():
+    # Inyectar estilos responsivos globales de la Parte 1
+    inyectar_css_movil()
+
+    st.header("💬 SF Pangea Chat")
+
+    supabase = get_supabase_client()
+
+    # Si se solicitó cerrar/cambiar usuario manualmente en el chat, limpiar la variable
+    if st.session_state.get("chat_manual_logout", False):
+        st.session_state.sf_chat_user = ""
+        st.session_state.usuario_nombre = ""
+    elif "usuario_nombre" in st.session_state and st.session_state.usuario_nombre:
+        st.session_state.sf_chat_user = st.session_state.usuario_nombre
+    elif "session_user" in st.query_params:
+        st.session_state.sf_chat_user = st.query_params["session_user"]
+
+    if "sf_chat_user" not in st.session_state:
+        st.session_state.sf_chat_user = ""
+
+    if "upload_counter" not in st.session_state:
+        st.session_state.upload_counter = 0
+
+    if "notified_msg_ids" not in st.session_state:
+        st.session_state.notified_msg_ids = set()
+
+    # Inicio de Sesión mediante Selección de Usuario Registrado
+    usuarios_registrados = obtener_usuarios_registrados(supabase)
+
+    if not st.session_state.sf_chat_user:
+        st.info("👋 Selecciona tu usuario para ingresar al sistema.")
+        with st.form("form_registro_chat"):
+            usr_select = st.selectbox(
+                "Usuario Oficial Autorizado:", usuarios_registrados
+            )
+            btn_entrar = st.form_submit_button(
+                "Ingresar al Chat 🚀", use_container_width=True
+            )
+            if btn_entrar:
+                st.session_state.sf_chat_user = usr_select
+                st.session_state.usuario_nombre = usr_select
+                st.session_state.chat_manual_logout = False
+                st.query_params["session_user"] = usr_select
+                st.rerun()
+        return
+
+    # Evaluación de Administrador Supremo Maestro Único ('SF')
+    usr_actual_clean = st.session_state.sf_chat_user.strip().upper()
+    es_admin = usr_actual_clean == "SF"
+
+    # Encabezado de Usuario y Logout
+    col_status, col_logout = st.columns([3, 1.2])
+    with col_status:
+        rol_badge = "👑 ADMIN" if es_admin else "👤 COLABORADOR"
+        st.caption(f"🟢 **{st.session_state.sf_chat_user}** (`{rol_badge}`)")
+    with col_logout:
+        if es_admin:
+            if st.button("Salir 🚪", key="sf_chat_btn_logout", use_container_width=True):
+                st.session_state.sf_chat_user = ""
+                st.session_state.usuario_nombre = ""
+                st.session_state.chat_manual_logout = True
+                if "session_user" in st.query_params:
+                    del st.query_params["session_user"]
+                st.rerun()
+
+    # Navegación Optimizada para Móviles (Menú desplegable táctil)
+    modos = [
+        "📢 Canales Públicos",
+        "🔒 Chat 1 a 1",
+        "🔔 Mis Menciones",
+        "📁 Archivos Públicos",
+        "🔒 Mis Archivos Privados",
+    ]
+    if es_admin:
+        modos.append("⚙️ Panel Admin")
+
+    modo_chat = st.selectbox(
+        "Navegación por el Chat:",
+        modos,
+        key="sf_chat_modo_principal",
+        label_visibility="collapsed",
+    )
+
+    st.markdown("---")
+
+    # --- MODO 1: CANALES PÚBLICOS ---
+    if modo_chat == "📢 Canales Públicos":
+        canales_disponibles = obtener_canales_db(supabase)
+        canales_labels = [c.capitalize() for c in canales_disponibles]
+
+        # Selector de canal compacto en lugar de radio horizontal gigante
+        canal_seleccionado = st.selectbox(
+            "Seleccionar Canal:",
+            canales_labels,
+            key="sf_chat_radio_canal",
+        )
+        canal_activo = canal_seleccionado.lower()
+
+        # Barra de búsqueda y controles responsivos
+        col_search, col_filter, col_clear = st.columns([2.5, 1, 1])
+        f_fecha_c, f_h_ini_c, f_h_fin_c = None, None, None
+
+        with col_search:
+            kw_canal = st.text_input(
+                "Buscar",
+                key="kw_canal",
+                placeholder="🔍 Palabras o folios...",
+                label_visibility="collapsed",
+            )
+        with col_filter:
+            with st.popover("📅"):
+                if st.checkbox("Filtro fecha", key="chk_f_canales"):
+                    f_fecha_c = st.date_input("Día:", key="date_canales")
+                    if st.checkbox("Rango horas", key="chk_h_canales"):
+                        f_h_ini_c = st.time_input(
+                            "Desde:",
+                            datetime.strptime("00:00", "%H:%M").time(),
+                            key="h_ini_c",
+                        )
+                        f_h_fin_c = st.time_input(
+                            "Hasta:",
+                            datetime.strptime("23:59", "%H:%M").time(),
+                            key="h_fin_c",
+                        )
+
+        with col_clear:
+            if es_admin:
+                with st.popover("🧹"):
+                    st.warning(f"Borrar mensajes de #{canal_activo.upper()}.")
+                    if st.checkbox("Confirmar borrado", key="chk_del_c"):
+                        if st.button("Vaciar 🗑️", type="primary", use_container_width=True):
+                            supabase.table("mensajes").delete().eq(
+                                "canal", canal_activo
+                            ).execute()
+                            st.success("Canal vaciado.")
+                            st.rerun()
+
+        render_historial_fragment(
+            st.session_state.sf_chat_user,
+            canal=canal_activo,
+            fecha_filtro=f_fecha_c,
+            hora_inicio=f_h_ini_c,
+            hora_fin=f_h_fin_c,
+            texto_busqueda=kw_canal,
+        )
+
+        count = st.session_state.upload_counter
+        with st.popover("📎 Adjuntar evidencias a #" + canal_activo.upper(), use_container_width=True):
+            archivos_adjuntos = st.file_uploader(
+                "Selecciona archivos",
+                type=[
+                    "png", "jpg", "jpeg", "webp", "gif", "pdf",
+                    "xlsx", "xls", "docx", "doc", "pptx", "ppt",
+                ],
+                accept_multiple_files=True,
+                key=f"sf_chat_uploader_canales_{count}",
+            )
+            if archivos_adjuntos:
+                folio_input = st.text_input(
+                    "Folio / Ticket / AIRIS *",
+                    key=f"sf_chat_folio_canales_{count}",
+                    placeholder="Ej. AIRIS-12345",
+                )
+                comentario_adjunto = st.text_area(
+                    "Comentario (Opcional):",
+                    key=f"sf_chat_comentario_canales_{count}",
+                )
+                if st.button(
+                    "Enviar Evidencias 🚀",
+                    key=f"btn_enviar_canales_{count}",
+                    use_container_width=True,
+                ):
+                    if not folio_input.strip():
+                        st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
+                    else:
+                        urls = [
+                            subir_adjunto_supabase(f, supabase)
+                            for f in archivos_adjuntos if f
+                        ]
+                        urls_validas = [u for u in urls if u]
+                        if urls_validas:
+                            msg_f = f"### 📌 Folio / Ticket / AIRIS: {folio_input.strip()}"
+                            if comentario_adjunto.strip():
+                                msg_f += f"\n\n{comentario_adjunto.strip()}"
+                            supabase.table("mensajes").insert({
+                                "canal": canal_activo,
+                                "emisor": st.session_state.sf_chat_user,
+                                "mensaje": msg_f,
+                                "destinatario": None,
+                                "url_adjunto": "|".join(urls_validas),
+                            }).execute()
+                            st.session_state.upload_counter += 1
+                            st.rerun()
+
+        prompt_canal = st.chat_input(
+            f"Escribe un mensaje en #{canal_activo.upper()}..."
+        )
+        if prompt_canal:
+            supabase.table("mensajes").insert({
+                "canal": canal_activo,
+                "emisor": st.session_state.sf_chat_user,
+                "mensaje": prompt_canal,
+                "destinatario": None,
+                "url_adjunto": None,
+            }).execute()
+            st.rerun()
+
+    # --- MODO 2: CHAT PRIVADO 1 A 1 ---
+    elif modo_chat == "🔒 Chat 1 a 1":
+        colegas = [
+            u for u in usuarios_registrados if u != st.session_state.sf_chat_user
+        ]
+        if colegas:
+            destinatario_activo = st.selectbox(
+                "Seleccionar Colega:", colegas, key="sf_chat_select_privado"
+            )
+
+            col_search_p, col_filter_p, col_clear_p = st.columns([2.5, 1, 1])
+            f_fecha_p, f_h_ini_p, f_h_fin_p = None, None, None
+
+            with col_search_p:
+                kw_priv = st.text_input(
+                    "Buscar",
+                    key="kw_priv",
+                    placeholder="🔍 Buscar texto...",
+                    label_visibility="collapsed",
+                )
+            with col_filter_p:
+                with st.popover("📅"):
+                    if st.checkbox("Filtro fecha", key="chk_f_privado"):
+                        f_fecha_p = st.date_input("Día:", key="date_privado")
+                        if st.checkbox("Rango horas", key="chk_h_privado"):
+                            f_h_ini_p = st.time_input(
+                                "Desde:",
+                                datetime.strptime("00:00", "%H:%M").time(),
+                                key="h_ini_p",
+                            )
+                            f_h_fin_p = st.time_input(
+                                "Hasta:",
+                                datetime.strptime("23:59", "%H:%M").time(),
+                                key="h_fin_p",
+                            )
+
+            with col_clear_p:
+                if es_admin:
+                    with st.popover("🧹"):
+                        st.warning(f"Borrar chat con {destinatario_activo}.")
+                        if st.checkbox("Confirmar borrado", key="chk_del_priv"):
+                            if st.button("Eliminar 🗑️", type="primary", use_container_width=True):
+                                supabase.table("mensajes").delete().eq(
+                                    "canal", "privado"
+                                ).or_(
+                                    f"and(emisor.eq.{st.session_state.sf_chat_user},destinatario.eq.{destinatario_activo}),and(emisor.eq.{destinatario_activo},destinatario.eq.{st.session_state.sf_chat_user})"
+                                ).execute()
+                                st.success("Chat privado eliminado.")
+                                st.rerun()
+
+            render_historial_fragment(
+                st.session_state.sf_chat_user,
+                canal="privado",
+                destinatario=destinatario_activo,
+                fecha_filtro=f_fecha_p,
+                hora_inicio=f_h_ini_p,
+                hora_fin=f_h_fin_p,
+                texto_busqueda=kw_priv,
+            )
+
+            count = st.session_state.upload_counter
+            with st.popover(
+                f"📎 Adjuntar archivo para {destinatario_activo}",
+                use_container_width=True
+            ):
+                archivos_privados = st.file_uploader(
+                    "Selecciona archivos",
+                    type=[
+                        "png", "jpg", "jpeg", "webp", "gif", "pdf",
+                        "xlsx", "xls", "docx", "doc", "pptx", "ppt",
+                    ],
+                    accept_multiple_files=True,
+                    key=f"sf_chat_uploader_priv_{count}",
+                )
+                if archivos_privados:
+                    folio_priv = st.text_input(
+                        "Folio / Ticket / AIRIS *",
+                        key=f"sf_chat_folio_priv_{count}",
+                    )
+                    coment_priv = st.text_area(
+                        "Comentario (Opcional):",
+                        key=f"sf_chat_coment_priv_{count}",
+                    )
+                    if st.button(
+                        "Enviar Evidencia Privada 🚀",
+                        key=f"btn_enviar_priv_{count}",
+                        use_container_width=True,
+                    ):
+                        if not folio_priv.strip():
+                            st.error("⚠️ Debes ingresar el Folio / Ticket / AIRIS.")
+                        else:
+                            urls = [
+                                subir_adjunto_supabase(f, supabase)
+                                for f in archivos_privados if f
+                            ]
+                            urls_validas = [u for u in urls if u]
+                            if urls_validas:
+                                msg_f = f"### 📌 Folio / Ticket / AIRIS: {folio_priv.strip()}"
+                                if coment_priv.strip():
+                                    msg_f += f"\n\n{coment_priv.strip()}"
+                                supabase.table("mensajes").insert({
+                                    "canal": "privado",
+                                    "emisor": st.session_state.sf_chat_user,
+                                    "mensaje": msg_f,
+                                    "destinatario": destinatario_activo,
+                                    "url_adjunto": "|".join(urls_validas),
+                                }).execute()
+                                st.session_state.upload_counter += 1
+                                st.rerun()
+
+            prompt_privado = st.chat_input(
+                f"Mensaje privado para {destinatario_activo}..."
+            )
+            if prompt_privado:
+                supabase.table("mensajes").insert({
+                    "canal": "privado",
+                    "emisor": st.session_state.sf_chat_user,
+                    "mensaje": prompt_privado,
+                    "destinatario": destinatario_activo,
+                    "url_adjunto": None,
+                }).execute()
+                st.rerun()
+        else:
+            st.info("💡 Aún no hay otros usuarios registrados para chatear.")
+
+    # --- MODO 3: MIS MENCIONES ---
+    elif modo_chat == "🔔 Mis Menciones":
+        col_search_m, col_filter_m = st.columns([3, 1])
+        f_fecha_m, f_h_ini_m, f_h_fin_m = None, None, None
+
+        with col_search_m:
+            kw_menc = st.text_input(
+                "Buscar",
+                key="kw_menc",
+                placeholder="🔍 Buscar menciones...",
+                label_visibility="collapsed",
+            )
+        with col_filter_m:
+            with st.popover("📅"):
+                if st.checkbox("Filtro fecha", key="chk_f_menciones"):
+                    f_fecha_m = st.date_input("Día:", key="date_menciones")
+                    if st.checkbox("Rango horas", key="chk_h_menciones"):
+                        f_h_ini_m = st.time_input(
+                            "Desde:",
+                            datetime.strptime("00:00", "%H:%M").time(),
+                            key="h_ini_m",
+                        )
+                        f_h_fin_m = st.time_input(
+                            "Hasta:",
+                            datetime.strptime("23:59", "%H:%M").time(),
+                            key="h_fin_m",
+                        )
+
+        render_historial_fragment(
+            st.session_state.sf_chat_user,
+            solo_menciones=True,
+            fecha_filtro=f_fecha_m,
+            hora_inicio=f_h_ini_m,
+            hora_fin=f_h_fin_m,
+            texto_busqueda=kw_menc,
+        )
+
+    # --- MODO 4: ARCHIVOS PÚBLICOS ---
+    elif modo_chat == "📁 Archivos Públicos":
+        render_panel_archivos_publicos(supabase)
+
+    # --- MODO 5: ARCHIVOS PRIVADOS ---
+    elif modo_chat == "🔒 Mis Archivos Privados":
+        render_panel_archivos_privados(supabase, st.session_state.sf_chat_user)
+
+    # --- MODO 6: PANEL ADMIN (SOLO SUPER ADMIN 'SF') ---
+    elif modo_chat == "⚙️ Panel Admin" and es_admin:
+        st.subheader("⚙️ Panel de Administración Global")
+        st.caption("Gestiona usuarios, canales y mantenimiento.")
+
+        # Estructura adaptativa para smartphones y tablets
+        with st.container():
+            st.markdown("### 👤 Gestión de Usuarios")
+            nuevo_usr = st.text_input("Nuevo usuario:", placeholder="Ej. Juan_Perez")
+            if st.button("Registrar Usuario ➕", use_container_width=True):
+                u_clean = nuevo_usr.strip()
+                if u_clean:
+                    try:
+                        supabase.table("usuarios").insert({"nombre": u_clean, "rol": "colaborador"}).execute()
+                        st.success(f"Usuario '{u_clean}' registrado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al registrar usuario: {e}")
+                else:
+                    st.warning("Nombre de usuario no válido.")
+
+            usr_borrar = st.selectbox(
+                "Usuario a eliminar:",
+                [u for u in usuarios_registrados if u.upper() != "SF"]
+            )
+            if st.button("Eliminar Usuario ❌", use_container_width=True):
+                try:
+                    supabase.table("usuarios").delete().eq("nombre", usr_borrar).execute()
+                    st.success(f"Usuario '{usr_borrar}' eliminado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al eliminar: {e}")
+
+        st.markdown("---")
+
+        with st.container():
+            st.markdown("### 📢 Gestión de Canales")
+            nuevo_canal = st.text_input("Nuevo canal:", placeholder="Ej. Electrica")
+            if st.button("Crear Canal 🚀", use_container_width=True):
+                c_clean = re.sub(r"[^a-zA-Z0-9_]", "", nuevo_canal.strip().lower())
+                if c_clean:
+                    try:
+                        supabase.table("canales").insert({"nombre": c_clean}).execute()
+                        st.success(f"Canal #{c_clean.upper()} creado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al crear canal: {e}")
+
+            canales_existentes = obtener_canales_db(supabase)
+            canal_borrar = st.selectbox("Canal a eliminar:", canales_existentes, key="sb_borrar_canal")
+            if st.button("Eliminar Canal ❌", use_container_width=True):
+                try:
+                    supabase.table("canales").delete().eq("nombre", canal_borrar.lower()).execute()
+                    supabase.table("mensajes").delete().eq("canal", canal_borrar.lower()).execute()
+                    st.success(f"Canal #{canal_borrar.upper()} eliminado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al eliminar canal: {e}")
+
+        st.markdown("---")
+        st.markdown("### 🔥 Mantenimiento General")
+        if st.checkbox("⚠️ Confirmar borrado completo de mensajes", key="chk_wipe_all"):
+            if st.button("BORRAR TODOS LOS MENSAJES 🗑️", type="primary", use_container_width=True):
+                try:
+                    supabase.table("mensajes").delete().neq("id", 0).execute()
+                    st.success("Toda la base de datos de mensajes ha sido vaciada.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al purgar: {e}")
+
+
+# -----------------------------------------------------------------------------
+# ESCUCHADOR GLOBAL DE MENCIONES Y MENSAJES PRIVADOS (PARA APP.PY)
+# -----------------------------------------------------------------------------
+@st.fragment(run_every=3)
+def escuchador_menciones_global():
+    """
+    Escucha de fondo que se invoca en app.py para disparar alertas auditivas
+    y visuales (toast) sin importar en qué módulo o pantalla esté el usuario.
+    """
+    if not st.session_state.get("autenticado", False):
+        return
+
+    usuario_actual = st.session_state.get("usuario_nombre", "") or st.session_state.get("sf_chat_user", "")
+    if not usuario_actual:
+        return
+
+    if "notified_msg_ids" not in st.session_state:
+        st.session_state.notified_msg_ids = set()
+
+    try:
+        supabase = get_supabase_client()
+        res = (
+            supabase.table("mensajes")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(15)
+            .execute()
+        )
+        mensajes = res.data if res.data else []
+
+        for m in mensajes:
+            emisor = m.get("emisor", "")
+            if emisor == usuario_actual:
+                continue
+
+            msg_id = m.get("id") or f"{emisor}_{m.get('created_at', '')}"
+            msg_text = m.get("mensaje", "")
+            canal_origen = m.get("canal", "general")
+            destinatario = m.get("destinatario", None)
+
+            es_mencion = evaluar_mencion_inteligente(msg_text, usuario_actual)
+            es_privado_para_mi = (canal_origen == "privado" and destinatario == usuario_actual)
+
+            if (es_mencion or es_privado_para_mi) and msg_id not in st.session_state.notified_msg_ids:
+                st.session_state.notified_msg_ids.add(msg_id)
+
+                if es_privado_para_mi and not es_mencion:
+                    alerta_texto = f"🔒 ¡Nuevo mensaje privado de {emisor}!"
+                else:
+                    alerta_texto = f"🔔 ¡{emisor} te ha mencionado en #{canal_origen.upper()}!"
+
+                st.toast(alerta_texto, icon="💬")
+
+                components.html(
+                    f"""
+                    <audio autoplay style="display:none;">
+                        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+                    </audio>
+                    <script>
+                    if (Notification.permission === 'granted') {{
+                        new Notification("🔔 SF Pangea Chat", {{
+                            body: "{alerta_texto}",
+                            icon: "https://cdn-icons-png.flaticon.com/512/732/732200.png"
+                        }});
+                    }} else if (Notification.permission !== 'denied') {{
+                        Notification.requestPermission();
+                    }}
+                    </script>
+                    """,
+                    height=0,
+                    width=0,
+                )
+    except Exception:
+        pass
