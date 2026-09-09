@@ -2608,7 +2608,7 @@ else:
 
             col_pdf_j, col_docx_j = st.columns(2)
 
-            # --- GENERADOR DE DOCUMENTO PDF (CENTRADOR X=18mm, PIE Y=page_h-15mm) ---
+            # --- GENERADOR DE DOCUMENTO PDF (ZONA SEGURA DE IMPRESIÓN FÍSICA Y CENTRADO) ---
             if motor_pdf_listo:
                 import tempfile, os, zipfile, re
 
@@ -2676,13 +2676,13 @@ else:
                     pdf_j.set_font("Arial", 'I', 8.5)
                     pdf_j.cell(194, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
 
-                # 2. Pie de Página (Ajustado más abajo: Y = page_h_j - 15mm)
+                # 2. Pie de Página (Y = page_h_j - 22mm para evitar el recorte de rodillo físico)
                 if "Ocultar" not in tipo_membrete and ftr_j_bytes:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_jf:
                         tmp_jf.write(ftr_j_bytes)
                         tmp_jf_path = tmp_jf.name
                     try:
-                        pdf_j.image(tmp_jf_path, x=11, y=page_h_j - 15, w=194)
+                        pdf_j.image(tmp_jf_path, x=11, y=page_h_j - 22, w=194)
                     finally:
                         try: os.unlink(tmp_jf_path)
                         except: pass
@@ -2735,7 +2735,7 @@ else:
                 fill_hp = (f_registro == "HAND PUNCH")
                 pdf_j.cell(18, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
 
-                # Tabla de Conceptos (Suma exacta = 180 mm)
+                # Tabla de Conceptos
                 Y_TABLE = Y_START_BODY + 42
                 pdf_j.set_font("Arial", 'B', 9)
                 pdf_j.set_fill_color(225, 225, 225)
@@ -2756,11 +2756,11 @@ else:
                     t_n2 = f" {n2}".encode('latin-1', 'replace').decode('latin-1')
 
                     pdf_j.set_xy(X_START, current_y)
-                    pdf_j.cell(13, 6.0, txt=c1, border=1, ln=False, align='C', fill=fill_l)
-                    pdf_j.cell(77, 6.0, txt=t_n1, border=1, ln=False, fill=fill_l)
-                    pdf_j.cell(13, 6.0, txt=c2, border=1, ln=False, align='C', fill=fill_r)
-                    pdf_j.cell(77, 6.0, txt=t_n2, border=1, ln=True, fill=fill_r)
-                    current_y += 6.0
+                    pdf_j.cell(13, 5.8, txt=c1, border=1, ln=False, align='C', fill=fill_l)
+                    pdf_j.cell(77, 5.8, txt=t_n1, border=1, ln=False, fill=fill_l)
+                    pdf_j.cell(13, 5.8, txt=c2, border=1, ln=False, align='C', fill=fill_r)
+                    pdf_j.cell(77, 5.8, txt=t_n2, border=1, ln=True, fill=fill_r)
+                    current_y += 5.8
 
                 Y_FECHAS = current_y + 3.0
                 pdf_j.set_font("Arial", 'B', 9.5)
@@ -2781,13 +2781,13 @@ else:
                 pdf_j.set_xy(X_START, Y_MOTIVO)
                 pdf_j.cell(W_TOTAL, 5.5, txt="MOTIVO", border=1, ln=True, align='C', fill=True)
 
-                pdf_j.rect(X_START, Y_MOTIVO + 5.5, W_TOTAL, 20)
+                pdf_j.rect(X_START, Y_MOTIVO + 5.5, W_TOTAL, 19)
                 pdf_j.set_xy(X_START, Y_MOTIVO + 7.5)
                 pdf_j.multi_cell(W_TOTAL, 4.5, txt=motivo_enc, align='C')
 
-                # Retícula de 4 firmas simétricas (45 mm por columna)
-                Y_FIRMAS = Y_MOTIVO + 29.5
-                h_grid = 48
+                # Retícula de 4 firmas simétricas
+                Y_FIRMAS = Y_MOTIVO + 28.0
+                h_grid = 45
                 w_col = W_TOTAL / 4.0
 
                 pdf_j.rect(X_START, Y_FIRMAS, W_TOTAL, h_grid)
@@ -2795,26 +2795,26 @@ else:
                 pdf_j.line(X_START + 2*w_col, Y_FIRMAS, X_START + 2*w_col, Y_FIRMAS + h_grid)
                 pdf_j.line(X_START + 3*w_col, Y_FIRMAS, X_START + 3*w_col, Y_FIRMAS + h_grid)
 
-                pdf_j.line(X_START, Y_FIRMAS + 31, X_START + W_TOTAL, Y_FIRMAS + 31)
+                pdf_j.line(X_START, Y_FIRMAS + 29, X_START + W_TOTAL, Y_FIRMAS + 29)
 
                 pdf_j.set_font("Arial", 'B', 8)
-                pdf_j.set_xy(X_START, Y_FIRMAS + 32.5)
+                pdf_j.set_xy(X_START, Y_FIRMAS + 30.5)
                 pdf_j.multi_cell(w_col, 3.0, txt=firma_solicita_enc, align='C')
-                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 32.5)
+                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 30.5)
                 pdf_j.multi_cell(w_col, 3.0, txt=autoriza_n_enc, align='C')
-                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 32.5)
+                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 30.5)
                 pdf_j.multi_cell(w_col, 3.0, txt=revisa_n_enc, align='C')
-                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 32.5)
+                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 30.5)
                 pdf_j.multi_cell(w_col, 3.0, txt=recibe_n_enc, align='C')
 
                 pdf_j.set_font("Arial", 'B', 7.5)
-                pdf_j.set_xy(X_START, Y_FIRMAS + 40.5)
+                pdf_j.set_xy(X_START, Y_FIRMAS + 38.0)
                 pdf_j.multi_cell(w_col, 2.8, txt="SOLICITANTE", align='C')
-                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 40.5)
+                pdf_j.set_xy(X_START + w_col, Y_FIRMAS + 38.0)
                 pdf_j.multi_cell(w_col, 2.8, txt=autoriza_c_enc, align='C')
-                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 40.5)
+                pdf_j.set_xy(X_START + 2*w_col, Y_FIRMAS + 38.0)
                 pdf_j.multi_cell(w_col, 2.8, txt=revisa_c_enc, align='C')
-                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 40.5)
+                pdf_j.set_xy(X_START + 3*w_col, Y_FIRMAS + 38.0)
                 pdf_j.multi_cell(w_col, 2.8, txt=recibe_c_enc, align='C')
 
                 pdf_data_j = pdf_j.output(dest='S').encode('latin-1', 'replace')
@@ -2822,11 +2822,13 @@ else:
             else:
                 col_pdf_j.error("❌ Función PDF no disponible.")
 
-            # --- GENERADOR DE DOCUMENTO WORD (.DOCX PARA JUSTIFICACIONES) ---
+            # --- GENERADOR NATIVO DE WORD (.DOCX ESTRUCTURADO Y ESTÉTICO) ---
             try:
                 import docx
-                from docx.shared import Pt, Inches
+                from docx.shared import Pt, Inches, RGBColor
                 from docx.enum.text import WD_ALIGN_PARAGRAPH
+                from docx.oxml import OxmlElement, parse_xml
+                from docx.oxml.ns import nsdecls, qn
                 import io, os
 
                 if "Plantilla" in tipo_membrete and os.path.exists("oficiossf.docx"):
@@ -2834,10 +2836,15 @@ else:
                 else:
                     doc_j = docx.Document()
                     for sec in doc_j.sections:
-                        sec.top_margin = Inches(0.8)
-                        sec.bottom_margin = Inches(0.8)
-                        sec.left_margin = Inches(0.8)
-                        sec.right_margin = Inches(0.8)
+                        sec.top_margin = Inches(0.6)
+                        sec.bottom_margin = Inches(0.6)
+                        sec.left_margin = Inches(0.7)
+                        sec.right_margin = Inches(0.7)
+
+                # Auxiliar para sombrear celdas en Word
+                def set_cell_background(cell, fill_hex):
+                    shading_elm = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{fill_hex}"/>')
+                    cell._tc.get_or_add_tcPr().append(shading_elm)
 
                 p_tit = doc_j.add_paragraph()
                 p_tit.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -2845,55 +2852,132 @@ else:
                 r_tit.bold = True
                 r_tit.font.size = Pt(12)
 
-                p_info = doc_j.add_paragraph()
-                p_info.paragraph_format.space_before = Pt(8)
-                p_info.paragraph_format.line_spacing = 1.2
-                p_info.add_run(f"SOLICITA: {solicita}\t\tFECHA: {f_doc_str}\n").bold = True
-                p_info.add_run(f"JUSTIFICAR: {just_line}\n").bold = True
-                p_info.add_run(f"SANCIONAR: {sanc_line}\t\tNo. DE EMP.: {num_emp}\n").bold = True
-                p_info.add_run(f"ADSCRITO A: {adscrito}\t\tF. REGISTRO: {f_registro}").bold = True
+                # 1. Tabla de Encabezado / Datos
+                tbl_info = doc_j.add_table(rows=4, cols=4)
+                tbl_info.autofit = False
+                
+                rows_info = tbl_info.rows
+                for r in rows_info:
+                    r.cells[0].width = Inches(1.2)
+                    r.cells[1].width = Inches(3.2)
+                    r.cells[2].width = Inches(1.1)
+                    r.cells[3].width = Inches(1.5)
 
-                # Tabla de Conceptos en Word
-                table_c = doc_j.add_table(rows=1, cols=4)
-                table_c.style = 'Table Grid'
-                hdr_cells = table_c.rows[0].cells
-                hdr_cells[0].text = 'CLAVE'
-                hdr_cells[1].text = 'CONCEPTO'
-                hdr_cells[2].text = 'CLAVE'
-                hdr_cells[3].text = 'CONCEPTO'
+                # Fila 1
+                r0 = rows_info[0].cells
+                r0[0].paragraphs[0].add_run("SOLICITA:").bold = True
+                r0[1].paragraphs[0].add_run(solicita)
+                r0[2].paragraphs[0].add_run("FECHA:").bold = True
+                r0[3].paragraphs[0].add_run(f_doc_str)
+
+                # Fila 2
+                r1 = rows_info[1].cells
+                r1[0].paragraphs[0].add_run("JUSTIFICAR:").bold = True
+                r1[1].paragraphs[0].add_run(just_line)
+                r1[2].paragraphs[0].add_run("")
+                r1[3].paragraphs[0].add_run("")
+
+                # Fila 3
+                r2 = rows_info[2].cells
+                r2[0].paragraphs[0].add_run("SANCIONAR:").bold = True
+                r2[1].paragraphs[0].add_run(sanc_line)
+                r2[2].paragraphs[0].add_run("No. EMP:").bold = True
+                r2[3].paragraphs[0].add_run(num_emp)
+
+                # Fila 4
+                r3 = rows_info[3].cells
+                r3[0].paragraphs[0].add_run("ADSCRITO A:").bold = True
+                r3[1].paragraphs[0].add_run(adscrito)
+                r3[2].paragraphs[0].add_run("F. REGISTRO:").bold = True
+                r3[3].paragraphs[0].add_run(f_registro)
+
+                # 2. Tabla de Conceptos
+                doc_j.add_paragraph().paragraph_format.space_after = Pt(4)
+                tbl_c = doc_j.add_table(rows=1, cols=4)
+                tbl_c.style = 'Table Grid'
+                
+                hdr_c = tbl_c.rows[0].cells
+                hdr_titles = ["CLAVE", "CONCEPTO", "CLAVE", "CONCEPTO"]
+                for idx, t in enumerate(hdr_titles):
+                    hdr_c[idx].text = t
+                    set_cell_background(hdr_c[idx], "E1E1E1")
+                    hdr_c[idx].paragraphs[0].runs[0].font.bold = True
+                    hdr_c[idx].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
                 for c1, n1, c2, n2 in conceptos_grid:
-                    row_cells = table_c.add_row().cells
-                    row_cells[0].text = c1
-                    row_cells[1].text = n1
-                    row_cells[2].text = c2
-                    row_cells[3].text = n2
+                    row_c = tbl_c.add_row().cells
+                    row_c[0].text = c1
+                    row_c[1].text = n1
+                    row_c[2].text = c2
+                    row_c[3].text = n2
+                    
+                    row_c[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    row_c[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    
+                    if cod_sel == c1:
+                        set_cell_background(row_c[0], "BCBCBC")
+                        set_cell_background(row_c[1], "BCBCBC")
+                    if cod_sel == c2:
+                        set_cell_background(row_c[2], "BCBCBC")
+                        set_cell_background(row_c[3], "BCBCBC")
 
-                p_fec = doc_j.add_paragraph()
-                p_fec.paragraph_format.space_before = Pt(10)
-                p_fec.add_run(f"FECHA: {f_ini_str}  {f_fin_str}").bold = True
+                # 3. Fechas en Rojo
+                doc_j.add_paragraph().paragraph_format.space_after = Pt(4)
+                tbl_fec = doc_j.add_table(rows=2, cols=2)
+                tbl_fec.style = 'Table Grid'
+                
+                c_fec_hdr = tbl_fec.rows[0].cells
+                c_fec_hdr[0].merge(c_fec_hdr[1])
+                c_fec_hdr[0].text = "FECHA DE INCIDENCIA:"
+                set_cell_background(c_fec_hdr[0], "F5F5F5")
+                c_fec_hdr[0].paragraphs[0].runs[0].font.bold = True
 
-                p_mot = doc_j.add_paragraph()
-                p_mot.paragraph_format.space_before = Pt(8)
-                p_mot.add_run(f"MOTIVO:\n{motivo if motivo else 'ASUNTO OPERATIVO ASIGNADO EN CAMPO.'}")
+                c_fec_val = tbl_fec.rows[1].cells
+                r_f1 = c_fec_val[0].paragraphs[0].add_run(f_ini_str)
+                r_f1.font.bold = True
+                r_f1.font.color.rgb = RGBColor(220, 0, 0)
+                c_fec_val[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-                # Tabla de Firmas (4 columnas)
-                p_fir = doc_j.add_paragraph()
-                p_fir.paragraph_format.space_before = Pt(20)
-                table_f = doc_j.add_table(rows=2, cols=4)
-                table_f.style = 'Table Grid'
-                f_cells_names = table_f.rows[0].cells
-                f_cells_cargos = table_f.rows[1].cells
+                r_f2 = c_fec_val[1].paragraphs[0].add_run(f_fin_str)
+                r_f2.font.bold = True
+                r_f2.font.color.rgb = RGBColor(220, 0, 0)
+                c_fec_val[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-                f_cells_names[0].text = firma_solicita
-                f_cells_names[1].text = autoriza_n
-                f_cells_names[2].text = revisa_n
-                f_cells_names[3].text = recibe_n
+                # 4. Motivo
+                doc_j.add_paragraph().paragraph_format.space_after = Pt(4)
+                tbl_mot = doc_j.add_table(rows=2, cols=1)
+                tbl_mot.style = 'Table Grid'
+                
+                c_mot_h = tbl_mot.rows[0].cells[0]
+                c_mot_h.text = "MOTIVO"
+                set_cell_background(c_mot_h, "E1E1E1")
+                c_mot_h.paragraphs[0].runs[0].font.bold = True
+                c_mot_h.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-                f_cells_cargos[0].text = "SOLICITANTE"
-                f_cells_cargos[1].text = autoriza_c
-                f_cells_cargos[2].text = revisa_c
-                f_cells_cargos[3].text = recibe_c
+                c_mot_v = tbl_mot.rows[1].cells[0]
+                c_mot_v.text = motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO."
+                c_mot_v.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+                # 5. Firmas (4 Columnas)
+                doc_j.add_paragraph().paragraph_format.space_after = Pt(8)
+                tbl_fir = doc_j.add_table(rows=2, cols=4)
+                tbl_fir.style = 'Table Grid'
+                
+                r_names = tbl_fir.rows[0].cells
+                r_titles = tbl_fir.rows[1].cells
+
+                names_data = [firma_solicita, autoriza_n, revisa_n, recibe_n]
+                titles_data = ["SOLICITANTE", autoriza_c, revisa_c, recibe_c]
+
+                for i in range(4):
+                    r_names[i].text = f"\n\n{names_data[i]}"
+                    r_names[i].paragraphs[0].runs[0].font.bold = True
+                    r_names[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    
+                    r_titles[i].text = titles_data[i]
+                    r_titles[i].paragraphs[0].runs[0].font.bold = True
+                    r_titles[i].paragraphs[0].runs[0].font.size = Pt(8)
+                    r_titles[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
                 stream_docx_j = io.BytesIO()
                 doc_j.save(stream_docx_j)
