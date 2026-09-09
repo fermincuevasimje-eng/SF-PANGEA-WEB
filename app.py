@@ -2608,7 +2608,7 @@ else:
 
             col_pdf_j, col_docx_j = st.columns(2)
 
-            # --- GENERADOR DE DOCUMENTO PDF (ZONA SEGURA DE IMPRESIÓN FÍSICA Y CENTRADO) ---
+            # --- GENERADOR DE DOCUMENTO PDF (BANNER COMPLETO Y MARGEN DE IMPRESIÓN FÍSICA) ---
             if motor_pdf_listo:
                 import tempfile, os, zipfile, re
 
@@ -2617,6 +2617,7 @@ else:
 
                 fmt_pdf_j = 'Letter' if "Carta" in formato_hoja_j else 'Legal'
                 page_h_j = 279.4 if fmt_pdf_j == 'Letter' else 355.6
+                page_w_j = 215.9 if fmt_pdf_j == 'Letter' else 215.9
 
                 pdf_j = FPDF(orientation='P', unit='mm', format=fmt_pdf_j)
                 pdf_j.set_margins(18, 20, 18)
@@ -2660,35 +2661,35 @@ else:
                                     ftr_j_bytes = z.read('word/media/' + m_ftr.group(1))
                     except Exception: pass
 
-                # 1. Encabezado
+                # 1. Encabezado Superior
                 if "Ocultar" not in tipo_membrete:
                     if hdr_j_bytes:
                         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_jh:
                             tmp_jh.write(hdr_j_bytes)
                             tmp_jh_path = tmp_jh.name
                         try:
-                            pdf_j.image(tmp_jh_path, x=11, y=3, w=194)
+                            pdf_j.image(tmp_jh_path, x=0, y=2, w=page_w_j)
                         finally:
                             try: os.unlink(tmp_jh_path)
                             except: pass
 
-                    pdf_j.set_xy(11, 28)
+                    pdf_j.set_xy(11, 26)
                     pdf_j.set_font("Arial", 'I', 8.5)
                     pdf_j.cell(194, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
 
-                # 2. Pie de Página (Y = page_h_j - 22mm para evitar el recorte de rodillo físico)
+                # 2. Pie de Página Inferior (Ancho completo X=0, W=215.9, Y=page_h - 19mm)
                 if "Ocultar" not in tipo_membrete and ftr_j_bytes:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_jf:
                         tmp_jf.write(ftr_j_bytes)
                         tmp_jf_path = tmp_jf.name
                     try:
-                        pdf_j.image(tmp_jf_path, x=11, y=page_h_j - 22, w=194)
+                        pdf_j.image(tmp_jf_path, x=0, y=page_h_j - 19, w=page_w_j)
                     finally:
                         try: os.unlink(tmp_jf_path)
                         except: pass
 
                 # 3. CUERPO DE LA JUSTIFICACIÓN
-                Y_START_BODY = 36.0
+                Y_START_BODY = 34.0
 
                 pdf_j.set_font("Arial", 'B', 11)
                 pdf_j.set_xy(X_START, Y_START_BODY)
@@ -2822,13 +2823,13 @@ else:
             else:
                 col_pdf_j.error("❌ Función PDF no disponible.")
 
-            # --- GENERADOR NATIVO DE WORD (.DOCX ESTRUCTURADO Y ESTÉTICO) ---
+            # --- GENERADOR DE WORD (.DOCX NATIVO CON COMBINACIÓN REAL DE CELDAS) ---
             try:
                 import docx
                 from docx.shared import Pt, Inches, RGBColor
                 from docx.enum.text import WD_ALIGN_PARAGRAPH
-                from docx.oxml import OxmlElement, parse_xml
-                from docx.oxml.ns import nsdecls, qn
+                from docx.oxml import parse_xml
+                from docx.oxml.ns import nsdecls
                 import io, os
 
                 if "Plantilla" in tipo_membrete and os.path.exists("oficiossf.docx"):
@@ -2836,12 +2837,11 @@ else:
                 else:
                     doc_j = docx.Document()
                     for sec in doc_j.sections:
-                        sec.top_margin = Inches(0.6)
-                        sec.bottom_margin = Inches(0.6)
+                        sec.top_margin = Inches(0.5)
+                        sec.bottom_margin = Inches(0.5)
                         sec.left_margin = Inches(0.7)
                         sec.right_margin = Inches(0.7)
 
-                # Auxiliar para sombrear celdas en Word
                 def set_cell_background(cell, fill_hex):
                     shading_elm = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{fill_hex}"/>')
                     cell._tc.get_or_add_tcPr().append(shading_elm)
@@ -2852,47 +2852,38 @@ else:
                 r_tit.bold = True
                 r_tit.font.size = Pt(12)
 
-                # 1. Tabla de Encabezado / Datos
+                # 1. Tabla Datos Generales
                 tbl_info = doc_j.add_table(rows=4, cols=4)
-                tbl_info.autofit = False
+                tbl_info.style = 'Table Grid'
                 
-                rows_info = tbl_info.rows
-                for r in rows_info:
-                    r.cells[0].width = Inches(1.2)
-                    r.cells[1].width = Inches(3.2)
-                    r.cells[2].width = Inches(1.1)
-                    r.cells[3].width = Inches(1.5)
+                rows_i = tbl_info.rows
+                
+                # Fila 0: SOLICITA
+                rows_i[0].cells[0].paragraphs[0].add_run("SOLICITA:").bold = True
+                rows_i[0].cells[1].paragraphs[0].add_run(solicita)
+                rows_i[0].cells[2].paragraphs[0].add_run("FECHA:").bold = True
+                rows_i[0].cells[3].paragraphs[0].add_run(f_doc_str)
 
-                # Fila 1
-                r0 = rows_info[0].cells
-                r0[0].paragraphs[0].add_run("SOLICITA:").bold = True
-                r0[1].paragraphs[0].add_run(solicita)
-                r0[2].paragraphs[0].add_run("FECHA:").bold = True
-                r0[3].paragraphs[0].add_run(f_doc_str)
+                # Fila 1: JUSTIFICAR (Combinar celdas 1 a 3)
+                rows_i[1].cells[0].paragraphs[0].add_run("JUSTIFICAR:").bold = True
+                c_just = rows_i[1].cells[1]
+                c_just.merge(rows_i[1].cells[3])
+                c_just.paragraphs[0].add_run(just_line)
 
-                # Fila 2
-                r1 = rows_info[1].cells
-                r1[0].paragraphs[0].add_run("JUSTIFICAR:").bold = True
-                r1[1].paragraphs[0].add_run(just_line)
-                r1[2].paragraphs[0].add_run("")
-                r1[3].paragraphs[0].add_run("")
+                # Fila 2: SANCIONAR
+                rows_i[2].cells[0].paragraphs[0].add_run("SANCIONAR:").bold = True
+                rows_i[2].cells[1].paragraphs[0].add_run(sanc_line)
+                rows_i[2].cells[2].paragraphs[0].add_run("No. EMP:").bold = True
+                rows_i[2].cells[3].paragraphs[0].add_run(num_emp)
 
-                # Fila 3
-                r2 = rows_info[2].cells
-                r2[0].paragraphs[0].add_run("SANCIONAR:").bold = True
-                r2[1].paragraphs[0].add_run(sanc_line)
-                r2[2].paragraphs[0].add_run("No. EMP:").bold = True
-                r2[3].paragraphs[0].add_run(num_emp)
+                # Fila 3: ADSCRITO A
+                rows_i[3].cells[0].paragraphs[0].add_run("ADSCRITO A:").bold = True
+                rows_i[3].cells[1].paragraphs[0].add_run(adscrito)
+                rows_i[3].cells[2].paragraphs[0].add_run("F. REGISTRO:").bold = True
+                rows_i[3].cells[3].paragraphs[0].add_run(f_registro)
 
-                # Fila 4
-                r3 = rows_info[3].cells
-                r3[0].paragraphs[0].add_run("ADSCRITO A:").bold = True
-                r3[1].paragraphs[0].add_run(adscrito)
-                r3[2].paragraphs[0].add_run("F. REGISTRO:").bold = True
-                r3[3].paragraphs[0].add_run(f_registro)
-
-                # 2. Tabla de Conceptos
-                doc_j.add_paragraph().paragraph_format.space_after = Pt(4)
+                # 2. Tabla Conceptos
+                doc_j.add_paragraph().paragraph_format.space_after = Pt(2)
                 tbl_c = doc_j.add_table(rows=1, cols=4)
                 tbl_c.style = 'Table Grid'
                 
@@ -2921,16 +2912,16 @@ else:
                         set_cell_background(row_c[2], "BCBCBC")
                         set_cell_background(row_c[3], "BCBCBC")
 
-                # 3. Fechas en Rojo
-                doc_j.add_paragraph().paragraph_format.space_after = Pt(4)
+                # 3. Tabla Fechas
+                doc_j.add_paragraph().paragraph_format.space_after = Pt(2)
                 tbl_fec = doc_j.add_table(rows=2, cols=2)
                 tbl_fec.style = 'Table Grid'
                 
-                c_fec_hdr = tbl_fec.rows[0].cells
-                c_fec_hdr[0].merge(c_fec_hdr[1])
-                c_fec_hdr[0].text = "FECHA DE INCIDENCIA:"
-                set_cell_background(c_fec_hdr[0], "F5F5F5")
-                c_fec_hdr[0].paragraphs[0].runs[0].font.bold = True
+                c_fec_hdr = tbl_fec.rows[0].cells[0]
+                c_fec_hdr.merge(tbl_fec.rows[0].cells[1])
+                c_fec_hdr.text = "FECHA DE INCIDENCIA:"
+                set_cell_background(c_fec_hdr, "F5F5F5")
+                c_fec_hdr.paragraphs[0].runs[0].font.bold = True
 
                 c_fec_val = tbl_fec.rows[1].cells
                 r_f1 = c_fec_val[0].paragraphs[0].add_run(f_ini_str)
@@ -2943,8 +2934,8 @@ else:
                 r_f2.font.color.rgb = RGBColor(220, 0, 0)
                 c_fec_val[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-                # 4. Motivo
-                doc_j.add_paragraph().paragraph_format.space_after = Pt(4)
+                # 4. Tabla Motivo
+                doc_j.add_paragraph().paragraph_format.space_after = Pt(2)
                 tbl_mot = doc_j.add_table(rows=2, cols=1)
                 tbl_mot.style = 'Table Grid'
                 
@@ -2958,8 +2949,8 @@ else:
                 c_mot_v.text = motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO."
                 c_mot_v.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-                # 5. Firmas (4 Columnas)
-                doc_j.add_paragraph().paragraph_format.space_after = Pt(8)
+                # 5. Tabla Firmas
+                doc_j.add_paragraph().paragraph_format.space_after = Pt(4)
                 tbl_fir = doc_j.add_table(rows=2, cols=4)
                 tbl_fir.style = 'Table Grid'
                 
