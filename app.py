@@ -1999,8 +1999,10 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
 
-                # --- GENERADOR DE DOCUMENTO PDF (OPTIMIZADO Y SIMÉTRICO) ---
+                # --- GENERADOR DE DOCUMENTO PDF (CON EXTRACCIÓN AUTOMÁTICA DE MEMBRETE DE oficiossf.docx) ---
                 if motor_pdf_listo:
+                    import tempfile, os, zipfile
+
                     fmt_pdf = 'Letter' if "Carta" in formato_hoja_of else 'Legal'
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
 
@@ -2009,11 +2011,46 @@ else:
                     pdf.set_auto_page_break(auto=False)
                     pdf.add_page()
 
-                    if "Plantilla" in tipo_membrete_of:
+                    # Extracción de imágenes de encabezado y pie desde oficiossf.docx para FPDF
+                    hdr_bytes_tmpl, ftr_bytes_tmpl = None, None
+                    if "Plantilla" in tipo_membrete_of and os.path.exists("oficiossf.docx"):
+                        try:
+                            with zipfile.ZipFile("oficiossf.docx", 'r') as z:
+                                media_files = [f for f in z.namelist() if f.startswith('word/media/')]
+                                media_files.sort()
+                                if len(media_files) >= 1:
+                                    hdr_bytes_tmpl = z.read(media_files[0])
+                                if len(media_files) >= 2:
+                                    ftr_bytes_tmpl = z.read(media_files[1])
+                        except Exception:
+                            pass
+
+                    # 1. Dibujar Encabezado
+                    if "Plantilla" in tipo_membrete_of and hdr_bytes_tmpl:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_hdr:
+                            tmp_hdr.write(hdr_bytes_tmpl)
+                            tmp_hdr_path = tmp_hdr.name
+                        try:
+                            pdf.image(tmp_hdr_path, x=11, y=3, w=194)
+                        finally:
+                            try: os.unlink(tmp_hdr_path)
+                            except: pass
                         pdf.set_y(38)
                     else:
                         pdf.set_y(25)
 
+                    # 2. Dibujar Pie de Página
+                    if "Plantilla" in tipo_membrete_of and ftr_bytes_tmpl:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_ftr:
+                            tmp_ftr.write(ftr_bytes_tmpl)
+                            tmp_ftr_path = tmp_ftr.name
+                        try:
+                            pdf.image(tmp_ftr_path, x=11, y=page_h - 21, w=194)
+                        finally:
+                            try: os.unlink(tmp_ftr_path)
+                            except: pass
+
+                    # 3. Contenido del documento
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
@@ -2070,7 +2107,7 @@ else:
                 else:
                     col_pdf.error("❌ PDF no disponible.")
 
-                # --- GENERADOR DE WORD CONEXIÓN DIRECTA A oficiossf.docx ---
+                # --- GENERADOR DE WORD (.DOCX CON ANCLAJE INFERIOR DE C.C.P.) ---
                 try:
                     import docx
                     from docx.shared import Pt, Inches
@@ -2111,8 +2148,9 @@ else:
                     r_fm = p_f.add_run(f"{firm.upper()}\n{cargo_firm.upper()}")
                     r_fm.bold = True
 
+                    # C.c.p. empujado al fondo de la hoja mediante espacio previo
                     p_ccp_doc = doc_of.add_paragraph()
-                    p_ccp_doc.paragraph_format.space_before = Pt(18)
+                    p_ccp_doc.paragraph_format.space_before = Pt(110)
                     p_ccp_doc.paragraph_format.line_spacing = 1.15
 
                     if ccp:
