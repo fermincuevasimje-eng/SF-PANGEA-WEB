@@ -2823,11 +2823,12 @@ else:
             else:
                 col_pdf_j.error("❌ Función PDF no disponible.")
 
-            # --- GENERADOR DE WORD (.DOCX NATIVO CON COMBINACIÓN REAL DE CELDAS) ---
+            # --- GENERADOR DE WORD (.DOCX PROPORCIONAL Y EXACTO AL PDF) ---
             try:
                 import docx
                 from docx.shared import Pt, Inches, RGBColor
                 from docx.enum.text import WD_ALIGN_PARAGRAPH
+                from docx.enum.table import WD_TABLE_ALIGNMENT
                 from docx.oxml import parse_xml
                 from docx.oxml.ns import nsdecls
                 import io, os
@@ -2836,75 +2837,98 @@ else:
                     doc_j = docx.Document("oficiossf.docx")
                 else:
                     doc_j = docx.Document()
-                    for sec in doc_j.sections:
-                        sec.top_margin = Inches(0.5)
-                        sec.bottom_margin = Inches(0.5)
-                        sec.left_margin = Inches(0.7)
-                        sec.right_margin = Inches(0.7)
+
+                # Ajuste de márgenes idénticos al PDF (18mm lados = 0.71", 20mm arriba = 0.79")
+                for sec in doc_j.sections:
+                    sec.top_margin = Inches(0.79)
+                    sec.bottom_margin = Inches(0.5)
+                    sec.left_margin = Inches(0.71)
+                    sec.right_margin = Inches(0.71)
 
                 def set_cell_background(cell, fill_hex):
                     shading_elm = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{fill_hex}"/>')
                     cell._tc.get_or_add_tcPr().append(shading_elm)
 
+                def format_cell_text(cell, text, font_size=8, bold=False, align=WD_ALIGN_PARAGRAPH.LEFT, color_rgb=None, space_after=1):
+                    p = cell.paragraphs[0]
+                    p.paragraph_format.space_before = Pt(1)
+                    p.paragraph_format.space_after = Pt(space_after)
+                    p.paragraph_format.line_spacing = 1.05
+                    p.alignment = align
+                    p.text = text
+                    if len(p.runs) > 0:
+                        run = p.runs[0]
+                        run.font.name = "Arial"
+                        run.font.size = Pt(font_size)
+                        run.bold = bold
+                        if color_rgb:
+                            run.font.color.rgb = color_rgb
+
+                def set_table_widths(table, widths_in_inches):
+                    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                    for row in table.rows:
+                        for idx, w in enumerate(widths_in_inches):
+                            row.cells[idx].width = Inches(w)
+
+                # Título principal
                 p_tit = doc_j.add_paragraph()
+                p_tit.paragraph_format.space_before = Pt(4)
+                p_tit.paragraph_format.space_after = Pt(6)
                 p_tit.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 r_tit = p_tit.add_run("FORMATO ÚNICO DE JUSTIFICACIÓN")
+                r_tit.font.name = "Arial"
                 r_tit.bold = True
-                r_tit.font.size = Pt(12)
+                r_tit.font.size = Pt(11)
 
-                # 1. Tabla Datos Generales
+                # 1. Tabla de Datos Generales (Ancho total: 7.08 in / 180 mm)
+                w_info = [0.86, 3.86, 0.71, 1.65]
                 tbl_info = doc_j.add_table(rows=4, cols=4)
                 tbl_info.style = 'Table Grid'
-                
-                rows_i = tbl_info.rows
-                
-                # Fila 0: SOLICITA
-                rows_i[0].cells[0].paragraphs[0].add_run("SOLICITA:").bold = True
-                rows_i[0].cells[1].paragraphs[0].add_run(solicita)
-                rows_i[0].cells[2].paragraphs[0].add_run("FECHA:").bold = True
-                rows_i[0].cells[3].paragraphs[0].add_run(f_doc_str)
+                set_table_widths(tbl_info, w_info)
 
-                # Fila 1: JUSTIFICAR (Combinar celdas 1 a 3)
-                rows_i[1].cells[0].paragraphs[0].add_run("JUSTIFICAR:").bold = True
-                c_just = rows_i[1].cells[1]
-                c_just.merge(rows_i[1].cells[3])
-                c_just.paragraphs[0].add_run(just_line)
+                r0 = tbl_info.rows[0].cells
+                format_cell_text(r0[0], "SOLICITA:", font_size=9, bold=True)
+                format_cell_text(r0[1], solicita, font_size=9)
+                format_cell_text(r0[2], "FECHA:", font_size=9, bold=True)
+                format_cell_text(r0[3], f_doc_str, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
 
-                # Fila 2: SANCIONAR
-                rows_i[2].cells[0].paragraphs[0].add_run("SANCIONAR:").bold = True
-                rows_i[2].cells[1].paragraphs[0].add_run(sanc_line)
-                rows_i[2].cells[2].paragraphs[0].add_run("No. EMP:").bold = True
-                rows_i[2].cells[3].paragraphs[0].add_run(num_emp)
+                r1 = tbl_info.rows[1].cells
+                format_cell_text(r1[0], "JUSTIFICAR:", font_size=9, bold=True)
+                r1[1].merge(r1[3])
+                format_cell_text(r1[1], just_line, font_size=9)
 
-                # Fila 3: ADSCRITO A
-                rows_i[3].cells[0].paragraphs[0].add_run("ADSCRITO A:").bold = True
-                rows_i[3].cells[1].paragraphs[0].add_run(adscrito)
-                rows_i[3].cells[2].paragraphs[0].add_run("F. REGISTRO:").bold = True
-                rows_i[3].cells[3].paragraphs[0].add_run(f_registro)
+                r2 = tbl_info.rows[2].cells
+                format_cell_text(r2[0], "SANCIONAR:", font_size=9, bold=True)
+                format_cell_text(r2[1], sanc_line, font_size=9)
+                format_cell_text(r2[2], "No. EMP:", font_size=9, bold=True)
+                format_cell_text(r2[3], num_emp, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
 
-                # 2. Tabla Conceptos
+                r3 = tbl_info.rows[3].cells
+                format_cell_text(r3[0], "ADSCRITO A:", font_size=9, bold=True)
+                format_cell_text(r3[1], adscrito, font_size=9)
+                format_cell_text(r3[2], "F. REG:", font_size=8.5, bold=True)
+                format_cell_text(r3[3], f_registro, font_size=9, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+                # 2. Tabla de Conceptos (Ancho total: 7.08 in / 180 mm)
                 doc_j.add_paragraph().paragraph_format.space_after = Pt(2)
+                w_conceptos = [0.51, 3.03, 0.51, 3.03]
                 tbl_c = doc_j.add_table(rows=1, cols=4)
                 tbl_c.style = 'Table Grid'
-                
+                set_table_widths(tbl_c, w_conceptos)
+
                 hdr_c = tbl_c.rows[0].cells
                 hdr_titles = ["CLAVE", "CONCEPTO", "CLAVE", "CONCEPTO"]
                 for idx, t in enumerate(hdr_titles):
-                    hdr_c[idx].text = t
                     set_cell_background(hdr_c[idx], "E1E1E1")
-                    hdr_c[idx].paragraphs[0].runs[0].font.bold = True
-                    hdr_c[idx].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    format_cell_text(hdr_c[idx], t, font_size=8.5, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
 
                 for c1, n1, c2, n2 in conceptos_grid:
                     row_c = tbl_c.add_row().cells
-                    row_c[0].text = c1
-                    row_c[1].text = n1
-                    row_c[2].text = c2
-                    row_c[3].text = n2
-                    
-                    row_c[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    row_c[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    
+                    format_cell_text(row_c[0], c1, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+                    format_cell_text(row_c[1], f" {n1}", font_size=8)
+                    format_cell_text(row_c[2], c2, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+                    format_cell_text(row_c[3], f" {n2}", font_size=8)
+
                     if cod_sel == c1:
                         set_cell_background(row_c[0], "BCBCBC")
                         set_cell_background(row_c[1], "BCBCBC")
@@ -2912,48 +2936,46 @@ else:
                         set_cell_background(row_c[2], "BCBCBC")
                         set_cell_background(row_c[3], "BCBCBC")
 
-                # 3. Tabla Fechas
+                set_table_widths(tbl_c, w_conceptos)
+
+                # 3. Tabla de Fechas
                 doc_j.add_paragraph().paragraph_format.space_after = Pt(2)
+                w_fec = [3.54, 3.54]
                 tbl_fec = doc_j.add_table(rows=2, cols=2)
                 tbl_fec.style = 'Table Grid'
-                
+                set_table_widths(tbl_fec, w_fec)
+
                 c_fec_hdr = tbl_fec.rows[0].cells[0]
                 c_fec_hdr.merge(tbl_fec.rows[0].cells[1])
-                c_fec_hdr.text = "FECHA DE INCIDENCIA:"
                 set_cell_background(c_fec_hdr, "F5F5F5")
-                c_fec_hdr.paragraphs[0].runs[0].font.bold = True
+                format_cell_text(c_fec_hdr, " FECHA DE INCIDENCIA:", font_size=8.5, bold=True)
 
                 c_fec_val = tbl_fec.rows[1].cells
-                r_f1 = c_fec_val[0].paragraphs[0].add_run(f_ini_str)
-                r_f1.font.bold = True
-                r_f1.font.color.rgb = RGBColor(220, 0, 0)
-                c_fec_val[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                format_cell_text(c_fec_val[0], f_ini_str, font_size=9.5, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, color_rgb=RGBColor(220, 0, 0))
+                format_cell_text(c_fec_val[1], f_fin_str, font_size=9.5, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, color_rgb=RGBColor(220, 0, 0))
 
-                r_f2 = c_fec_val[1].paragraphs[0].add_run(f_fin_str)
-                r_f2.font.bold = True
-                r_f2.font.color.rgb = RGBColor(220, 0, 0)
-                c_fec_val[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-                # 4. Tabla Motivo
+                # 4. Tabla de Motivo
                 doc_j.add_paragraph().paragraph_format.space_after = Pt(2)
+                w_mot = [7.08]
                 tbl_mot = doc_j.add_table(rows=2, cols=1)
                 tbl_mot.style = 'Table Grid'
-                
+                set_table_widths(tbl_mot, w_mot)
+
                 c_mot_h = tbl_mot.rows[0].cells[0]
-                c_mot_h.text = "MOTIVO"
                 set_cell_background(c_mot_h, "E1E1E1")
-                c_mot_h.paragraphs[0].runs[0].font.bold = True
-                c_mot_h.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                format_cell_text(c_mot_h, "MOTIVO", font_size=8.5, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
 
                 c_mot_v = tbl_mot.rows[1].cells[0]
-                c_mot_v.text = motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO."
-                c_mot_v.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                txt_motivo = motivo if motivo else "ASUNTO OPERATIVO ASIGNADO EN CAMPO."
+                format_cell_text(c_mot_v, txt_motivo, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=4)
 
-                # 5. Tabla Firmas
+                # 5. Tabla de Firmas (4 Columnas simétricas de 1.77 in)
                 doc_j.add_paragraph().paragraph_format.space_after = Pt(4)
+                w_fir = [1.77, 1.77, 1.77, 1.77]
                 tbl_fir = doc_j.add_table(rows=2, cols=4)
                 tbl_fir.style = 'Table Grid'
-                
+                set_table_widths(tbl_fir, w_fir)
+
                 r_names = tbl_fir.rows[0].cells
                 r_titles = tbl_fir.rows[1].cells
 
@@ -2961,14 +2983,8 @@ else:
                 titles_data = ["SOLICITANTE", autoriza_c, revisa_c, recibe_c]
 
                 for i in range(4):
-                    r_names[i].text = f"\n\n{names_data[i]}"
-                    r_names[i].paragraphs[0].runs[0].font.bold = True
-                    r_names[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    
-                    r_titles[i].text = titles_data[i]
-                    r_titles[i].paragraphs[0].runs[0].font.bold = True
-                    r_titles[i].paragraphs[0].runs[0].font.size = Pt(8)
-                    r_titles[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    format_cell_text(r_names[i], f"\n\n{names_data[i]}", font_size=8, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+                    format_cell_text(r_titles[i], titles_data[i], font_size=7.5, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
 
                 stream_docx_j = io.BytesIO()
                 doc_j.save(stream_docx_j)
