@@ -2036,7 +2036,7 @@ else:
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
 
                     pdf = FPDF(orientation='P', unit='mm', format=fmt_pdf)
-                    pdf.set_margins(33, 20, 14)
+                    pdf.set_margins(18, 20, 18)
                     pdf.set_auto_page_break(auto=False)
                     pdf.add_page()
 
@@ -2054,7 +2054,7 @@ else:
                             img_temp.save(tmp_hdr.name, format="JPEG")
                             tmp_hdr_path = tmp_hdr.name
                         try:
-                            pdf.image(tmp_hdr_path, x=11, y=3, w=194)
+                            pdf.image(tmp_hdr_path, x=15, y=3, w=186)
                             # Se ajusta set_y a 38mm para separar la fecha del banner
                             pdf.set_y(38)
                         finally:
@@ -2070,7 +2070,7 @@ else:
                             img_temp.save(tmp_ftr.name, format="JPEG")
                             tmp_ftr_path = tmp_ftr.name
                         try:
-                            pdf.image(tmp_ftr_path, x=11, y=page_h - 21, w=194)
+                            pdf.image(tmp_ftr_path, x=15, y=page_h - 21, w=186)
                         finally:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
@@ -2649,14 +2649,14 @@ else:
 
             # --- CONSTRUCTOR DEL DOCUMENTO PDF OFICIAL (MÁXIMA FIDELIDAD IMPRESA CARTA / OFICIO) ---
             if motor_pdf_listo:
-                X_START = 29.0
-                W_TOTAL = 168.0
+                X_START = 18.0
+                W_TOTAL = 180.0
 
                 fmt_pdf_j = 'Letter' if "Carta" in formato_hoja_j else 'Legal'
                 page_h_j = 279.4 if fmt_pdf_j == 'Letter' else 355.6
 
                 pdf_j = FPDF(orientation='P', unit='mm', format=fmt_pdf_j)
-                pdf_j.set_margins(33, 26, 14)
+                pdf_j.set_margins(18, 26, 18)
                 pdf_j.set_auto_page_break(auto=False)
                 pdf_j.add_page()
 
@@ -2713,7 +2713,7 @@ else:
                         img_temp.save(tmp_j_hdr.name, format="JPEG")
                         tmp_j_hdr_path = tmp_j_hdr.name
                     try:
-                        pdf_j.image(tmp_j_hdr_path, x=11, y=3, w=194)
+                        pdf_j.image(tmp_j_hdr_path, x=15, y=3, w=186)
                     finally:
                         try: os.unlink(tmp_j_hdr_path)
                         except: pass
@@ -2727,7 +2727,7 @@ else:
                         img_temp.save(tmp_j_ftr.name, format="JPEG")
                         tmp_j_ftr_path = tmp_j_ftr.name
                     try:
-                        pdf_j.image(tmp_j_ftr_path, x=11, y=page_h_j - 21, w=194)
+                        pdf_j.image(tmp_j_ftr_path, x=15, y=page_h_j - 21, w=186)
                     finally:
                         try: os.unlink(tmp_j_ftr_path)
                         except: pass
