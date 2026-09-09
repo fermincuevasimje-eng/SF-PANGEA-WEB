@@ -2030,7 +2030,7 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
 
-                # --- GENERADOR DE DOCUMENTO PDF (MÁXIMO APROVECHAMIENTO DE HOJA) ---
+                # --- GENERADOR DE DOCUMENTO PDF (ESPACIADO CORRECTO DE FECHA) ---
                 if motor_pdf_listo:
                     fmt_pdf = 'Letter' if "Carta" in formato_hoja_of else 'Legal'
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
@@ -2055,7 +2055,8 @@ else:
                             tmp_hdr_path = tmp_hdr.name
                         try:
                             pdf.image(tmp_hdr_path, x=11, y=3, w=194)
-                            pdf.set_y(28)
+                            # Se ajusta set_y a 38mm para separar la fecha del banner
+                            pdf.set_y(38)
                         finally:
                             try: os.unlink(tmp_hdr_path)
                             except: pass
@@ -2074,7 +2075,7 @@ else:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
 
-                    # 3. Encabezado de Texto
+                    # 3. Encabezado de Texto y Datos
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
@@ -2731,8 +2732,8 @@ else:
                         try: os.unlink(tmp_j_ftr_path)
                         except: pass
 
-                # 3. CUERPO DE LA JUSTIFICACIÓN
-                Y_START_BODY = 35.0
+                # 3. CUERPO DE LA JUSTIFICACIÓN (Se incrementa inicio a 42mm)
+                Y_START_BODY = 42.0
 
                 pdf_j.set_font("Arial", 'B', 11)
                 pdf_j.set_xy(X_START, Y_START_BODY)
