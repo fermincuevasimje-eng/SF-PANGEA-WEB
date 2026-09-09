@@ -2234,7 +2234,7 @@ else:
                     col_docx.warning("⚠️ Instala `python-docx` para exportar Word.")
             
 # ==================================================================================
-# 📝 PESTAÑA DE JUSTIFICACIONES E INCIDENCIAS DE PERSONAL (TAB_J REFACTORIZADO)
+# 📝 PESTAÑA DE JUSTIFICACIONES E INCIDENCIAS DE PERSONAL (TAB_J COMPLETO)
 # ==================================================================================
         with tab_j:
             st.subheader("📝 Control de Justificaciones e Incidencias de Personal")
@@ -2606,18 +2606,20 @@ else:
                     ws.append_row([id_reg_j, fecha_mx, nombre_emp, num_emp, json.dumps(payload_j), ""])
                     st.success("✅ Formato Único de Justificación Sincronizado en la Nube."); time.sleep(1); st.rerun()
 
-            # --- GENERADOR DE DOCUMENTO PDF (SIMETRÍA EXACTA A X=11mm, W=194mm) ---
+            col_pdf_j, col_docx_j = st.columns(2)
+
+            # --- GENERADOR DE DOCUMENTO PDF (CENTRADOR X=18mm, PIE Y=page_h-15mm) ---
             if motor_pdf_listo:
                 import tempfile, os, zipfile, re
 
-                X_START = 11.0
-                W_TOTAL = 194.0
+                X_START = 18.0
+                W_TOTAL = 180.0
 
                 fmt_pdf_j = 'Letter' if "Carta" in formato_hoja_j else 'Legal'
                 page_h_j = 279.4 if fmt_pdf_j == 'Letter' else 355.6
 
                 pdf_j = FPDF(orientation='P', unit='mm', format=fmt_pdf_j)
-                pdf_j.set_margins(11, 20, 11)
+                pdf_j.set_margins(18, 20, 18)
                 pdf_j.set_auto_page_break(auto=False)
                 pdf_j.add_page()
 
@@ -2637,7 +2639,6 @@ else:
                 revisa_c_enc = revisa_c.encode('latin-1', 'replace').decode('latin-1')
                 recibe_c_enc = recibe_c.encode('latin-1', 'replace').decode('latin-1')
 
-                # Extracción de membrete desde oficiossf.docx o banners personalizados
                 hdr_j_bytes, ftr_j_bytes = img_j_hdr_bytes, img_j_ftr_bytes
 
                 if "Plantilla" in tipo_membrete and os.path.exists("oficiossf.docx"):
@@ -2659,7 +2660,7 @@ else:
                                     ftr_j_bytes = z.read('word/media/' + m_ftr.group(1))
                     except Exception: pass
 
-                # 1. Dibujar Encabezado
+                # 1. Encabezado
                 if "Ocultar" not in tipo_membrete:
                     if hdr_j_bytes:
                         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_jh:
@@ -2675,13 +2676,13 @@ else:
                     pdf_j.set_font("Arial", 'I', 8.5)
                     pdf_j.cell(194, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
 
-                # 2. Dibujar Pie de Página
+                # 2. Pie de Página (Ajustado más abajo: Y = page_h_j - 15mm)
                 if "Ocultar" not in tipo_membrete and ftr_j_bytes:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_jf:
                         tmp_jf.write(ftr_j_bytes)
                         tmp_jf_path = tmp_jf.name
                     try:
-                        pdf_j.image(tmp_jf_path, x=11, y=page_h_j - 21, w=194)
+                        pdf_j.image(tmp_jf_path, x=11, y=page_h_j - 15, w=194)
                     finally:
                         try: os.unlink(tmp_jf_path)
                         except: pass
@@ -2697,52 +2698,52 @@ else:
                 pdf_j.set_xy(X_START, Y_START_BODY + 8)
                 pdf_j.cell(22, 7, txt="SOLICITA: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(108, 7, txt=solicita_enc, border='B', ln=False)
+                pdf_j.cell(98, 7, txt=solicita_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.cell(18, 7, txt=" FECHA: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(46, 7, txt=f_doc_str, border='B', ln=True, align='C')
+                pdf_j.cell(42, 7, txt=f_doc_str, border='B', ln=True, align='C')
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 16)
                 pdf_j.cell(26, 7, txt="JUSTIFICAR: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(168, 7, txt=just_line_enc, border='B', ln=True)
+                pdf_j.cell(154, 7, txt=just_line_enc, border='B', ln=True)
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 24)
                 pdf_j.cell(26, 7, txt="SANCIONAR: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(100, 7, txt=sanc_line_enc, border='B', ln=False)
+                pdf_j.cell(92, 7, txt=sanc_line_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 10)
-                pdf_j.cell(28, 7, txt=" No. DE EMP.: ", border=0, ln=False)
+                pdf_j.cell(26, 7, txt=" No. DE EMP.: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(40, 7, txt=num_emp, border='B', ln=True, align='C')
+                pdf_j.cell(36, 7, txt=num_emp, border='B', ln=True, align='C')
 
                 pdf_j.set_font("Arial", 'B', 10)
                 pdf_j.set_xy(X_START, Y_START_BODY + 32)
                 pdf_j.cell(26, 7, txt="ADSCRITO A: ", border=0, ln=False)
                 pdf_j.set_font("Arial", '', 10)
-                pdf_j.cell(100, 7, txt=adscrito_enc, border='B', ln=False)
+                pdf_j.cell(92, 7, txt=adscrito_enc, border='B', ln=False)
                 pdf_j.set_font("Arial", 'B', 8.5)
                 pdf_j.cell(26, 7, txt=" F. REGISTRO: ", border=0, ln=False)
 
                 fill_lista = (f_registro == "LISTA")
                 pdf_j.set_fill_color(188, 188, 188)
-                pdf_j.cell(18, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
+                pdf_j.cell(16, 5.5, txt="LISTA", border=1, ln=False, align='C', fill=fill_lista)
                 pdf_j.cell(2, 5.5, txt="", border=0, ln=False)
                 fill_hp = (f_registro == "HAND PUNCH")
-                pdf_j.cell(22, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
+                pdf_j.cell(18, 5.5, txt="H.P.", border=1, ln=True, align='C', fill=fill_hp)
 
-                # Tabla de Conceptos (Suma exacta = 194 mm)
+                # Tabla de Conceptos (Suma exacta = 180 mm)
                 Y_TABLE = Y_START_BODY + 42
                 pdf_j.set_font("Arial", 'B', 9)
                 pdf_j.set_fill_color(225, 225, 225)
                 pdf_j.set_xy(X_START, Y_TABLE)
-                pdf_j.cell(14, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                pdf_j.cell(83, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
-                pdf_j.cell(14, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
-                pdf_j.cell(83, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
+                pdf_j.cell(13, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
+                pdf_j.cell(77, 5.5, txt="CONCEPTO", border=1, ln=False, align='C', fill=True)
+                pdf_j.cell(13, 5.5, txt="CLAVE", border=1, ln=False, align='C', fill=True)
+                pdf_j.cell(77, 5.5, txt="CONCEPTO", border=1, ln=True, align='C', fill=True)
 
                 pdf_j.set_font("Arial", '', 8)
                 current_y = Y_TABLE + 5.5
@@ -2755,10 +2756,10 @@ else:
                     t_n2 = f" {n2}".encode('latin-1', 'replace').decode('latin-1')
 
                     pdf_j.set_xy(X_START, current_y)
-                    pdf_j.cell(14, 6.0, txt=c1, border=1, ln=False, align='C', fill=fill_l)
-                    pdf_j.cell(83, 6.0, txt=t_n1, border=1, ln=False, fill=fill_l)
-                    pdf_j.cell(14, 6.0, txt=c2, border=1, ln=False, align='C', fill=fill_r)
-                    pdf_j.cell(83, 6.0, txt=t_n2, border=1, ln=True, fill=fill_r)
+                    pdf_j.cell(13, 6.0, txt=c1, border=1, ln=False, align='C', fill=fill_l)
+                    pdf_j.cell(77, 6.0, txt=t_n1, border=1, ln=False, fill=fill_l)
+                    pdf_j.cell(13, 6.0, txt=c2, border=1, ln=False, align='C', fill=fill_r)
+                    pdf_j.cell(77, 6.0, txt=t_n2, border=1, ln=True, fill=fill_r)
                     current_y += 6.0
 
                 Y_FECHAS = current_y + 3.0
@@ -2770,8 +2771,8 @@ else:
                 pdf_j.set_font("Arial", 'B', 10.5)
                 pdf_j.set_text_color(220, 0, 0)
                 pdf_j.set_xy(X_START, Y_FECHAS + 5.5)
-                pdf_j.cell(97, 8.5, txt=f_ini_str, border=1, ln=False, align='C')
-                pdf_j.cell(97, 8.5, txt=f_fin_str, border=1, ln=True, align='C')
+                pdf_j.cell(90, 8.5, txt=f_ini_str, border=1, ln=False, align='C')
+                pdf_j.cell(90, 8.5, txt=f_fin_str, border=1, ln=True, align='C')
                 pdf_j.set_text_color(0, 0, 0)
 
                 Y_MOTIVO = Y_FECHAS + 17.0
@@ -2784,7 +2785,7 @@ else:
                 pdf_j.set_xy(X_START, Y_MOTIVO + 7.5)
                 pdf_j.multi_cell(W_TOTAL, 4.5, txt=motivo_enc, align='C')
 
-                # Retícula de 4 firmas simétricas (48.5 mm por columna)
+                # Retícula de 4 firmas simétricas (45 mm por columna)
                 Y_FIRMAS = Y_MOTIVO + 29.5
                 h_grid = 48
                 w_col = W_TOTAL / 4.0
@@ -2817,9 +2818,90 @@ else:
                 pdf_j.multi_cell(w_col, 2.8, txt=recibe_c_enc, align='C')
 
                 pdf_data_j = pdf_j.output(dest='S').encode('latin-1', 'replace')
-                st.download_button(label="🚀 DESCARGAR JUSTIFICACIÓN PDF", data=pdf_data_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True)
+                col_pdf_j.download_button(label="🚀 DESCARGAR JUSTIFICACIÓN PDF", data=pdf_data_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True)
             else:
-                st.error("❌ Función PDF no disponible.")
+                col_pdf_j.error("❌ Función PDF no disponible.")
+
+            # --- GENERADOR DE DOCUMENTO WORD (.DOCX PARA JUSTIFICACIONES) ---
+            try:
+                import docx
+                from docx.shared import Pt, Inches
+                from docx.enum.text import WD_ALIGN_PARAGRAPH
+                import io, os
+
+                if "Plantilla" in tipo_membrete and os.path.exists("oficiossf.docx"):
+                    doc_j = docx.Document("oficiossf.docx")
+                else:
+                    doc_j = docx.Document()
+                    for sec in doc_j.sections:
+                        sec.top_margin = Inches(0.8)
+                        sec.bottom_margin = Inches(0.8)
+                        sec.left_margin = Inches(0.8)
+                        sec.right_margin = Inches(0.8)
+
+                p_tit = doc_j.add_paragraph()
+                p_tit.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                r_tit = p_tit.add_run("FORMATO ÚNICO DE JUSTIFICACIÓN")
+                r_tit.bold = True
+                r_tit.font.size = Pt(12)
+
+                p_info = doc_j.add_paragraph()
+                p_info.paragraph_format.space_before = Pt(8)
+                p_info.paragraph_format.line_spacing = 1.2
+                p_info.add_run(f"SOLICITA: {solicita}\t\tFECHA: {f_doc_str}\n").bold = True
+                p_info.add_run(f"JUSTIFICAR: {just_line}\n").bold = True
+                p_info.add_run(f"SANCIONAR: {sanc_line}\t\tNo. DE EMP.: {num_emp}\n").bold = True
+                p_info.add_run(f"ADSCRITO A: {adscrito}\t\tF. REGISTRO: {f_registro}").bold = True
+
+                # Tabla de Conceptos en Word
+                table_c = doc_j.add_table(rows=1, cols=4)
+                table_c.style = 'Table Grid'
+                hdr_cells = table_c.rows[0].cells
+                hdr_cells[0].text = 'CLAVE'
+                hdr_cells[1].text = 'CONCEPTO'
+                hdr_cells[2].text = 'CLAVE'
+                hdr_cells[3].text = 'CONCEPTO'
+
+                for c1, n1, c2, n2 in conceptos_grid:
+                    row_cells = table_c.add_row().cells
+                    row_cells[0].text = c1
+                    row_cells[1].text = n1
+                    row_cells[2].text = c2
+                    row_cells[3].text = n2
+
+                p_fec = doc_j.add_paragraph()
+                p_fec.paragraph_format.space_before = Pt(10)
+                p_fec.add_run(f"FECHA: {f_ini_str}  {f_fin_str}").bold = True
+
+                p_mot = doc_j.add_paragraph()
+                p_mot.paragraph_format.space_before = Pt(8)
+                p_mot.add_run(f"MOTIVO:\n{motivo if motivo else 'ASUNTO OPERATIVO ASIGNADO EN CAMPO.'}")
+
+                # Tabla de Firmas (4 columnas)
+                p_fir = doc_j.add_paragraph()
+                p_fir.paragraph_format.space_before = Pt(20)
+                table_f = doc_j.add_table(rows=2, cols=4)
+                table_f.style = 'Table Grid'
+                f_cells_names = table_f.rows[0].cells
+                f_cells_cargos = table_f.rows[1].cells
+
+                f_cells_names[0].text = firma_solicita
+                f_cells_names[1].text = autoriza_n
+                f_cells_names[2].text = revisa_n
+                f_cells_names[3].text = recibe_n
+
+                f_cells_cargos[0].text = "SOLICITANTE"
+                f_cells_cargos[1].text = autoriza_c
+                f_cells_cargos[2].text = revisa_c
+                f_cells_cargos[3].text = recibe_c
+
+                stream_docx_j = io.BytesIO()
+                doc_j.save(stream_docx_j)
+                docx_bytes_j = stream_docx_j.getvalue()
+
+                col_docx_j.download_button(label="📝 DESCARGAR JUSTIFICACIÓN WORD", data=docx_bytes_j, file_name=f"Justificacion_{num_emp}_{f_inicio.strftime('%Y%m%d')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+            except ImportError:
+                col_docx_j.warning("⚠️ Instala `python-docx` para exportar Word.")
     elif st.session_state.menu == "SF5":
         st.title("🛡️ SF5 - Centro de Depuración Inteligente")
 
