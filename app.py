@@ -1903,39 +1903,13 @@ else:
                     col_sp1, col_sp2 = st.columns(2)
                     espacio_firma = col_sp1.slider("Espacio para Firma (mm):", min_value=5, max_value=40, value=int(data_previa.get("espacio_firma", 15)), key=f"sp_firm_{pk}")
                     pos_y_ccp = col_sp2.slider("Anclaje Inferior C.c.p. (mm):", min_value=-45, max_value=-15, value=int(data_previa.get("pos_y_ccp", -28)), key=f"sp_ccp_{pk}")
-                # --- CONTROL DE ENCABEZADO Y MEMBRETE EN OFICIOS (PERSISTENTE CON PIE DE PÁGINA) ---
-                if "global_header_b64" not in st.session_state: st.session_state.global_header_b64 = None
-                if "global_footer_b64" not in st.session_state: st.session_state.global_footer_b64 = None
-
-                opciones_memb_of = ["Sistema (Texto Directo)", "Imagen Personalizada (Subir Banner)", "Hoja Física (Espacio para Membrete)"]
-                tipo_membrete_of = st.selectbox("Configuración de Encabezado / Membrete Oficio:", opciones_memb_of, index=0, key=f"tipo_memb_of_{pk}")
+                # --- CONTROL DE MEMBRETE LIGERO (PLANTILLA NATIVA WORD / HOJA BLANCA) ---
+                opciones_memb_of = ["🏛️ Plantilla Institucional (oficiossf.docx)", "📄 Hoja Blanca (Impresión Física)"]
+                prev_memb_of = data_previa.get("tipo_membrete", opciones_memb_of[0])
+                idx_memb_of = opciones_memb_of.index(prev_memb_of) if prev_memb_of in opciones_memb_of else 0
+                
+                tipo_membrete_of = st.selectbox("Configuración de Membrete:", opciones_memb_of, index=idx_memb_of, key=f"tipo_memb_of_{pk}")
                 formato_hoja_of = st.selectbox("Tamaño de Hoja Oficio:", ["Carta (Letter)", "Oficio (Legal)"], index=0 if data_previa.get("formato_hoja", "Carta (Letter)") == "Carta (Letter)" else 1, key=f"fmt_hoja_of_{pk}")
-
-                img_of_hdr_b64 = data_previa.get("img_header_b64") or st.session_state.global_header_b64
-                img_of_ftr_b64 = data_previa.get("img_footer_b64") or st.session_state.global_footer_b64
-                img_of_hdr_bytes, img_of_ftr_bytes = None, None
-
-                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)":
-                    col_up_h, col_up_f = st.columns(2)
-                    with col_up_h:
-                        file_hdr_of = st.file_uploader("1. Encabezado / Banner Superior:", type=["png", "jpg", "jpeg"], key=f"file_hdr_of_{pk}")
-                        if file_hdr_of is not None:
-                            img_of_hdr_bytes = file_hdr_of.getvalue()
-                            img_of_hdr_b64 = base64.b64encode(img_of_hdr_bytes).decode('utf-8')
-                            st.session_state.global_header_b64 = img_of_hdr_b64
-                        elif img_of_hdr_b64:
-                            try: img_of_hdr_bytes = base64.b64decode(img_of_hdr_b64)
-                            except: pass
-
-                    with col_up_f:
-                        file_ftr_of = st.file_uploader("2. Pie de Página / Banner Inferior:", type=["png", "jpg", "jpeg"], key=f"file_ftr_of_{pk}")
-                        if file_ftr_of is not None:
-                            img_of_ftr_bytes = file_ftr_of.getvalue()
-                            img_of_ftr_b64 = base64.b64encode(img_of_ftr_bytes).decode('utf-8')
-                            st.session_state.global_footer_b64 = img_of_ftr_b64
-                        elif img_of_ftr_b64:
-                            try: img_of_ftr_bytes = base64.b64decode(img_of_ftr_b64)
-                            except: pass
 
             with c_preview:
                 st.markdown("### 👁️ Vista Previa")
@@ -1945,27 +1919,23 @@ else:
                 ccp_html = ccp.replace('\n', '<br>') if ccp else ""
                 minutario_html = minutario.replace('\n', '<br>') if minutario else ""
 
-                if tipo_membrete_of == "Sistema (Texto Directo)":
-                    html_header_of = ""
-                    e_sup = "20px"
-                elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_hdr_b64:
-                    html_header_of = f"""
-                    <div style="width: 100%; text-align: center; margin-bottom: 15px;">
-                        <img src="data:image/png;base64,{img_of_hdr_b64}" style="width: 100%; max-height: 90px; object-fit: contain;">
+                if "Plantilla" in tipo_membrete_of:
+                    html_header_of = """
+                    <div style="text-align: center; border-bottom: 2px solid #800020; padding-bottom: 8px; margin-bottom: 15px;">
+                        <span style="font-size: 11px; font-weight: bold; color: #555;">DIRECCIÓN GENERAL DE SERVICIOS PÚBLICOS | DIRECCIÓN DE ALUMBRADO PÚBLICO</span><br>
+                        <span style="font-size: 9px; font-style: italic; color: #777;">"2026. Año del Humanismo Mexicano en el Estado de México"</span>
                     </div>
                     """
-                    e_sup = "0px"
+                    html_footer_of = """
+                    <div style="border-top: 1px solid #ccc; text-align: center; font-size: 9px; color: #666; margin-top: 30px; padding-top: 5px;">
+                        H. Ayuntamiento de Toluca | Rafael Alducin s/n esq. 1ro de Mayo, Col. Reforma y Ferrocarriles
+                    </div>
+                    """
+                    e_sup = "10px"
                 else:
-                    html_header_of = """<div style="height: 80px;"></div>"""
-                    e_sup = "20px"
-
-                html_footer_of = ""
-                if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_ftr_b64:
-                    html_footer_of = f"""
-                    <div style="width: 100%; text-align: center; margin-top: 30px;">
-                        <img src="data:image/png;base64,{img_of_ftr_b64}" style="width: 100%; max-height: 70px; object-fit: contain;">
-                    </div>
-                    """
+                    html_header_of = """<div style="height: 60px; border: 1px dashed #ccc; text-align: center; color: #aaa; line-height: 60px; font-size: 11px;">[ Espacio reservado para membrete físico ]</div>"""
+                    html_footer_of = """<div style="height: 40px; border: 1px dashed #ccc; text-align: center; color: #aaa; line-height: 40px; font-size: 11px; margin-top: 20px;">[ Espacio reservado para pie físico ]</div>"""
+                    e_sup = "15px"
 
                 sec_minutario_html = f"""<div style="font-size: 10px; margin-top: 4px;"><b>Archivo/minutario:</b><br>{minutario_html}</div>""" if minutario_html else ""
 
@@ -2009,9 +1979,8 @@ else:
                             "firma": firm, "cargo_f": cargo_firm, "ccp": ccp,
                             "minutario": minutario, "espacio_firma": espacio_firma,
                             "pos_y_ccp": pos_y_ccp, "plantilla": tipo_p,
-                            "formato_hoja": formato_hoja_of,
-                            "img_header_b64": img_of_hdr_b64,
-                            "img_footer_b64": img_of_ftr_b64
+                            "tipo_membrete": tipo_membrete_of,
+                            "formato_hoja": formato_hoja_of
                         }
                         st.session_state.db_oficios[id_r] = payload_oficio
 
@@ -2030,52 +1999,21 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
 
-                # --- GENERADOR DE DOCUMENTO PDF (ESPACIADO CORRECTO DE FECHA) ---
+                # --- GENERADOR DE DOCUMENTO PDF (OPTIMIZADO Y SIMÉTRICO) ---
                 if motor_pdf_listo:
                     fmt_pdf = 'Letter' if "Carta" in formato_hoja_of else 'Legal'
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
 
                     pdf = FPDF(orientation='P', unit='mm', format=fmt_pdf)
-                    pdf.set_margins(18, 20, 18)
+                    pdf.set_margins(25, 20, 25)
                     pdf.set_auto_page_break(auto=False)
                     pdf.add_page()
 
-                    import tempfile
-                    import os
+                    if "Plantilla" in tipo_membrete_of:
+                        pdf.set_y(38)
+                    else:
+                        pdf.set_y(25)
 
-                    # 1. Encabezado Pegado al Borde Superior (Y = 3mm)
-                    if tipo_membrete_of == "Hoja Física (Espacio para Membrete)":
-                        pdf.ln(10)
-                    elif tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_hdr_bytes is not None:
-                        from PIL import Image
-                        import io
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_hdr:
-                            img_temp = Image.open(io.BytesIO(img_of_hdr_bytes)).convert("RGB")
-                            img_temp.save(tmp_hdr.name, format="JPEG")
-                            tmp_hdr_path = tmp_hdr.name
-                        try:
-                            pdf.image(tmp_hdr_path, x=15, y=3, w=186)
-                            # Se ajusta set_y a 38mm para separar la fecha del banner
-                            pdf.set_y(38)
-                        finally:
-                            try: os.unlink(tmp_hdr_path)
-                            except: pass
-
-                    # 2. Pie de Página Pegado al Borde Inferior (Y = page_h - 21mm)
-                    if tipo_membrete_of == "Imagen Personalizada (Subir Banner)" and img_of_ftr_bytes is not None:
-                        from PIL import Image
-                        import io
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_ftr:
-                            img_temp = Image.open(io.BytesIO(img_of_ftr_bytes)).convert("RGB")
-                            img_temp.save(tmp_ftr.name, format="JPEG")
-                            tmp_ftr_path = tmp_ftr.name
-                        try:
-                            pdf.image(tmp_ftr_path, x=15, y=page_h - 21, w=186)
-                        finally:
-                            try: os.unlink(tmp_ftr_path)
-                            except: pass
-
-                    # 3. Encabezado de Texto y Datos
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
@@ -2094,7 +2032,6 @@ else:
                     c_pdf = cuerpo_txt.replace("[FOLIO]", f_ref)
                     pdf.multi_cell(0, 5.5, txt=c_pdf.encode('latin-1', 'replace').decode('latin-1'), align='J')
 
-                    # 4. Firma
                     pdf.ln(espacio_firma)
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt="A T E N T A M E N T E", ln=True, align='C')
@@ -2103,7 +2040,6 @@ else:
                     pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
                     pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
 
-                    # 5. C.c.p. y Archivo/minutario
                     y_ccp_calc = page_h - 28
                     pdf.set_y(y_ccp_calc)
                     pdf.set_font("Arial", '', 8)
@@ -2134,19 +2070,22 @@ else:
                 else:
                     col_pdf.error("❌ PDF no disponible.")
 
-                # --- GENERADOR NATIVO DE WORD (.DOCX) ---
+                # --- GENERADOR DE WORD CONEXIÓN DIRECTA A oficiossf.docx ---
                 try:
                     import docx
                     from docx.shared import Pt, Inches
                     from docx.enum.text import WD_ALIGN_PARAGRAPH
-                    import io
+                    import io, os
 
-                    doc_of = docx.Document()
-                    for sec in doc_of.sections:
-                        sec.top_margin = Inches(0.8)
-                        sec.bottom_margin = Inches(0.8)
-                        sec.left_margin = Inches(1.0)
-                        sec.right_margin = Inches(0.8)
+                    if "Plantilla" in tipo_membrete_of and os.path.exists("oficiossf.docx"):
+                        doc_of = docx.Document("oficiossf.docx")
+                    else:
+                        doc_of = docx.Document()
+                        for sec in doc_of.sections:
+                            sec.top_margin = Inches(0.8)
+                            sec.bottom_margin = Inches(0.8)
+                            sec.left_margin = Inches(1.0)
+                            sec.right_margin = Inches(0.8)
 
                     p_top = doc_of.add_paragraph()
                     p_top.alignment = WD_ALIGN_PARAGRAPH.RIGHT
