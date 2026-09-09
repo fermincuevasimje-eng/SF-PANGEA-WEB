@@ -1999,9 +1999,9 @@ else:
 
                 col_pdf, col_docx = st.columns(2)
 
-                # --- GENERADOR DE DOCUMENTO PDF (CON EXTRACCIÓN AUTOMÁTICA DE MEMBRETE DE oficiossf.docx) ---
+                # --- GENERADOR DE DOCUMENTO PDF (MAPEO EXACTO DE XML DE oficiossf.docx) ---
                 if motor_pdf_listo:
-                    import tempfile, os, zipfile
+                    import tempfile, os, zipfile, re
 
                     fmt_pdf = 'Letter' if "Carta" in formato_hoja_of else 'Legal'
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
@@ -2011,35 +2011,66 @@ else:
                     pdf.set_auto_page_break(auto=False)
                     pdf.add_page()
 
-                    # Extracción de imágenes de encabezado y pie desde oficiossf.docx para FPDF
+                    # Inspección de las relaciones de archivo (.rels) para vincular encabezado y pie reales
                     hdr_bytes_tmpl, ftr_bytes_tmpl = None, None
                     if "Plantilla" in tipo_membrete_of and os.path.exists("oficiossf.docx"):
                         try:
                             with zipfile.ZipFile("oficiossf.docx", 'r') as z:
-                                media_files = [f for f in z.namelist() if f.startswith('word/media/')]
-                                media_files.sort()
-                                if len(media_files) >= 1:
-                                    hdr_bytes_tmpl = z.read(media_files[0])
-                                if len(media_files) >= 2:
-                                    ftr_bytes_tmpl = z.read(media_files[1])
+                                namelist = z.namelist()
+                                
+                                # Extraer imagen de encabezado
+                                hdr_rels = [f for f in namelist if 'header' in f and f.endswith('.rels')]
+                                hdr_img_path = None
+                                if hdr_rels:
+                                    rel_xml = z.read(hdr_rels[0]).decode('utf-8', errors='ignore')
+                                    m_hdr = re.search(r'Target=["\'](?:.*?/)?media/([^"\']+)["\']', rel_xml)
+                                    if m_hdr:
+                                        hdr_img_path = 'word/media/' + m_hdr.group(1)
+
+                                # Extraer imagen de pie de página
+                                ftr_rels = [f for f in namelist if 'footer' in f and f.endswith('.rels')]
+                                ftr_img_path = None
+                                if ftr_rels:
+                                    rel_xml_f = z.read(ftr_rels[0]).decode('utf-8', errors='ignore')
+                                    m_ftr = re.search(r'Target=["\'](?:.*?/)?media/([^"\']+)["\']', rel_xml_f)
+                                    if m_ftr:
+                                        ftr_img_path = 'word/media/' + m_ftr.group(1)
+
+                                # Respaldo si no se leen relaciones directas
+                                media_files = sorted([f for f in namelist if f.startswith('word/media/')])
+                                if not hdr_img_path and media_files:
+                                    hdr_img_path = media_files[0]
+                                if not ftr_img_path and len(media_files) > 1:
+                                    ftr_img_path = media_files[-1]
+
+                                if hdr_img_path and hdr_img_path in namelist:
+                                    hdr_bytes_tmpl = z.read(hdr_img_path)
+                                if ftr_img_path and ftr_img_path in namelist and ftr_img_path != hdr_img_path:
+                                    ftr_bytes_tmpl = z.read(ftr_img_path)
                         except Exception:
                             pass
 
-                    # 1. Dibujar Encabezado
-                    if "Plantilla" in tipo_membrete_of and hdr_bytes_tmpl:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_hdr:
-                            tmp_hdr.write(hdr_bytes_tmpl)
-                            tmp_hdr_path = tmp_hdr.name
-                        try:
-                            pdf.image(tmp_hdr_path, x=11, y=3, w=194)
-                        finally:
-                            try: os.unlink(tmp_hdr_path)
-                            except: pass
+                    # 1. Encabezado e inyección de Leyenda Institucional 2026
+                    if "Plantilla" in tipo_membrete_of:
+                        if hdr_bytes_tmpl:
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_hdr:
+                                tmp_hdr.write(hdr_bytes_tmpl)
+                                tmp_hdr_path = tmp_hdr.name
+                            try:
+                                pdf.image(tmp_hdr_path, x=11, y=3, w=194)
+                            finally:
+                                try: os.unlink(tmp_hdr_path)
+                                except: pass
+
+                        # Leyenda obligatoria del Estado de México
+                        pdf.set_xy(11, 28)
+                        pdf.set_font("Arial", 'I', 8.5)
+                        pdf.cell(194, 4, txt='"2026. Año del Humanismo Mexicano en el Estado de México"', ln=True, align='C')
                         pdf.set_y(38)
                     else:
                         pdf.set_y(25)
 
-                    # 2. Dibujar Pie de Página
+                    # 2. Pie de página
                     if "Plantilla" in tipo_membrete_of and ftr_bytes_tmpl:
                         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_ftr:
                             tmp_ftr.write(ftr_bytes_tmpl)
@@ -2050,7 +2081,7 @@ else:
                             try: os.unlink(tmp_ftr_path)
                             except: pass
 
-                    # 3. Contenido del documento
+                    # 3. Datos del Oficio
                     pdf.set_font("Arial", 'B', 11)
                     pdf.cell(0, 5, txt=f"Toluca, México; a {f_oficio.strftime('%d/%m/%Y')}", ln=True, align='R')
                     pdf.cell(0, 5, txt=f"Oficio No: {n_oficio}", ln=True, align='R')
@@ -2077,6 +2108,7 @@ else:
                     pdf.cell(0, 5, txt=firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
                     pdf.cell(0, 5, txt=cargo_firm.upper().encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
 
+                    # 4. C.c.p. y Archivo/minutario
                     y_ccp_calc = page_h - 28
                     pdf.set_y(y_ccp_calc)
                     pdf.set_font("Arial", '', 8)
@@ -2107,7 +2139,7 @@ else:
                 else:
                     col_pdf.error("❌ PDF no disponible.")
 
-                # --- GENERADOR DE WORD (.DOCX CON ANCLAJE INFERIOR DE C.C.P.) ---
+                # --- GENERADOR DE WORD (.DOCX CON ESPACIADO DE C.C.P. A 220PT) ---
                 try:
                     import docx
                     from docx.shared import Pt, Inches
@@ -2148,9 +2180,9 @@ else:
                     r_fm = p_f.add_run(f"{firm.upper()}\n{cargo_firm.upper()}")
                     r_fm.bold = True
 
-                    # C.c.p. empujado al fondo de la hoja mediante espacio previo
+                    # Espaciado de 220pt para colocar C.c.p. pegado al pie de página
                     p_ccp_doc = doc_of.add_paragraph()
-                    p_ccp_doc.paragraph_format.space_before = Pt(110)
+                    p_ccp_doc.paragraph_format.space_before = Pt(220)
                     p_ccp_doc.paragraph_format.line_spacing = 1.15
 
                     if ccp:
