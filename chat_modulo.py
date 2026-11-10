@@ -743,8 +743,6 @@ def render_chat():
         st.session_state.usuario_nombre = ""
     elif "usuario_nombre" in st.session_state and st.session_state.usuario_nombre:
         st.session_state.sf_chat_user = st.session_state.usuario_nombre
-    elif "session_user" in st.query_params:
-        st.session_state.sf_chat_user = st.query_params["session_user"]
 
     if "sf_chat_user" not in st.session_state:
         st.session_state.sf_chat_user = ""
@@ -771,7 +769,6 @@ def render_chat():
                 st.session_state.sf_chat_user = usr_select
                 st.session_state.usuario_nombre = usr_select
                 st.session_state.chat_manual_logout = False
-                st.query_params["session_user"] = usr_select
                 st.rerun()
         return
 
@@ -790,8 +787,6 @@ def render_chat():
                 st.session_state.sf_chat_user = ""
                 st.session_state.usuario_nombre = ""
                 st.session_state.chat_manual_logout = True
-                if "session_user" in st.query_params:
-                    del st.query_params["session_user"]
                 st.rerun()
 
     # Navegación Optimizada para Móviles (Menú desplegable táctil)

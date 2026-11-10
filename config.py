@@ -1,11 +1,20 @@
 # config.py
+# Sin credenciales en el código: los PINs viven en Streamlit Secrets ([pins]).
+# Ver .streamlit/secrets.toml.example. Sin Secrets configurados, los PINs quedan vacíos
+# y el acceso a SF6 queda bloqueado (fail-closed).
+import streamlit as st
 
-# Credenciales de Seguridad Maestro
+
+def _secret(section, key):
+    try:
+        return str(st.secrets[section][key])
+    except Exception:
+        return ""
+
+
 USUARIO_MAESTRO = "SF"
- PASS_MAESTRO = "***REMOVED***"
-
- PIN_MAESTRO = "***REMOVED***"
- PIN_ALMACEN = "***REMOVED***"
+PIN_MAESTRO = _secret("pins", "maestro")
+PIN_ALMACEN = _secret("pins", "almacen")
 
 # Rutas de Archivos
 ARCHIVO_INVENTARIO = 'inventario_dap_guardado.csv'
@@ -14,8 +23,8 @@ ARCHIVO_TERRITORIAL = 'DELEUTB2.csv'
 
 # Catálogo Oficial Consolidado (10 Base + Sub-selecciones)
 USUARIOS_OFICIALES = [
-    "SF", "Director", "Jefe Mant", "Jefe Infra", 
-    "GuaDAP", "Almacen1", "Almacen2", "Ditto", 
+    "SF", "Director", "Jefe Mant", "Jefe Infra",
+    "GuaDAP", "Almacen1", "Almacen2", "Ditto",
     "Especial", "Brigada"
 ]
 
