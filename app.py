@@ -10,6 +10,7 @@ import requests
 import time
 import os
 import json
+import hmac
 import base64
 from datetime import datetime, timedelta, timezone
 import gspread
@@ -431,14 +432,7 @@ if "es_super_admin" not in st.session_state:
 if "perfil" not in st.session_state:
     st.session_state.perfil = None
 
-# 🔄 REPETICIÓN / RECUPERACIÓN AUTOMÁTICA DE SESIÓN (PROTECCIÓN F5)
-if not st.session_state.autenticado and "session_user" in st.query_params:
-    user_url = st.query_params["session_user"]
-    st.session_state.autenticado = True
-    st.session_state.usuario_autenticado = True
-    st.session_state.usuario_nombre = user_url
-    st.session_state.es_super_admin = (user_url == "SF")
-    st.session_state.perfil = "ADMIN" if user_url == "SF" else "OPERATIVO"
+# Sesión NO se recupera desde la URL: por seguridad, siempre se pide contraseña.
 
 # 📌 RECUPERAR MÓDULO/MENÚ ACTIVO TRAS UN F5
 if "menu" in st.query_params:
@@ -476,27 +470,16 @@ if not st.session_state.autenticado:
     with col_login_2:
         st.subheader("Iniciar Sesión")
         
-        # Diccionario de credenciales centralizadas
-        USUARIOS_PASSWORDS = {
-            "SF": "2938",
-            "Director": "DIR1",
-            "GuaDAP": "GDP1",
-            "Edith": "EDT2",
-            "Jefe Mant.": "JMN3",
-            "Jefe Infra.": "JIF4",
-            "Almacén 1": "ALM1",
-            "Almacén 2": "ALM2",
-            "DAP 1": "DAP1",
-            "DAP 2": "DAP2",
-            "DAP 3": "DAP3",
-        }
-        
-        # Añadir Brigadas 1 a 17 y Especiales 1 a 3
-        for i in range(1, 18):
-            USUARIOS_PASSWORDS[f"Brigada {i}"] = f"BR{i:02d}"
-            
-        for i in range(1, 4):
-            USUARIOS_PASSWORDS[f"Especial {i}"] = f"ESP{i}"
+        # Credenciales en Streamlit Secrets, NO en el código.
+        # Configurar en Streamlit Cloud > Settings > Secrets, sección [users].
+        # Ver .streamlit/secrets.toml.example para el formato.
+        try:
+            USUARIOS_PASSWORDS = dict(st.secrets["users"])
+        except Exception:
+            USUARIOS_PASSWORDS = {}
+        if not USUARIOS_PASSWORDS:
+            st.error("Falta configurar las credenciales en Secrets (sección [users]).")
+            st.stop()
 
         # Lista de opciones para el selector
         opciones_usuario = ["SF (Super Admin Maestro)"] + [u for u in USUARIOS_PASSWORDS.keys() if u != "SF"]
@@ -511,14 +494,13 @@ if not st.session_state.autenticado:
         if st.button("Ingresar al Sistema 🚀", use_container_width=True):
             clave_correcta = USUARIOS_PASSWORDS.get(user_sel)
             
-            if pass_input == clave_correcta:
+            if clave_correcta and pass_input and hmac.compare_digest(pass_input, str(clave_correcta)):
                 es_sf = (user_sel == "SF")
                 st.session_state.autenticado = True
                 st.session_state.usuario_autenticado = True
                 st.session_state.usuario_nombre = user_sel
                 st.session_state.es_super_admin = es_sf
                 st.session_state.perfil = "ADMIN" if es_sf else "OPERATIVO"
-                st.query_params["session_user"] = user_sel
                 st.query_params["menu"] = st.session_state.menu
                 st.success(f"🎉 Bienvenido {user_sel}.")
                 st.rerun()
