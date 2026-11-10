@@ -1,0 +1,6 @@
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+boveda_pangea.json
+inventario_dap_guardado.csv
+vales_historial_guardado.json
