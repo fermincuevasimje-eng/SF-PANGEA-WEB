@@ -76,6 +76,25 @@ def get_supabase_client() -> Client:
         st.stop()
 
 
+@st.cache_resource
+def get_supabase_service_client():
+    """Cliente con la llave service_role, SOLO para acciones de admin.
+
+    La llave service_role salta el RLS, por eso nunca debe usarse para
+    las lecturas ni los mensajes normales del chat. Devuelve None si
+    SUPABASE_SERVICE_KEY no está en Secrets: el chat sigue funcionando
+    y las acciones de admin muestran un aviso en lugar de ejecutarse.
+    """
+    try:
+        url = st.secrets["supabase"]["SUPABASE_URL"]
+        key = st.secrets["supabase"].get("SUPABASE_SERVICE_KEY", "")
+        if not key:
+            return None
+        return create_client(url, key)
+    except Exception:
+        return None
+
+
 # Sanitización estricta de nombres de archivos
 def sanitizar_nombre_archivo(nombre_original: str) -> str:
     partes = nombre_original.rsplit(".", 1)
@@ -737,6 +756,17 @@ def render_chat():
 
     supabase = get_supabase_client()
 
+    # Cliente admin (llave service_role): solo para acciones del Panel Admin.
+    # Si la llave no está en Secrets, las acciones de admin muestran un
+    # aviso y no se ejecutan; el resto del chat sigue funcionando.
+    supabase_admin = get_supabase_service_client()
+
+    def _db_admin():
+        if supabase_admin is None:
+            st.error("🔴 Acción de admin no disponible: falta SUPABASE_SERVICE_KEY en Streamlit Secrets.")
+            return None
+        return supabase_admin
+
     # Si se solicitó cerrar/cambiar usuario manualmente en el chat, limpiar la variable
     if st.session_state.get("chat_manual_logout", False):
         st.session_state.sf_chat_user = ""
@@ -855,11 +885,13 @@ def render_chat():
                     st.warning(f"Borrar mensajes de #{canal_activo.upper()}.")
                     if st.checkbox("Confirmar borrado", key="chk_del_c"):
                         if st.button("Vaciar 🗑️", type="primary", use_container_width=True):
-                            supabase.table("mensajes").delete().eq(
-                                "canal", canal_activo
-                            ).execute()
-                            st.success("Canal vaciado.")
-                            st.rerun()
+                            _admin = _db_admin()
+                            if _admin is not None:
+                                _admin.table("mensajes").delete().eq(
+                                    "canal", canal_activo
+                                ).execute()
+                                st.success("Canal vaciado.")
+                                st.rerun()
 
         render_historial_fragment(
             st.session_state.sf_chat_user,
@@ -973,13 +1005,15 @@ def render_chat():
                         st.warning(f"Borrar chat con {destinatario_activo}.")
                         if st.checkbox("Confirmar borrado", key="chk_del_priv"):
                             if st.button("Eliminar 🗑️", type="primary", use_container_width=True):
-                                supabase.table("mensajes").delete().eq(
-                                    "canal", "privado"
-                                ).or_(
-                                    f"and(emisor.eq.{st.session_state.sf_chat_user},destinatario.eq.{destinatario_activo}),and(emisor.eq.{destinatario_activo},destinatario.eq.{st.session_state.sf_chat_user})"
-                                ).execute()
-                                st.success("Chat privado eliminado.")
-                                st.rerun()
+                                _admin = _db_admin()
+                                if _admin is not None:
+                                    _admin.table("mensajes").delete().eq(
+                                        "canal", "privado"
+                                    ).or_(
+                                        f"and(emisor.eq.{st.session_state.sf_chat_user},destinatario.eq.{destinatario_activo}),and(emisor.eq.{destinatario_activo},destinatario.eq.{st.session_state.sf_chat_user})"
+                                    ).execute()
+                                    st.success("Chat privado eliminado.")
+                                    st.rerun()
 
             render_historial_fragment(
                 st.session_state.sf_chat_user,
@@ -1114,9 +1148,11 @@ def render_chat():
                 u_clean = nuevo_usr.strip()
                 if u_clean:
                     try:
-                        supabase.table("usuarios").insert({"nombre": u_clean, "rol": "colaborador"}).execute()
-                        st.success(f"Usuario '{u_clean}' registrado.")
-                        st.rerun()
+                        _admin = _db_admin()
+                        if _admin is not None:
+                            _admin.table("usuarios").insert({"nombre": u_clean, "rol": "colaborador"}).execute()
+                            st.success(f"Usuario '{u_clean}' registrado.")
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Error al registrar usuario: {e}")
                 else:
@@ -1128,9 +1164,11 @@ def render_chat():
             )
             if st.button("Eliminar Usuario ❌", use_container_width=True):
                 try:
-                    supabase.table("usuarios").delete().eq("nombre", usr_borrar).execute()
-                    st.success(f"Usuario '{usr_borrar}' eliminado.")
-                    st.rerun()
+                    _admin = _db_admin()
+                    if _admin is not None:
+                        _admin.table("usuarios").delete().eq("nombre", usr_borrar).execute()
+                        st.success(f"Usuario '{usr_borrar}' eliminado.")
+                        st.rerun()
                 except Exception as e:
                     st.error(f"Error al eliminar: {e}")
 
@@ -1143,9 +1181,11 @@ def render_chat():
                 c_clean = re.sub(r"[^a-zA-Z0-9_]", "", nuevo_canal.strip().lower())
                 if c_clean:
                     try:
-                        supabase.table("canales").insert({"nombre": c_clean}).execute()
-                        st.success(f"Canal #{c_clean.upper()} creado.")
-                        st.rerun()
+                        _admin = _db_admin()
+                        if _admin is not None:
+                            _admin.table("canales").insert({"nombre": c_clean}).execute()
+                            st.success(f"Canal #{c_clean.upper()} creado.")
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Error al crear canal: {e}")
 
@@ -1153,10 +1193,12 @@ def render_chat():
             canal_borrar = st.selectbox("Canal a eliminar:", canales_existentes, key="sb_borrar_canal")
             if st.button("Eliminar Canal ❌", use_container_width=True):
                 try:
-                    supabase.table("canales").delete().eq("nombre", canal_borrar.lower()).execute()
-                    supabase.table("mensajes").delete().eq("canal", canal_borrar.lower()).execute()
-                    st.success(f"Canal #{canal_borrar.upper()} eliminado.")
-                    st.rerun()
+                    _admin = _db_admin()
+                    if _admin is not None:
+                        _admin.table("canales").delete().eq("nombre", canal_borrar.lower()).execute()
+                        _admin.table("mensajes").delete().eq("canal", canal_borrar.lower()).execute()
+                        st.success(f"Canal #{canal_borrar.upper()} eliminado.")
+                        st.rerun()
                 except Exception as e:
                     st.error(f"Error al eliminar canal: {e}")
 
@@ -1165,9 +1207,11 @@ def render_chat():
         if st.checkbox("⚠️ Confirmar borrado completo de mensajes", key="chk_wipe_all"):
             if st.button("BORRAR TODOS LOS MENSAJES 🗑️", type="primary", use_container_width=True):
                 try:
-                    supabase.table("mensajes").delete().neq("id", 0).execute()
-                    st.success("Toda la base de datos de mensajes ha sido vaciada.")
-                    st.rerun()
+                    _admin = _db_admin()
+                    if _admin is not None:
+                        _admin.table("mensajes").delete().neq("id", 0).execute()
+                        st.success("Toda la base de datos de mensajes ha sido vaciada.")
+                        st.rerun()
                 except Exception as e:
                     st.error(f"Error al purgar: {e}")
 
