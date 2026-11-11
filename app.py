@@ -166,7 +166,6 @@ CATALOGO_MAESTRO = {
 MAPA_UTB_DEL = {utb: dl for dl, lista in CATALOGO_MAESTRO.items() for utb in lista}
 
 # --- 1.6 INVENTARIO MAESTRO () ---
-# --- 1.6 INVENTARIO MAESTRO () ---
 STOCK_INICIAL = [
     {"ID": "MAT-01", "Material": "FOTOCELDA 220V", "Stock": 100, "Min": 10, "Unidad": "Piezas"},
     {"ID": "MAT-02", "Material": "CABLE 2+1 # 6 BOBINA DE 300", "Stock": 100, "Min": 10, "Unidad": "Metros"},
@@ -1983,7 +1982,7 @@ else:
 
                 # --- GENERADOR DE DOCUMENTO PDF (ADAPTATIVO Y DINÁMICO) ---
                 if motor_pdf_listo:
-                    import tempfile, os, zipfile, re
+                    import tempfile, zipfile
 
                     fmt_pdf = 'Letter' if "Carta" in formato_hoja_of else 'Legal'
                     page_h = 279.4 if fmt_pdf == 'Letter' else 355.6
@@ -2141,7 +2140,6 @@ else:
                     import docx
                     from docx.shared import Pt, Inches
                     from docx.enum.text import WD_ALIGN_PARAGRAPH
-                    import io, os
 
                     if "Plantilla" in tipo_membrete_of and os.path.exists("oficiossf.docx"):
                         doc_of = docx.Document("oficiossf.docx")
@@ -2589,7 +2587,7 @@ else:
 
             # --- GENERADOR DE DOCUMENTO PDF (BANNER COMPLETO Y MARGEN DE IMPRESIÓN FÍSICA) ---
             if motor_pdf_listo:
-                import tempfile, os, zipfile, re
+                import tempfile, zipfile
 
                 X_START = 18.0
                 W_TOTAL = 180.0
@@ -2810,7 +2808,6 @@ else:
                 from docx.enum.table import WD_TABLE_ALIGNMENT
                 from docx.oxml import parse_xml
                 from docx.oxml.ns import nsdecls
-                import io, os
 
                 if "Plantilla" in tipo_membrete and os.path.exists("oficiossf.docx"):
                     doc_j = docx.Document("oficiossf.docx")
@@ -3109,7 +3106,6 @@ else:
                 col.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 10px; border-radius: 10px; border-left: 5px solid {colr};'><b style='font-size: 11px;'>{label}</b><br><span style='font-size: 18px;'>{val}</span></div>", unsafe_allow_html=True)
 
             out = io.BytesIO()
-            from openpyxl.styles import PatternFill
             yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
             with pd.ExcelWriter(out, engine='openpyxl') as w:
